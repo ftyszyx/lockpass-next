@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { localeLabels, locales, messages, type Locale } from '../../i18n'
-import { fallbackDownload, loadWindowsDownload, updateFeedHref } from '../../site'
+import { loadWindowsDownload, updateFeedHref } from '../../site'
 
 export function getStaticPaths() {
   return locales.map((locale) => ({ params: { locale } }))
@@ -172,7 +172,7 @@ const screenshots = [
   <script
     is:inline
     define:vars={{
-      fallbackDownload,
+      fallbackDownload: download,
       updateFeedHref
     }}
   >
@@ -195,7 +195,7 @@ const screenshots = [
       }
     }
 
-    fetch(updateFeedHref)
+    fetch(`${updateFeedHref}?t=${Date.now()}`)
       .then((response) => (response.ok ? response.json() : null))
       .then((manifest) => {
         const href = manifest?.platforms?.['windows-x86_64']?.url
@@ -208,8 +208,6 @@ const screenshots = [
           href
         })
       })
-      .catch(() => {
-        applyDownload(fallbackDownload)
-      })
+      .catch(() => {})
   </script>
 </BaseLayout>

@@ -26,6 +26,8 @@ DEFAULT_DIST_DIR = ROOT / "tools" / "dist" / "pc_release"
 DEFAULT_KEY_PATH = Path.home() / ".tauri" / "lockpass.key"
 DEFAULT_PLATFORM = "windows-x86_64"
 DEFAULT_PUBLIC_BASE_URL = "https://updates.lockpass.example.com"
+IMMUTABLE_ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable"
+LATEST_JSON_CACHE_CONTROL = "no-cache"
 
 
 @dataclass(frozen=True)
@@ -222,16 +224,31 @@ def upload_to_oss(
     public_read = parse_bool(env.get("OSS_PUBLIC_READ", "true"))
 
     uploads = [
-        (artifact.installer_path, normalize_key(join_key(asset_prefix, artifact.installer_path.name)), False),
-        (artifact.signature_path, normalize_key(join_key(asset_prefix, artifact.signature_path.name)), False),
-        (artifact.latest_json_path, latest_key, True),
+        (
+            artifact.installer_path,
+            normalize_key(join_key(asset_prefix, artifact.installer_path.name)),
+            False,
+            IMMUTABLE_ASSET_CACHE_CONTROL,
+        ),
+        (
+            artifact.signature_path,
+            normalize_key(join_key(asset_prefix, artifact.signature_path.name)),
+            False,
+            IMMUTABLE_ASSET_CACHE_CONTROL,
+        ),
+        (
+            artifact.latest_json_path,
+            latest_key,
+            True,
+            LATEST_JSON_CACHE_CONTROL,
+        ),
     ]
 
     print(f"OSS bucket: {bucket_name}")
     print(f"OSS endpoint: {endpoint}")
     if dry_run:
-        for source, key, _allow_overwrite in uploads:
-            print(f"Upload {source} -> oss://{bucket_name}/{key}")
+        for source, key, _allow_overwrite, cache_control in uploads:
+            print(f"Upload {source} -> oss://{bucket_name}/{key} Cache-Control={cache_control}")
         return
 
     try:
@@ -243,11 +260,11 @@ def upload_to_oss(
     key_secret = required_env(env, "OSS_ACCESS_KEY_SECRET")
     bucket = oss2.Bucket(oss2.Auth(key_id, key_secret), endpoint, bucket_name)
 
-    for source, key, allow_overwrite in uploads:
+    for source, key, allow_overwrite, cache_control in uploads:
         print(f"Upload {source} -> oss://{bucket_name}/{key}")
         if bucket.object_exists(key) and not (overwrite or allow_overwrite):
             raise SystemExit(f"OSS object already exists: {key}. Use --overwrite to replace it.")
-        bucket.put_object_from_file(key, str(source))
+        bucket.put_object_from_file(key, str(source), headers={"Cache-Control": cache_control})
         if public_read:
             bucket.put_object_acl(key, oss2.OBJECT_ACL_PUBLIC_READ)
 

@@ -8,3 +8,8 @@
 Copy-Item tools/pc_release.env.example tools/pc_release.env
 python tools/pc_release.py --upload
 ```
+
+上传到 OSS 时脚本会设置缓存策略：
+
+- 安装包和 `.sig`：`Cache-Control: public, max-age=31536000, immutable`
+- `latest.json`：`Cache-Control: no-cache`

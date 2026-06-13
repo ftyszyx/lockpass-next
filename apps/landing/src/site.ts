@@ -21,7 +21,7 @@ export const fallbackDownload: DesktopDownload = {
 
 export async function loadWindowsDownload(): Promise<DesktopDownload> {
   try {
-    const response = await fetch(updateFeedHref)
+    const response = await fetch(updateFeedUrlWithTimestamp())
     if (!response.ok) return fallbackDownload
     return parseWindowsDownload(await response.json())
   } catch {
@@ -50,4 +50,10 @@ function fileNameFromUrl(value: string): string {
   } catch {
     return fallbackDownload.fileName
   }
+}
+
+export function updateFeedUrlWithTimestamp(): string {
+  const url = new URL(updateFeedHref)
+  url.searchParams.set('t', String(Date.now()))
+  return url.toString()
 }
