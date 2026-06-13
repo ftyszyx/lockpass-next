@@ -40,6 +40,7 @@ pub fn router(state: AppState) -> Router {
 }
 
 fn cors_layer(state: &AppState) -> CorsLayer {
+    #[cfg_attr(not(debug_assertions), allow(unused_mut))]
     let mut origins = state
         .config
         .cors_origin
@@ -77,6 +78,7 @@ fn cors_layer(state: &AppState) -> CorsLayer {
         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
 }
 
+#[cfg(debug_assertions)]
 fn default_dev_cors_origins() -> [HeaderValue; 9] {
     [
         HeaderValue::from_static("http://127.0.0.1:1432"),

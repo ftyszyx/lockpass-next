@@ -1,7 +1,7 @@
-name: footdatalab
+name: lockpass
 services:
   server:
-    image: ftyszyx752/footballdata:latest
+    image: ftyszyx752/lockpass:latest
     env_file:
       - .env
     ports:

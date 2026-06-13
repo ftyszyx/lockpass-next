@@ -1,0 +1,8 @@
+.env
+.env.*
+target/
+crates/*/target/
+*.log
+*.db
+*.sqlite
+*.sqlite3

@@ -1,7 +1,7 @@
 FROM rust:1.88-bookworm AS builder
 
 ARG APP_VERSION=0.1.0
-ARG APP_IMAGE_NAME=footdatalab-server
+ARG APP_IMAGE_NAME=ftyszyx752/lockpass
 ARG APP_IMAGE_TAG=0.1.0
 ARG APP_GIT_COMMIT=unknown
 ARG APP_BUILD_TIME=unknown
@@ -29,11 +29,10 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY --from=builder /app/target/release/footdatalab-server /usr/local/bin/footdatalab-server
+COPY --from=builder /app/target/release/lockpass-sync-server /usr/local/bin/lockpass-sync-server
 COPY --from=builder /app/migrations /app/migrations
 
-ENV BIND_ADDR=0.0.0.0:8080
-ENV MIGRATIONS_DIR=/app/migrations
+ENV LOCKPASS_SERVER_ADDR=0.0.0.0:8080
 EXPOSE 8080
 
-CMD ["footdatalab-server"]
+CMD ["lockpass-sync-server"]
