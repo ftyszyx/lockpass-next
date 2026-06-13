@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LockPass 初始化流程原型</title>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f8fb;
+        --panel: #ffffff;
+        --line: #dfe5ea;
+        --text: #111827;
+        --muted: #637083;
+        --faint: #8a96a8;
+        --teal: #0f766e;
+        --teal-soft: #e7f5f2;
+        --amber: #b76e00;
+        --amber-soft: #fff5df;
+        --rose: #b4233a;
+        --rose-soft: #ffe7eb;
+        --shadow: 0 22px 60px rgba(15, 23, 42, 0.12);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", "Microsoft YaHei", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          linear-gradient(180deg, rgba(231, 245, 242, 0.78), rgba(246, 248, 251, 0.2)),
+          var(--bg);
+        color: var(--text);
+        font-size: 14px;
+      }
+
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        border: 0;
+      }
+
+      .shell {
+        display: grid;
+        min-height: 100vh;
+        grid-template-columns: minmax(260px, 330px) minmax(360px, 1fr);
+      }
+
+      .flow-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        border-right: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.7);
+        padding: 24px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 900;
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 40px;
+        height: 40px;
+        place-items: center;
+        border-radius: 8px;
+        background: #10201e;
+        color: #ffffff;
+      }
+
+      .flow-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .flow-step {
+        display: grid;
+        min-height: 48px;
+        grid-template-columns: 28px minmax(0, 1fr);
+        align-items: center;
+        gap: 10px;
+        border-radius: 8px;
+        padding: 8px;
+        color: var(--muted);
+      }
+
+      .flow-step.active {
+        background: var(--teal-soft);
+        color: #0f3f3b;
+      }
+
+      .step-dot {
+        display: grid;
+        width: 28px;
+        height: 28px;
+        place-items: center;
+        border-radius: 999px;
+        background: #eef2f7;
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .flow-step.active .step-dot {
+        background: var(--teal);
+        color: #ffffff;
+      }
+
+      .note {
+        margin-top: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 12px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .stage {
+        display: grid;
+        place-items: center;
+        padding: 36px;
+      }
+
+      .card {
+        display: grid;
+        width: min(100%, 500px);
+        gap: 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 24px;
+        box-shadow: var(--shadow);
+      }
+
+      .card.compact {
+        width: min(100%, 420px);
+      }
+
+      .top-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 24px;
+        line-height: 1.2;
+      }
+
+      h2 {
+        font-size: 20px;
+        line-height: 1.25;
+      }
+
+      p {
+        color: var(--muted);
+        line-height: 1.65;
+      }
+
+      .action-grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .action-card {
+        display: grid;
+        min-height: 84px;
+        grid-template-columns: 36px minmax(0, 1fr);
+        align-items: center;
+        gap: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 14px;
+        color: var(--text);
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .action-card.primary {
+        border-color: #b8e1dc;
+        background: var(--teal-soft);
+      }
+
+      .action-card:hover {
+        border-color: #8bcac3;
+      }
+
+      .action-icon {
+        display: grid;
+        width: 36px;
+        height: 36px;
+        place-items: center;
+        border-radius: 8px;
+        background: #f1f5f9;
+        color: #0f766e;
+      }
+
+      .action-card strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 16px;
+      }
+
+      .action-card span:last-child {
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .form-grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .field {
+        display: grid;
+        gap: 6px;
+        color: var(--muted);
+        font-weight: 700;
+      }
+
+      .input {
+        width: 100%;
+        min-height: 44px;
+        border: 1px solid #cfd8e3;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 10px 12px;
+        color: var(--text);
+        outline: none;
+      }
+
+      textarea.input {
+        min-height: 112px;
+        resize: vertical;
+        font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+        line-height: 1.6;
+      }
+
+      .input:focus {
+        border-color: var(--teal);
+        box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
+      }
+
+      .button-row {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+      }
+
+      .button {
+        display: inline-flex;
+        min-height: 40px;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border-radius: 8px;
+        background: #f3f6f8;
+        padding: 0 14px;
+        color: var(--text);
+        font-weight: 800;
+        cursor: pointer;
+      }
+
+      .button.primary {
+        background: var(--teal);
+        color: #ffffff;
+      }
+
+      .button:disabled {
+        cursor: not-allowed;
+        opacity: 0.56;
+      }
+
+      .recovery-box {
+        display: grid;
+        gap: 12px;
+        border: 1px solid #f0d49a;
+        border-radius: 8px;
+        background: var(--amber-soft);
+        padding: 14px;
+      }
+
+      .recovery-key {
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 12px;
+        color: #0f172a;
+        font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+        font-weight: 800;
+        line-height: 1.7;
+        overflow-wrap: anywhere;
+      }
+
+      .qr-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 128px;
+        gap: 12px;
+        align-items: start;
+      }
+
+      .qr {
+        display: grid;
+        width: 128px;
+        aspect-ratio: 1;
+        place-items: center;
+        border: 1px solid #f0d49a;
+        border-radius: 8px;
+        background:
+          linear-gradient(90deg, #111827 8px, transparent 8px) 0 0 / 24px 24px,
+          linear-gradient(#111827 8px, transparent 8px) 0 0 / 24px 24px,
+          #ffffff;
+        color: #111827;
+        font-size: 12px;
+        font-weight: 900;
+        text-align: center;
+      }
+
+      .success {
+        border: 1px solid #b8e1dc;
+        border-radius: 8px;
+        background: var(--teal-soft);
+        padding: 12px;
+        color: #0f3f3b;
+        font-weight: 800;
+      }
+
+      .error {
+        border: 1px solid #fecdd3;
+        border-radius: 8px;
+        background: var(--rose-soft);
+        padding: 10px 12px;
+        color: var(--rose);
+        font-weight: 800;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      @media (max-width: 860px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
+
+        .flow-panel {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .note {
+          margin-top: 0;
+        }
+
+        .stage {
+          padding: 20px;
+        }
+
+        .qr-row {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <aside class="flow-panel" aria-label="初始化流程">
+        <div class="brand">
+          <div class="brand-mark"><i data-lucide="lock-keyhole"></i></div>
+          <div>
+            LockPass Next
+            <small style="display: block; color: var(--muted); font-weight: 700">初始化流程原型</small>
+          </div>
+        </div>
+
+        <div class="flow-list">
+          <div class="flow-step active" data-step="entry">
+            <span class="step-dot">1</span>
+            <span><strong>入口选择</strong><small style="display: block">新用户或已有用户</small></span>
+          </div>
+          <div class="flow-step" data-step="new-account">
+            <span class="step-dot">2A</span>
+            <span><strong>新用户创建</strong><small style="display: block">创建账号并生成恢复密钥</small></span>
+          </div>
+          <div class="flow-step" data-step="existing-recovery">
+            <span class="step-dot">2B</span>
+            <span><strong>已有用户恢复</strong><small style="display: block">主密码 + 恢复密钥</small></span>
+          </div>
+        </div>
+
+        <div class="note">
+          这个文件只整理初始化体验，不承载完整桌面功能。恢复密钥不上传服务器；新用户由客户端生成。已有用户恢复和旧设备二维码迁移是协议预留流程，需同步服务完整接入后才可用。
+        </div>
+      </aside>
+
+      <section class="stage">
+        <div class="card compact" id="screenEntry">
+          <div class="top-row">
+            <h1>你是新用户还是已有用户？</h1>
+          </div>
+          <div class="action-grid">
+            <button class="action-card primary" type="button" data-open="new-create">
+              <span class="action-icon"><i data-lucide="user-plus"></i></span>
+              <span>
+                <strong>我是新用户</strong>
+                <span>创建新用户，并生成恢复密钥。</span>
+              </span>
+            </button>
+            <button class="action-card" type="button" data-open="existing-unlock">
+              <span class="action-icon"><i data-lucide="cloud"></i></span>
+              <span>
+                <strong>我是已有用户</strong>
+                <span>输入主密码和恢复密钥；完整恢复待同步服务接入。</span>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div class="card hidden" id="screenNewCreate">
+          <button class="button" type="button" data-open="entry" style="justify-self: start">
+            <i data-lucide="arrow-left"></i>
+            返回上一步
+          </button>
+          <h1>创建新用户</h1>
+          <div class="form-grid">
+            <label class="field">
+              用户名
+              <input class="input" id="newUsername" placeholder="例如 zhangsan" autocomplete="username" />
+            </label>
+            <label class="field">
+              主密码
+              <input class="input" id="newPassword" type="password" autocomplete="new-password" />
+            </label>
+            <label class="field">
+              确认主密码
+              <input class="input" id="newPasswordConfirm" type="password" autocomplete="new-password" />
+            </label>
+            <p class="error hidden" id="newUserError">请补全信息。</p>
+          </div>
+          <div class="button-row">
+            <button class="button primary" type="button" id="createUser">
+              <i data-lucide="save"></i>
+              创建并生成恢复密钥
+            </button>
+          </div>
+        </div>
+
+        <div class="card hidden" id="screenNewRecovery">
+          <button class="button" type="button" data-open="new-create" style="justify-self: start">
+            <i data-lucide="arrow-left"></i>
+            返回上一步
+          </button>
+          <h1>保存恢复密钥</h1>
+          <div class="recovery-box">
+            <div class="success">
+              已保存到这台受信任设备；请再离线保存一份。
+            </div>
+            <div class="recovery-key" id="generatedRecoveryKey">LP-N7QF-K2VA-P9HM-8CDR-T4ZX-M6LY</div>
+          </div>
+          <label class="field" style="grid-template-columns: 20px minmax(0, 1fr); align-items: center">
+            <input id="savedOffline" type="checkbox" />
+            我已离线保存恢复密钥
+          </label>
+          <div class="button-row">
+            <button class="button primary" type="button" id="finishNewUser" disabled>
+              <i data-lucide="check"></i>
+              进入保险库
+            </button>
+          </div>
+        </div>
+
+        <div class="card hidden" id="screenExistingUnlock">
+          <button class="button" type="button" data-open="entry" style="justify-self: start">
+            <i data-lucide="arrow-left"></i>
+            返回上一步
+          </button>
+          <h1>已有用户恢复（预留）</h1>
+          <div class="form-grid">
+            <label class="field">
+              主密码
+              <input class="input" id="existingPassword" type="password" autocomplete="current-password" />
+            </label>
+            <label class="field">
+              恢复密钥
+              <textarea class="input" id="existingRecoveryKey" placeholder="输入恢复密钥，或扫描旧设备二维码后自动填入" spellcheck="false"></textarea>
+            </label>
+          </div>
+          <div class="button-row">
+            <button class="button" type="button" id="scanRecoveryQr">
+              <i data-lucide="scan-line"></i>
+              扫描二维码
+            </button>
+            <button class="button primary" type="button" id="recoverVault">
+              <i data-lucide="unlock"></i>
+              恢复并解锁
+            </button>
+          </div>
+        </div>
+
+        <div class="card hidden" id="screenOldDeviceExport">
+          <button class="button" type="button" data-open="existing-unlock" style="justify-self: start">
+            <i data-lucide="arrow-left"></i>
+            返回上一步
+          </button>
+          <h1>旧设备导出恢复密钥（预留）</h1>
+          <div class="qr-row">
+            <div class="recovery-box">
+              <div class="recovery-key">LP-N7QF-K2VA-P9HM-8CDR-T4ZX-M6LY</div>
+              <p>新设备迁移二维码是预留流程；当前只表达恢复密钥的输入形态。</p>
+            </div>
+            <div class="qr">QR<br />恢复密钥</div>
+          </div>
+          <div class="button-row">
+            <button class="button primary" type="button" data-open="existing-unlock">
+              <i data-lucide="check"></i>
+              新设备已获取
+            </button>
+          </div>
+        </div>
+
+        <div class="card compact hidden" id="screenDone">
+          <div class="success">保险库已解锁</div>
+          <h1>初始化完成</h1>
+          <p>后续进入桌面端主界面。</p>
+          <button class="button primary" type="button" data-open="entry">
+            <i data-lucide="rotate-ccw"></i>
+            重新查看流程
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const screens = {
+        entry: "screenEntry",
+        "new-create": "screenNewCreate",
+        "new-recovery": "screenNewRecovery",
+        "existing-unlock": "screenExistingUnlock",
+        "old-device-export": "screenOldDeviceExport",
+        done: "screenDone"
+      }
+
+      const stepByScreen = {
+        entry: "entry",
+        "new-create": "new-account",
+        "new-recovery": "new-account",
+        "existing-unlock": "existing-recovery",
+        "old-device-export": "existing-recovery",
+        done: "entry"
+      }
+
+      function $(selector) {
+        return document.querySelector(selector)
+      }
+
+      function showScreen(name) {
+        Object.values(screens).forEach((id) => document.getElementById(id).classList.add("hidden"))
+        document.getElementById(screens[name]).classList.remove("hidden")
+        document.querySelectorAll(".flow-step").forEach((step) => {
+          step.classList.toggle("active", step.dataset.step === stepByScreen[name])
+        })
+      }
+
+      function generateRecoveryKey() {
+        const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+        const bytes = new Uint8Array(24)
+        crypto.getRandomValues(bytes)
+        const text = Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("")
+        return `LP-${text.match(/.{1,4}/g).join("-")}`
+      }
+
+      document.querySelectorAll("[data-open]").forEach((button) => {
+        button.addEventListener("click", () => showScreen(button.dataset.open))
+      })
+
+      $("#createUser").addEventListener("click", () => {
+        const username = $("#newUsername").value.trim()
+        const password = $("#newPassword").value
+        const confirm = $("#newPasswordConfirm").value
+        const error = $("#newUserError")
+        let message = ""
+
+        if (!username) message = "请输入用户名。"
+        else if (password.length < 8) message = "主密码至少需要 8 位。"
+        else if (password !== confirm) message = "两次输入的主密码不一致。"
+
+        if (message) {
+          error.textContent = message
+          error.classList.remove("hidden")
+          return
+        }
+
+        error.classList.add("hidden")
+        $("#generatedRecoveryKey").textContent = generateRecoveryKey()
+        $("#savedOffline").checked = false
+        $("#finishNewUser").disabled = true
+        showScreen("new-recovery")
+      })
+
+      $("#savedOffline").addEventListener("change", (event) => {
+        $("#finishNewUser").disabled = !event.target.checked
+      })
+
+      $("#finishNewUser").addEventListener("click", () => showScreen("done"))
+
+      $("#scanRecoveryQr").addEventListener("click", () => {
+        $("#existingRecoveryKey").value = "LP-N7QF-K2VA-P9HM-8CDR-T4ZX-M6LY"
+        showScreen("old-device-export")
+      })
+
+      $("#recoverVault").addEventListener("click", () => {
+        if (!$("#existingPassword").value || !$("#existingRecoveryKey").value.trim()) return
+        alert("已有用户恢复需要同步服务接入后完成。")
+      })
+
+      lucide.createIcons()
+    </script>
+  </body>
+</html>

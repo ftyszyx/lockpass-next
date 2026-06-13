@@ -1,0 +1,131 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Microsoft YaHei", sans-serif;
+  text-rendering: geometricPrecision;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 980px;
+  min-height: 100vh;
+  overflow: hidden;
+  background: #f7f8fa;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  border: 0;
+}
+
+@layer components {
+  .plain-button {
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 hover:border-slate-300 hover:bg-slate-50;
+  }
+
+  .primary-button {
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-teal-700 bg-teal-700 px-3 text-sm font-semibold text-white shadow-sm shadow-teal-900/10 hover:bg-teal-800;
+  }
+
+  .danger-button {
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-rose-600 bg-rose-600 px-3 text-sm font-semibold text-white shadow-sm shadow-rose-900/10 hover:bg-rose-700 disabled:cursor-not-allowed disabled:border-rose-200 disabled:bg-rose-200;
+  }
+
+  .icon-button {
+    @apply inline-flex size-9 items-center justify-center rounded-lg border border-transparent bg-transparent text-slate-600 hover:border-slate-200 hover:bg-white hover:text-slate-950;
+  }
+
+  .mini-button {
+    @apply inline-flex size-7 items-center justify-center rounded-lg border border-transparent text-slate-500 hover:border-slate-200 hover:bg-white hover:text-teal-700;
+  }
+
+  .nav-button {
+    @apply flex h-9 w-full items-center justify-between gap-2 rounded-lg px-2 text-left text-sm text-slate-700 hover:bg-white hover:text-slate-950;
+  }
+
+  .form-label {
+    @apply grid gap-2 text-xs font-bold text-slate-500;
+  }
+
+  .required-mark {
+    @apply ml-1 font-black text-rose-600;
+  }
+
+  .form-input {
+    @apply min-h-9 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-950 outline-none focus:border-teal-700 focus:ring-4 focus:ring-teal-700/10;
+  }
+
+  .check {
+    @apply flex min-h-9 items-center gap-2 rounded-lg border border-slate-200 px-2 text-sm;
+  }
+
+  .action-card {
+    @apply grid min-h-14 grid-cols-[34px_minmax(0,1fr)] items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left hover:border-slate-300 hover:bg-slate-50;
+  }
+
+  .action-card small,
+  .setting-row small {
+    @apply block text-xs font-normal text-slate-500;
+  }
+
+  .action-icon {
+    @apply grid size-9 place-items-center rounded-lg bg-slate-100 text-teal-700;
+  }
+
+  .setting-row {
+    @apply flex min-h-14 items-center justify-between gap-4 border-b border-slate-200 py-2 last:border-b-0;
+  }
+
+  .file-icon {
+    @apply grid size-9 place-items-center rounded-lg bg-slate-100 text-xs font-black text-slate-600;
+  }
+
+  .resize-handle {
+    @apply relative h-full cursor-col-resize bg-[#f7f8fa] outline-none;
+    touch-action: none;
+  }
+
+  .resize-handle::before {
+    position: absolute;
+    inset: 0 auto 0 50%;
+    width: 1px;
+    content: "";
+    background: rgb(226 232 240);
+    transform: translateX(-50%);
+  }
+
+  .resize-handle::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 3px;
+    height: 40px;
+    content: "";
+    border-radius: 999px;
+    background: transparent;
+    transform: translate(-50%, -50%);
+    transition:
+      background 120ms ease,
+      height 120ms ease;
+  }
+
+  .resize-handle:hover::after,
+  .resize-handle:focus-visible::after,
+  .resize-handle[data-active="true"]::after {
+    height: 56px;
+    background: rgb(15 118 110);
+  }
+}

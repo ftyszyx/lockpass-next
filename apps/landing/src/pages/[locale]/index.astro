@@ -1,0 +1,172 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { localeLabels, locales, messages, type Locale } from '../../i18n'
+import { downloadConfig } from '../../site'
+
+export function getStaticPaths() {
+  return locales.map((locale) => ({ params: { locale } }))
+}
+
+const locale = Astro.params.locale as Locale
+const t = messages[locale]
+const alternateLocale: Locale = locale === 'zh-CN' ? 'en-US' : 'zh-CN'
+const alternateHref = `/${alternateLocale}/`
+const currentYear = new Date().getFullYear()
+const download = downloadConfig.windows
+const screenshots = [
+  {
+    src: '/screenshots/desktop-vault.png',
+    alt: t.screenshotSection.items[0].title,
+    ...t.screenshotSection.items[0]
+  },
+  {
+    src: '/screenshots/desktop-settings.png',
+    alt: t.screenshotSection.items[1].title,
+    ...t.screenshotSection.items[1]
+  }
+]
+---
+
+<BaseLayout locale={locale} title={t.meta.title} description={t.meta.description}>
+  <header class="site-header" aria-label="LockPass">
+    <a class="brand" href={`/${locale}/`} aria-label="LockPass">
+      <span class="brand-mark" aria-hidden="true">L</span>
+      <span>LockPass</span>
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="#features">{t.nav.features}</a>
+      <a href="#workflow">{t.nav.workflow}</a>
+      <a href={download.href}>{t.nav.download}</a>
+      <a href="#guide">{t.nav.guide}</a>
+    </nav>
+    <a class="language-link" href={alternateHref} aria-label={localeLabels[alternateLocale]}>
+      {t.nav.language}
+    </a>
+  </header>
+
+  <main>
+    <section class="hero">
+      <img class="hero-preview" src="/screenshots/desktop-vault.png" alt="" aria-hidden="true" />
+      <div class="hero-overlay"></div>
+      <div class="hero-content">
+        <p class="eyebrow">{t.hero.eyebrow}</p>
+        <h1>{t.hero.title}</h1>
+        <p class="hero-subtitle">{t.hero.subtitle}</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href={download.href}>{t.hero.primaryCta}</a>
+          <a class="button button-secondary" href="#guide">{t.hero.secondaryCta}</a>
+        </div>
+        <div class="hero-meta" aria-label={t.hero.platformNote}>
+          <span>{t.hero.versionPrefix} {download.version}</span>
+          <span>{t.hero.platformNote}</span>
+        </div>
+        <ul class="trust-list" aria-label={t.featureSection.eyebrow}>
+          {t.hero.trustItems.map((item) => <li>{item}</li>)}
+        </ul>
+      </div>
+    </section>
+
+    <section id="features" class="section">
+      <div class="section-heading">
+        <p class="eyebrow">{t.featureSection.eyebrow}</p>
+        <h2>{t.featureSection.title}</h2>
+        <p>{t.featureSection.intro}</p>
+      </div>
+      <div class="feature-grid">
+        {
+          t.featureSection.items.map((item) => (
+            <article class="feature-card">
+              <span class="feature-icon" aria-hidden="true"></span>
+              <h3>{item.title}</h3>
+              <p>{item.body}</p>
+            </article>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="section screenshot-section">
+      <div class="section-heading">
+        <p class="eyebrow">{t.screenshotSection.eyebrow}</p>
+        <h2>{t.screenshotSection.title}</h2>
+        <p>{t.screenshotSection.intro}</p>
+      </div>
+      <div class="screenshot-grid">
+        {
+          screenshots.map((screenshot) => (
+            <article class="screenshot-card">
+              <a class="screenshot-frame" href={screenshot.src}>
+                <img src={screenshot.src} alt={screenshot.alt} loading="lazy" />
+              </a>
+              <div>
+                <h3>{screenshot.title}</h3>
+                <p>{screenshot.body}</p>
+              </div>
+            </article>
+          ))
+        }
+      </div>
+    </section>
+
+    <section id="workflow" class="section">
+      <div class="section-heading">
+        <p class="eyebrow">{t.workflowSection.eyebrow}</p>
+        <h2>{t.workflowSection.title}</h2>
+      </div>
+      <div class="steps">
+        {
+          t.workflowSection.steps.map((step, index) => (
+            <article class="step">
+              <span class="step-index">{String(index + 1).padStart(2, '0')}</span>
+              <div>
+                <h3>{step.title}</h3>
+                <p>{step.body}</p>
+              </div>
+            </article>
+          ))
+        }
+      </div>
+    </section>
+
+    <section id="guide" class="section guide-section">
+      <div class="section-heading">
+        <p class="eyebrow">{t.guideSection.eyebrow}</p>
+        <h2>{t.guideSection.title}</h2>
+      </div>
+      <ol class="guide-list">
+        {t.guideSection.items.map((item) => <li>{item}</li>)}
+      </ol>
+    </section>
+
+    <section class="section server-band">
+      <p class="eyebrow">{t.serverSection.eyebrow}</p>
+      <h2>{t.serverSection.title}</h2>
+      <p>{t.serverSection.body}</p>
+    </section>
+
+    <section class="section faq-section">
+      <div class="section-heading">
+        <p class="eyebrow">{t.faqSection.eyebrow}</p>
+        <h2>{t.faqSection.title}</h2>
+      </div>
+      <div class="faq-list">
+        {
+          t.faqSection.items.map((item) => (
+            <details>
+              <summary>{item.question}</summary>
+              <p>{item.answer}</p>
+            </details>
+          ))
+        }
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div>
+      <strong>{t.footer.product}</strong>
+      <p>{t.footer.tagline}</p>
+    </div>
+    <span>{currentYear} {t.footer.copyright}</span>
+  </footer>
+</BaseLayout>

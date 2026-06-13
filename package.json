@@ -1,0 +1,36 @@
+{
+  "name": "lockpass-next",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "server",
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run -w @lockpass/web dev",
+    "dev:desktop": "npm run -w @lockpass/desktop dev",
+    "dev:landing": "npm run -w @lockpass/landing dev",
+    "dev:mobile": "npm run -w @lockpass/mobile dev",
+    "dev:server": "npm run -w @lockpass/server dev",
+    "dev:server_web": "npm run -w @lockpass/server_web dev",
+    "build:web": "npm run -w @lockpass/web build",
+    "build:desktop": "npm run -w @lockpass/desktop build",
+    "build:landing": "npm run -w @lockpass/landing build",
+    "build:mobile": "npm run -w @lockpass/mobile build",
+    "build:server": "npm run -w @lockpass/server build",
+    "build:server_web": "npm run -w @lockpass/server_web build",
+    "check:server": "npm run -w @lockpass/server check",
+    "check:landing": "npm run -w @lockpass/landing typecheck",
+    "check:server_web": "npm run -w @lockpass/server_web typecheck",
+    "lint": "npm run -ws lint",
+    "typecheck": "npm run -ws typecheck"
+  },
+  "devDependencies": {
+    "typescript": "~5.6.0",
+    "@types/node": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,72 @@
+{
+  // 仍然指向 Tauri 的 JSON schema，编辑器可以继续提供字段提示。
+  $schema: '../node_modules/@tauri-apps/cli/config.schema.json',
+
+  // 产品名会影响安装包名称、系统安装信息和部分系统展示名称。
+  productName: 'LockPass',
+  version: '0.1.1',
+  identifier: 'com.lockpass.next',
+
+  build: {
+    // Tauri dev 会先启动桌面端 Vite 前端。
+    beforeDevCommand: 'npm run dev:frontend',
+    // Tauri build 会先执行前端类型检查和生产构建。
+    beforeBuildCommand: 'npm run build',
+    devUrl: 'http://127.0.0.1:1430',
+    frontendDist: '../dist',
+  },
+
+  app: {
+    windows: [
+      {
+        title: 'LockPass',
+        width: 1280,
+        height: 820,
+        minWidth: 980,
+        minHeight: 680,
+        resizable: true,
+      },
+    ],
+    security: {
+      csp: null,
+    },
+  },
+
+  bundle: {
+    active: true,
+    // 只生成 NSIS 安装包；应用内自动更新第一阶段使用 NSIS exe。
+    targets: 'nsis',
+    // 生成 updater 所需的签名文件。发布构建时必须设置签名私钥环境变量。
+    createUpdaterArtifacts: true,
+    icon: [
+      'icons/icon.ico',
+    ],
+    windows: {
+      nsis: {
+        languages: ['SimpChinese', 'English'],
+        displayLanguageSelector: true,
+      },
+    },
+  },
+
+  plugins: {
+    'deep-link': {
+      desktop: {
+        schemes: [
+          'lockpass',
+        ],
+      },
+    },
+    updater: {
+      // 公钥来自本机生成的 updater 签名密钥；私钥不要提交到仓库。
+      pubkey: 'dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE4NjgwNTIwQjY4REUyN0MKUldSODRvMjJJQVZvR0o5N0w2TkorcFBqaThJYmpGM2FqRWdFUVY2cmxxcy9oZkhoMW5qTFlIOXoK',
+      endpoints: [
+        'https://bytefuse.oss-cn-guangzhou.aliyuncs.com/lockpass/latest.json',
+      ],
+      windows: {
+        // passive 会显示安装进度，但尽量减少用户操作。
+        installMode: 'passive',
+      },
+    },
+  },
+}

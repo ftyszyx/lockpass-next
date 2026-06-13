@@ -1,0 +1,13 @@
+{
+  "name": "@lockpass/server",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "cargo run --manifest-path Cargo.toml",
+    "build": "cargo build --release --manifest-path Cargo.toml",
+    "check": "cargo check --manifest-path Cargo.toml",
+    "test": "cargo test --manifest-path Cargo.toml",
+    "lint": "cargo clippy --all-targets --manifest-path Cargo.toml -- -D warnings",
+    "fmt": "cargo fmt --manifest-path Cargo.toml"
+  }
+}

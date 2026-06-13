@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "paths": {
+      "@lockpass/core": ["./packages/core/src/index.ts"],
+      "@lockpass/crypto": ["./packages/crypto/src/index.ts"],
+      "@lockpass/db": ["./packages/db/src/index.ts"],
+      "@lockpass/ui": ["./packages/ui/src/index.ts"],
+      "@lockpass/sync-client": ["./packages/sync-client/src/index.ts"]
+    }
+  }
+}

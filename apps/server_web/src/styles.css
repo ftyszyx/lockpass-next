@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Microsoft YaHei", sans-serif;
+  text-rendering: geometricPrecision;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: #f6f8f9;
+  color: #17212b;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  border: 0;
+}
+
+@layer components {
+  .lp-button {
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .lp-button-primary {
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-teal-700 bg-teal-700 px-3 text-sm font-semibold text-white shadow-sm shadow-teal-900/10 hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .lp-button-danger {
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-white px-3 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .lp-icon-button {
+    @apply inline-flex size-9 items-center justify-center rounded-lg border border-transparent bg-transparent text-slate-600 hover:border-slate-200 hover:bg-white hover:text-slate-950;
+  }
+
+  .lp-panel {
+    @apply w-full rounded-lg border border-slate-200 bg-white;
+  }
+
+  .lp-panel-head {
+    @apply flex min-h-12 items-center justify-between gap-3 border-b border-slate-200 px-4;
+  }
+
+  .lp-panel-body {
+    @apply grid gap-3 p-4;
+  }
+
+  .lp-input {
+    @apply h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-950 outline-none focus:border-teal-700 focus:ring-4 focus:ring-teal-700/10;
+  }
+
+  .lp-label {
+    @apply grid gap-2 text-xs font-bold text-slate-500;
+  }
+
+  .lp-pill {
+    @apply inline-flex h-6 items-center gap-1 rounded-full bg-slate-100 px-2 text-xs font-bold text-slate-600;
+  }
+
+  .lp-pill-ok {
+    @apply bg-teal-50 text-teal-700;
+  }
+
+  .lp-pill-warn {
+    @apply bg-amber-50 text-amber-700;
+  }
+
+  .lp-pill-danger {
+    @apply bg-rose-50 text-rose-700;
+  }
+
+  .lp-row {
+    @apply grid min-h-14 grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-slate-200 bg-white p-2;
+  }
+
+  .lp-icon-tile {
+    @apply grid size-9 place-items-center rounded-lg bg-teal-50 text-sm font-black text-teal-700;
+  }
+
+  .lp-table-wrap {
+    @apply overflow-x-auto rounded-lg border border-slate-200 bg-white;
+  }
+
+  .lp-table {
+    @apply w-full border-collapse text-sm;
+  }
+
+  .lp-table thead {
+    @apply bg-slate-50 text-left text-xs font-black text-slate-500;
+  }
+
+  .lp-table th {
+    @apply px-3 py-3;
+  }
+
+  .lp-table td {
+    @apply border-t border-slate-200 px-3 py-3 align-top;
+  }
+}
