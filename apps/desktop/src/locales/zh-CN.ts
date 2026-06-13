@@ -396,6 +396,23 @@ const zhCN = {
     legacyImportTitle: '正在导入旧版 LockPass',
     legacyImportBody: '正在解密旧版备份并导入本机保险库。'
   },
+  update: {
+    availableTitle: '发现新版本',
+    availableBody: '当前版本 {currentVersion}，可更新到 {version}。',
+    forceTitle: '需要更新后继续使用',
+    forceBody: '当前版本 {currentVersion} 与新版本 {version} 存在兼容性变化，请先更新。',
+    install: '立即更新',
+    later: '稍后再说',
+    downloadingTitle: '正在下载更新',
+    downloadingBody: '正在下载新版安装包，请保持软件打开。',
+    downloadingProgress: '已下载 {percent}%',
+    downloadingProgressUnknown: '正在下载...',
+    installingTitle: '正在安装更新',
+    installingBody: '安装完成后 LockPass 会自动重启。',
+    installingProgress: '正在安装...',
+    failedTitle: '更新失败',
+    failedBody: '暂时无法完成更新，请稍后重试。'
+  },
   settings: {
     title: '设置',
     language: '界面语言',

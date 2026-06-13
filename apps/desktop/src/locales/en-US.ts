@@ -394,6 +394,23 @@ const enUS: LocaleMessages = {
     legacyImportTitle: 'Importing legacy LockPass',
     legacyImportBody: 'Decrypting the legacy backup and importing it into the local vault.'
   },
+  update: {
+    availableTitle: 'Update available',
+    availableBody: 'Current version {currentVersion}. Version {version} is available.',
+    forceTitle: 'Update required',
+    forceBody: 'Version {version} includes compatibility changes from {currentVersion}. Update before continuing.',
+    install: 'Update now',
+    later: 'Later',
+    downloadingTitle: 'Downloading update',
+    downloadingBody: 'Downloading the new installer. Keep LockPass open.',
+    downloadingProgress: '{percent}% downloaded',
+    downloadingProgressUnknown: 'Downloading...',
+    installingTitle: 'Installing update',
+    installingBody: 'LockPass will restart after the installation finishes.',
+    installingProgress: 'Installing...',
+    failedTitle: 'Update failed',
+    failedBody: 'The update could not be completed. Try again later.'
+  },
   settings: {
     title: 'Settings',
     language: 'Language',
