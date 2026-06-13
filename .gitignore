@@ -27,7 +27,6 @@ apps/mobile/ios/
 *.key
 *.vault
 .env
-.env.*
 .codex-logs/
 .codex/
 

@@ -56,6 +56,16 @@ npm run -w @lockpass/desktop tauri:build
 ```text
 apps/desktop/src-tauri/target/release/bundle/nsis/LockPass Next_0.1.0_x64-setup.exe
 ```
+
+正式发布推荐使用发布脚本，它会读取 `tools/pc_release.env`，注入桌面端官方服务器地址、updater 签名私钥，并生成/上传 `latest.json`：
+
+```bash
+Copy-Item tools/pc_release.env.example tools/pc_release.env
+python tools/pc_release.py --upload
+```
+
+其中 `VITE_LOCKPASS_OFFICIAL_SERVER_URL` 是官方网页登录地址，`VITE_LOCKPASS_OFFICIAL_API_URL` 是官方同步 API 地址；这两个值会在打包时写进桌面端前端代码。
+
 ## 本地开发
 
 ### 桌面端
@@ -81,7 +91,7 @@ VITE_LOCKPASS_OFFICIAL_API_URL=http://127.0.0.1:1480
 npm run dev:server
 ```
 
-服务端必须配置 `server/.env` 中的 `DATABASE_URL`。启动时会连接 PostgreSQL 并执行 `server/migrations` 下的迁移，不再提供兜底存储。
+服务端必须配置 `server/.env` 中的 `DATABASE_URL`。
 
 ### 服务器管理后台
 
