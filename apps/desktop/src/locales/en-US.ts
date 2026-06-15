@@ -92,6 +92,16 @@ const enUS: LocaleMessages = {
     backToVault: 'Back to vault',
     close: 'Close'
   },
+  logs: {
+    title: 'Runtime logs',
+    body: 'Use logs to troubleshoot sync, backup, import/export, and update issues. Logs do not record the master password, recovery key, device tokens, or item contents.',
+    refresh: 'Refresh',
+    copy: 'Copy logs',
+    loading: 'Reading logs...',
+    empty: 'No logs yet. Retry sync or switch the log level to Info, then check again.',
+    failed: 'Could not read logs.',
+    browserPreview: 'Browser preview cannot read local log files.'
+  },
   shortcuts: {
     title: 'Shortcuts',
     body: 'Click a shortcut field, then press the new key combination. Global shortcuts are checked against the system and other apps.',

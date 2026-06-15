@@ -37,6 +37,11 @@ export async function openLogDir(): Promise<string | null> {
   return invoke<string>('open_log_dir')
 }
 
+export async function readDesktopLog(maxBytes = 256 * 1024): Promise<string | null> {
+  if (!isTauriRuntime()) return null
+  return invoke<string>('read_desktop_log', { maxBytes })
+}
+
 async function writeLog(level: WritableLogLevel, message: string, metadata?: Record<string, unknown>): Promise<void> {
   if (!shouldWrite(level)) return
 
@@ -81,6 +86,12 @@ function sanitizeValue(value: unknown): unknown {
   if (typeof value === 'string') return value.length > 120 ? `${value.slice(0, 117)}...` : value
   if (typeof value === 'number' || typeof value === 'boolean' || value === null) return value
   if (Array.isArray(value)) return `[array:${value.length}]`
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: sanitizeValue(value.message)
+    }
+  }
   if (typeof value === 'object') return '[object]'
   return String(value)
 }

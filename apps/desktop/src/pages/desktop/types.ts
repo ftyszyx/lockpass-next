@@ -2,7 +2,7 @@ import type { VaultColor, VaultItemField, VaultItemType } from '@lockpass/core'
 import type { AttachmentDraft, SelectedType } from '@/stores/vault'
 
 export type DrawerName = 'generator' | 'sync' | null
-export type ManagementPageName = 'conflicts' | 'backup' | 'settings' | 'shortcuts' | 'system'
+export type ManagementPageName = 'conflicts' | 'backup' | 'settings' | 'shortcuts' | 'logs' | 'system'
 export type ModalName = 'item' | 'vault' | 'quick' | 'lock' | 'user' | 'recoveryKey' | 'removeUser' | 'switchUserConfirm' | 'deleteVaultConfirm' | null
 export type ResizeTarget = 'sidebar' | 'itemList'
 export type DetailTab = 'details' | 'history' | 'security'

@@ -472,6 +472,8 @@ export const useVaultStore = defineStore('vault', {
       await saveSyncDeviceToken(user.id, exchange.deviceToken)
       const client = new SyncApiClient(serverUrl)
       const syncSpace = await ensureSyncSpace(client, exchange.deviceToken, user.displayName || user.username)
+      await this.ensureAllVaultObjectsLoaded()
+      resetLoadedObjectsForNewSyncTarget(this.vaults, this.items, this.attachments, this.settings.deviceId)
       const now = new Date().toISOString()
       this.settings.sync = {
         mode,
@@ -486,6 +488,12 @@ export const useVaultStore = defineStore('vault', {
       }
       this.clearOfficialLoginState()
       await this.persist()
+      await logInfo('sync target bound', {
+        mode,
+        serverUrl,
+        syncSpaceId: syncSpace.id,
+        localObjects: this.vaults.length + this.items.length + this.attachments.length
+      })
     },
     async disconnectSync(): Promise<void> {
       if (this.activeUser) {
@@ -504,11 +512,15 @@ export const useVaultStore = defineStore('vault', {
       try {
         return await this.runSyncWithCurrentConnection()
       } catch (error) {
+        await logError('sync failed', {
+          ...syncErrorLogMetadata(error),
+          mode: this.settings.sync.mode,
+          serverUrl: syncServerUrlForSettings(this.settings.sync)
+        })
         if (isSyncConnectionInvalid(error)) {
           await this.markSyncConnectionInvalid()
           throw new Error('syncConnectionInvalid')
         }
-        await logError('sync failed', { error: error instanceof Error ? error.message : String(error) })
         throw error
       }
     },
@@ -534,6 +546,14 @@ export const useVaultStore = defineStore('vault', {
         ? { id: this.settings.sync.syncSpaceId }
         : await ensureSyncSpace(client, deviceToken, user.displayName || user.username)
       this.settings.sync.syncSpaceId = syncSpace.id
+
+      if (shouldResetLocalObjectsForInitialSync(this)) {
+        resetLoadedObjectsForNewSyncTarget(this.vaults, this.items, this.attachments, this.settings.deviceId)
+        await this.persist()
+        await logInfo('sync local objects reset for initial upload', {
+          localObjects: this.vaults.length + this.items.length + this.attachments.length
+        })
+      }
 
       if (shouldRepairEmptyLocalSyncState(this)) {
         const repairResult = await restoreFromSyncSnapshot({
@@ -592,12 +612,36 @@ export const useVaultStore = defineStore('vault', {
       let hasMore = true
       while (hasMore) {
         const pullResult = await client.pullSync(deviceToken, cursor, 200)
+        let skippedOtherSpaces = 0
         for (const event of pullResult.events) {
+          if (event.syncSpaceId !== syncSpace.id) {
+            skippedOtherSpaces += 1
+            continue
+          }
           if (event.objectSnapshot.updatedByDeviceId === this.settings.sync.deviceId) {
             continue
           }
-          await applyRemoteSyncObject(this, event.objectSnapshot, vaultKey)
+          try {
+            await applyRemoteSyncObject(this, event.objectSnapshot, vaultKey)
+          } catch (error) {
+            await logError('sync remote object failed', {
+              ...syncErrorLogMetadata(error),
+              eventId: event.id,
+              objectId: event.objectId,
+              objectType: event.objectSnapshot.objectType,
+              revision: event.objectSnapshot.revision,
+              updatedByDeviceId: event.objectSnapshot.updatedByDeviceId
+            })
+            throw error
+          }
           pulled += 1
+        }
+        if (skippedOtherSpaces > 0) {
+          await logInfo('sync skipped events from other spaces', {
+            skipped: skippedOtherSpaces,
+            cursor,
+            nextCursor: pullResult.nextCursor
+          })
         }
         cursor = pullResult.nextCursor
         hasMore = Boolean(pullResult.hasMore)
@@ -1528,6 +1572,33 @@ function isSyncConnectionInvalid(error: unknown): boolean {
   return /unauthorized|forbidden|not found|device not found|sync space/i.test(message)
 }
 
+function syncErrorLogMetadata(error: unknown): Record<string, unknown> {
+  if (error instanceof SyncApiError) {
+    return {
+      name: error.name,
+      message: error.message,
+      status: error.status
+    }
+  }
+
+  if (error instanceof Error) {
+    const metadata: Record<string, unknown> = {
+      name: error.name,
+      message: error.message
+    }
+    const cause = (error as Error & { cause?: unknown }).cause
+    if (cause instanceof Error) {
+      metadata.causeName = cause.name
+      metadata.causeMessage = cause.message
+    } else if (cause) {
+      metadata.cause = String(cause)
+    }
+    return metadata
+  }
+
+  return { message: String(error) }
+}
+
 interface SyncBuildInput {
   syncSpaceId: string
   vaultKey: Uint8Array
@@ -1787,6 +1858,33 @@ function markLocalObjectSyncState(
   )
 }
 
+function resetLoadedObjectsForNewSyncTarget(
+  vaults: Vault[],
+  items: VaultItem[],
+  attachments: VaultAttachment[],
+  deviceId: string
+): void {
+  for (const vault of vaults) {
+    vault.sync = resetSyncForNewTarget(vault.sync, deviceId)
+  }
+  for (const item of items) {
+    item.sync = resetSyncForNewTarget(item.sync, deviceId)
+  }
+  for (const attachment of attachments) {
+    attachment.sync = resetSyncForNewTarget(attachment.sync, deviceId)
+  }
+}
+
+function resetSyncForNewTarget(sync: SyncMetadata, deviceId: string): SyncMetadata {
+  return {
+    ...sync,
+    revision: 1,
+    baseRevision: 0,
+    updatedByDeviceId: deviceId,
+    state: 'dirty'
+  }
+}
+
 async function applyRemoteSyncObject(
   store: SyncStateContainer,
   object: SyncObjectView,
@@ -1852,6 +1950,12 @@ function syncFromRemoteObject(object: SyncObjectView): SyncMetadata {
 function shouldRepairEmptyLocalSyncState(store: SyncStateContainer): boolean {
   if (!store.settings.sync.syncSpaceId || store.settings.sync.cursor <= 0) return false
   return store.vaults.length === 0 && store.items.length === 0 && store.attachments.length === 0
+}
+
+function shouldResetLocalObjectsForInitialSync(store: SyncStateContainer): boolean {
+  if (!store.settings.sync.syncSpaceId || store.settings.sync.cursor > 0 || store.settings.sync.lastSyncAt) return false
+  const objects = [...store.vaults, ...store.items, ...store.attachments]
+  return objects.length > 0 && objects.some((object) => object.sync.state === 'clean')
 }
 
 async function restoreFromSyncSnapshot(input: {

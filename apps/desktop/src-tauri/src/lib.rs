@@ -1,5 +1,5 @@
-use std::fs::{self, OpenOptions};
-use std::io::{Cursor, Read, Write};
+use std::fs::{self, File, OpenOptions};
+use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 #[cfg(target_os = "windows")]
 use std::ptr;
@@ -297,6 +297,37 @@ fn write_desktop_log(app: AppHandle, level: String, message: String) -> Result<(
     writeln!(file, "{} [{}] {}", current_timestamp_string(), level, message)
         .map_err(|error| format!("failed to write desktop log file: {error}"))?;
     Ok(())
+}
+
+#[tauri::command]
+fn read_desktop_log(app: AppHandle, max_bytes: Option<u64>) -> Result<String, String> {
+    let log_path = log_dir(&app)?.join("lockpass.log");
+    if !log_path.exists() {
+        return Ok(String::new());
+    }
+
+    let mut file = File::open(&log_path)
+        .map_err(|error| format!("failed to open desktop log file: {error}"))?;
+    let file_len = file
+        .metadata()
+        .map_err(|error| format!("failed to read desktop log metadata: {error}"))?
+        .len();
+    let max_bytes = max_bytes.unwrap_or(256 * 1024).max(1);
+    let start = file_len.saturating_sub(max_bytes);
+    file.seek(SeekFrom::Start(start))
+        .map_err(|error| format!("failed to seek desktop log file: {error}"))?;
+
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)
+        .map_err(|error| format!("failed to read desktop log file: {error}"))?;
+    let mut text = String::from_utf8_lossy(&bytes).to_string();
+    if start > 0 {
+        if let Some(index) = text.find('\n') {
+            text = text[index + 1..].to_string();
+        }
+        text.insert_str(0, "...\n");
+    }
+    Ok(text)
 }
 
 #[tauri::command]
@@ -3050,6 +3081,7 @@ pub fn run() {
             open_file_parent_dir,
             open_log_dir,
             write_desktop_log,
+            read_desktop_log,
             check_global_shortcut,
             load_start_on_login,
             set_start_on_login,

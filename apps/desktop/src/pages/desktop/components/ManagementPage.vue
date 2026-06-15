@@ -11,6 +11,7 @@ import {
   LockKeyhole,
   Logs,
   PackagePlus,
+  RefreshCw,
   RotateCcw,
   Settings,
   Shield,
@@ -22,6 +23,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { VaultAttachment, VaultItem } from '@lockpass/core'
 import { localeLabels, supportedLocales, type SupportedLocale } from '@/i18n'
+import { readDesktopLog } from '@/services/logger'
 import {
   DEFAULT_SHORTCUT_SETTINGS,
   findShortcutConflict,
@@ -75,6 +77,9 @@ const legacyBackupInput = ref<HTMLInputElement | null>(null)
 const legacyImportOpen = ref(false)
 const legacySelectedFile = ref<File | null>(null)
 const legacyPassword = ref('')
+const logText = ref('')
+const logLoading = ref(false)
+const logLoadError = ref('')
 const logLevels: DesktopLogLevel[] = ['off', 'error', 'info', 'debug']
 const shortcutScope = ref<ShortcutScope>('global')
 const capturingShortcut = ref<{ scope: ShortcutScope; action: ShortcutAction } | null>(null)
@@ -88,6 +93,7 @@ const pages = computed<Array<{ name: ManagementPageName; label: string; icon: ty
   { name: 'backup', label: t('nav.backup'), icon: ArchiveRestore },
   { name: 'settings', label: t('nav.settings'), icon: Settings },
   { name: 'shortcuts', label: t('shortcuts.title'), icon: Keyboard },
+  { name: 'logs', label: t('logs.title'), icon: Logs },
   { name: 'system', label: t('system.title'), icon: Info }
 ])
 const pageTitle = computed(() => pages.value.find((page) => page.name === props.activePage)?.label ?? t('management.title'))
@@ -129,6 +135,7 @@ watch(
   () => props.activePage,
   (page) => {
     if (page === 'system') void loadSystemInfo()
+    if (page === 'logs') void loadDesktopLogs()
     if (page === 'settings') void syncStartOnLoginState()
     if (page === 'shortcuts' && shortcutScope.value === 'global') void checkVisibleGlobalShortcuts()
     if (page !== 'shortcuts') stopCapturingShortcut()
@@ -196,6 +203,26 @@ async function openLocalStorageDir(): Promise<void> {
   } catch (error) {
     emit('systemToast', error instanceof Error ? error.message : t('system.appDataDirOpenFailed'))
   }
+}
+
+async function loadDesktopLogs(): Promise<void> {
+  logLoading.value = true
+  logLoadError.value = ''
+  try {
+    const text = await readDesktopLog()
+    logText.value = text ?? ''
+    if (text === null) logLoadError.value = t('logs.browserPreview')
+  } catch (error) {
+    logText.value = ''
+    logLoadError.value = error instanceof Error ? error.message : t('logs.failed')
+  } finally {
+    logLoading.value = false
+  }
+}
+
+function copyDesktopLogs(): void {
+  if (!logText.value) return
+  emit('copyValue', logText.value)
 }
 
 async function syncStartOnLoginState(): Promise<void> {
@@ -673,6 +700,40 @@ function clearShortcutError(scope: ShortcutScope, action: ShortcutAction): void 
             <p v-if="shortcutScope === 'global'" class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
               {{ t('shortcuts.globalConflictHint') }}
             </p>
+          </section>
+        </div>
+
+        <div v-else-if="activePage === 'logs'" class="grid max-w-5xl gap-4">
+          <section class="grid gap-4 rounded-lg border border-slate-200 bg-white p-5">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div class="grid gap-1">
+                <h2 class="font-bold text-slate-950">{{ t('logs.title') }}</h2>
+                <p class="text-sm leading-6 text-slate-500">{{ t('logs.body') }}</p>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button class="plain-button" type="button" :disabled="logLoading" @click="loadDesktopLogs">
+                  <RefreshCw class="size-4" />
+                  {{ t('logs.refresh') }}
+                </button>
+                <button class="plain-button" type="button" :disabled="!logText" @click="copyDesktopLogs">
+                  <Copy class="size-4" />
+                  {{ t('logs.copy') }}
+                </button>
+                <button class="plain-button" type="button" @click="emit('openLogDir')">
+                  <FolderOpen class="size-4" />
+                  {{ t('settings.openLogDir') }}
+                </button>
+              </div>
+            </div>
+
+            <div class="overflow-hidden rounded-lg border border-slate-200 bg-slate-950">
+              <pre v-if="logText" class="max-h-[560px] min-h-[320px] overflow-auto p-4 font-mono text-xs leading-5 text-slate-100">{{ logText }}</pre>
+              <div v-else class="grid min-h-[320px] place-items-center p-6 text-center text-sm text-slate-300">
+                <span v-if="logLoading">{{ t('logs.loading') }}</span>
+                <span v-else-if="logLoadError" class="text-rose-200">{{ logLoadError }}</span>
+                <span v-else>{{ t('logs.empty') }}</span>
+              </div>
+            </div>
           </section>
         </div>
 
