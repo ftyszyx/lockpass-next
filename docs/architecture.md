@@ -1,16 +1,18 @@
-# 架构设计
+﻿# 架构设计
 
 ## 总体方向
 
-LockPass Next 当前采用 desktop first 架构：Tauri 2 桌面端是主产品，同时围绕同步协议建设开源服务器端和服务器后台基础能力。移动端、浏览器插件、多人共享保险库和完整托管商业化能力暂不进入当前阶段，但核心模型、密文格式和同步协议需要保留后续扩展能力。
+LockPass Next 当前采用共享客户端核心架构：Tauri 2 桌面端和普通用户 Web 端共用保险库体验与端到端加密模型，同时围绕保存协议建设开源服务器端和管理员后台基础能力。移动端、浏览器插件、多人共享保险库和完整托管商业化能力暂不进入当前阶段，但核心模型、密文格式和保存协议需要保留后续扩展能力。
 
 ```mermaid
 flowchart LR
-  UI["Vue + Tailwind Desktop UI"] --> Core["TypeScript Core"]
+  UI["Vue + Tailwind Vault UI"] --> Core["TypeScript Core"]
   Core --> Crypto["Crypto Provider"]
-  Core --> LocalStore["Local Storage Adapter"]
+  Core --> LocalStore["Desktop Cache Adapter"]
+  Core --> WebStore["Web Cache Adapter"]
   Core --> SyncClient["Sync Client"]
   LocalStore --> SQLite["Desktop SQLite"]
+  WebStore --> IndexedDB["Browser IndexedDB"]
   SyncClient --> API["Open Source Sync Server"]
   API --> Postgres["PostgreSQL"]
 ```
@@ -26,13 +28,17 @@ flowchart LR
 | Storage adapter | SQLite 读写、事务、schema migration | 明文业务逻辑 |
 | Sync client | 同步队列、revision、冲突处理、远端 API 调用 | 解密服务端数据 |
 
-## 本地用户与首启流程
+普通用户 Web 端不使用 Tauri shell。它复用 Vue 保险库 UI、Core、Crypto 和 Sync client，但平台能力通过 Web adapter 提供。浏览器本地只能保存密文缓存、cursor 和待保存队列；服务器 snapshot / pull / push 的结果是用户数据的权威来源。
 
-桌面端第一次启动时必须先创建本地用户，用户需要输入用户名和主密码。创建成功后才初始化默认保险库、条目集合和附件目录。
+## 服务器账号与首启流程
 
-本地多用户支持作为当前阶段能力保留：同一台设备上可以创建多个本地用户配置，每个用户有独立的保险库、条目、附件集合和主密码校验信息。切换用户时先锁定当前会话，再要求输入目标用户的主密码。
+桌面端第一次启动时应引导用户登录服务器账号，可以选择 LockPass 官方托管或自建服务器。账号身份以服务器账号为准，桌面端不再维护另一套独立账号系统。
 
-这里的多用户不是多人共享保险库。当前阶段不做协作共享；后续如果接入服务器账户，一个服务器账户可以绑定设备和同步空间，但服务端仍然不能拿到主密码、vault key 或明文条目。
+PC 客户端本机没有账号时，首屏只展示“登录”和“创建新账号”。“登录”用于已有账号恢复：用户输入邮箱、选择服务器，再输入主密码和安全密钥后拉取服务器密文并在本地解锁；“创建新账号”跳转网站，网站按邮箱验证码流程创建账号、设置主密码、生成并备份 Secret Key。
+
+本机只保存服务器账号在当前设备上的加密缓存、解锁材料状态、设备设置和离线待保存修改。同一台设备可以切换不同服务器账号，但每个服务器账号的数据缓存、密钥材料和待保存修改必须隔离。切换账号时先锁定当前会话，再要求目标账号完成解锁。
+
+当前阶段不做多人共享保险库。后续如果支持团队空间或共享库，可以在服务器账号下增加空间边界；服务端仍然不能拿到主密码、vault key 或明文条目。
 
 ## 服务器分层
 
@@ -53,10 +59,12 @@ apps/
     src/
       app/        Vue 应用
       tauri/      Tauri 命令、插件和系统集成
+  web/
+    src/        普通用户 Web 保险库入口
   server/
     src/        Rust + Axum HTTP API、同步服务、PostgreSQL migration
-  server_web/
-    src/        Vue + TypeScript 服务器后台与登录页
+  admin_web/
+    src/        Vue + TypeScript 管理员后台与设备绑定登录页
 packages/
   core/
   crypto/
@@ -99,8 +107,8 @@ docs/
 
 1. `accounts`：账户和登录身份。
 2. `devices`：设备、公钥、设备状态。
-3. `sync_spaces`：服务器账号下的同步空间。
-4. `wrapped_vault_keys`：协议预留的恢复密钥包密文，用于后续新设备恢复闭环。
+3. `sync_spaces`：服务器账号下的数据空间，第一版通常只有默认空间。
+4. `wrapped_vault_keys`：协议预留的安全密钥包密文，用于后续新设备恢复闭环。
 5. `sync_objects`：密文对象、revision、更新时间和删除标记。
 6. `sync_events`：增量同步事件。
 7. `device_sync_cursors` / `sync_idempotency_keys`：同步进度和幂等记录。
@@ -171,3 +179,4 @@ interface SyncObject {
 4. 服务端明文搜索。
 5. 完整托管商业化能力。
 6. 新设备恢复闭环；`wrappedVaultKey` / `wrapped_vault_keys` 仅作为协议和数据库预留，当前不能承诺用户已可在新设备完整恢复保险库。
+

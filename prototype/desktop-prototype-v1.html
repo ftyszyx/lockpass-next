@@ -1,0 +1,4077 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LockPass Next Desktop Prototype</title>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f8fb;
+        --panel: #ffffff;
+        --panel-soft: #f9faf7;
+        --line: #dfe5ea;
+        --line-strong: #cbd5dd;
+        --text: #17202a;
+        --muted: #60707d;
+        --faint: #87939d;
+        --teal: #0f766e;
+        --teal-soft: #e5f3f1;
+        --green: #1f7a4d;
+        --amber: #b76e00;
+        --amber-soft: #fff4dc;
+        --rose: #b4233a;
+        --rose-soft: #ffe7eb;
+        --indigo: #3451a3;
+        --shadow: 0 18px 44px rgba(27, 39, 53, 0.12);
+        --radius: 8px;
+        --sidebar-width: 236px;
+        --list-width: 358px;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", "Microsoft YaHei", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-width: 980px;
+        min-height: 100vh;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0)),
+          var(--bg);
+        color: var(--text);
+        font-size: 14px;
+      }
+
+      button,
+      input,
+      textarea,
+      select {
+        font: inherit;
+      }
+
+      button {
+        border: 0;
+      }
+
+      .app-shell {
+        display: grid;
+        grid-template-rows: 52px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      .titlebar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 0 18px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.82);
+        backdrop-filter: blur(16px);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 250px;
+        font-weight: 750;
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 30px;
+        height: 30px;
+        place-items: center;
+        border-radius: 8px;
+        background: #10201e;
+        color: #ffffff;
+      }
+
+      .brand small {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 520;
+      }
+
+      .global-search {
+        position: relative;
+        display: block;
+        width: min(480px, 38vw);
+      }
+
+      .global-search i,
+      .global-search svg {
+        position: absolute;
+        top: 50%;
+        left: 12px;
+        width: 17px;
+        height: 17px;
+        transform: translateY(-50%);
+        color: var(--faint);
+      }
+
+      .global-search input {
+        width: 100%;
+        height: 34px;
+        padding: 0 14px 0 38px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        outline: none;
+        background: #ffffff;
+        color: var(--text);
+      }
+
+      .global-search input:focus {
+        border-color: var(--teal);
+        box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.13);
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        min-width: 330px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        height: 34px;
+        min-width: 34px;
+        padding: 0 11px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+        color: var(--text);
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .button:hover {
+        border-color: var(--line-strong);
+        background: #f9fbfc;
+      }
+
+      .button:disabled {
+        cursor: not-allowed;
+        opacity: 0.56;
+      }
+
+      .button.primary {
+        border-color: var(--teal);
+        background: var(--teal);
+        color: #ffffff;
+      }
+
+      .button.danger {
+        border-color: #f4c8cf;
+        background: var(--rose-soft);
+        color: var(--rose);
+      }
+
+      .button.ghost {
+        border-color: transparent;
+        background: transparent;
+      }
+
+      .button.icon-only {
+        padding: 0;
+      }
+
+      .button i,
+      .button svg,
+      .mini-button i,
+      .mini-button svg,
+      .nav-item i,
+      .nav-item svg,
+      .meta i,
+      .meta svg,
+      .section-title i,
+      .section-title svg,
+      .copy-inline i,
+      .copy-inline svg,
+      .file-icon i,
+      .file-icon svg,
+      .action-icon i,
+      .action-icon svg {
+        width: 16px;
+        height: 16px;
+        flex: 0 0 auto;
+      }
+
+      .brand-mark svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      .icons-fallback i[data-lucide] {
+        display: inline-grid;
+        place-items: center;
+        font-style: normal;
+        line-height: 1;
+      }
+
+      .icons-fallback i[data-lucide]::before {
+        content: "•";
+      }
+
+      .icons-fallback i[data-lucide="lock-keyhole"]::before,
+      .icons-fallback i[data-lucide="lock"]::before {
+        content: "锁";
+      }
+
+      .icons-fallback i[data-lucide="unlock"]::before {
+        content: "开";
+      }
+
+      .icons-fallback i[data-lucide="search"]::before {
+        content: "⌕";
+      }
+
+      .icons-fallback i[data-lucide="command"]::before {
+        content: "⌘";
+      }
+
+      .icons-fallback i[data-lucide="plus"]::before {
+        content: "+";
+      }
+
+      .icons-fallback i[data-lucide="x"]::before {
+        content: "×";
+      }
+
+      .icons-fallback i[data-lucide="copy"]::before {
+        content: "拷";
+      }
+
+      .icons-fallback i[data-lucide="eye"]::before {
+        content: "看";
+      }
+
+      .icons-fallback i[data-lucide="refresh-cw"]::before {
+        content: "刷";
+      }
+
+      .icons-fallback i[data-lucide="wand-sparkles"]::before {
+        content: "生";
+      }
+
+      .icons-fallback i[data-lucide="triangle-alert"]::before {
+        content: "!";
+      }
+
+      .main-grid {
+        display: grid;
+        grid-template-columns: var(--sidebar-width) 6px var(--list-width) 6px minmax(520px, 1fr);
+        min-height: 0;
+      }
+
+      .resize-handle {
+        position: relative;
+        z-index: 2;
+        width: 6px;
+        border-right: 1px solid var(--line);
+        background: #f6f8f9;
+        cursor: col-resize;
+      }
+
+      .resize-handle::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 2px;
+        height: 48px;
+        border-radius: 999px;
+        background: #c8d2d6;
+        opacity: 0;
+        transform: translate(-50%, -50%);
+      }
+
+      .resize-handle:hover,
+      .resize-handle.active {
+        background: #edf8f5;
+      }
+
+      .resize-handle:hover::after,
+      .resize-handle.active::after {
+        opacity: 1;
+      }
+
+      .sidebar {
+        display: flex;
+        min-height: 0;
+        flex-direction: column;
+        border-right: 1px solid var(--line);
+        background: #eef4f2;
+      }
+
+      .profile {
+        position: relative;
+        padding: 12px 12px 10px;
+        border-bottom: 1px solid rgba(203, 213, 221, 0.8);
+      }
+
+      .profile-button {
+        display: grid;
+        width: 100%;
+        grid-template-columns: 38px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 11px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        padding: 4px;
+        color: inherit;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .profile-button:hover {
+        background: rgba(255, 255, 255, 0.78);
+      }
+
+      .avatar {
+        display: grid;
+        width: 38px;
+        height: 38px;
+        flex: 0 0 auto;
+        place-items: center;
+        border-radius: 8px;
+        background: #263b37;
+        color: #ffffff;
+        font-weight: 760;
+      }
+
+      .profile strong,
+      .profile-menu strong {
+        display: block;
+        line-height: 1.2;
+      }
+
+      .profile span {
+        display: block;
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .profile-menu {
+        position: absolute;
+        top: 62px;
+        right: 12px;
+        left: 12px;
+        z-index: 20;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: var(--shadow);
+      }
+
+      .profile-menu-title {
+        padding: 9px 11px;
+        border-bottom: 1px solid #eef2f4;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 760;
+      }
+
+      .profile-menu button {
+        display: grid;
+        width: 100%;
+        min-height: 38px;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 8px;
+        border: 0;
+        background: transparent;
+        padding: 8px 11px;
+        color: var(--text);
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .profile-menu button:hover {
+        background: #eff8f6;
+      }
+
+      .profile-menu button.danger {
+        color: var(--rose);
+      }
+
+      .profile-menu-actions {
+        border-top: 1px solid #eef2f4;
+        padding: 4px;
+      }
+
+      .profile-menu-actions button {
+        grid-template-columns: 22px minmax(0, 1fr);
+        border-radius: 6px;
+        padding: 7px;
+      }
+
+      .nav-section {
+        padding: 13px 10px 8px;
+      }
+
+      .section-label {
+        padding: 0 8px 8px;
+        color: #62737c;
+        font-size: 12px;
+        font-weight: 720;
+      }
+
+      .section-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 0 4px 8px 8px;
+      }
+
+      .section-heading .section-label {
+        padding: 0;
+      }
+
+      .mini-button {
+        display: inline-flex;
+        width: 26px;
+        height: 26px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+      }
+
+      .mini-button:hover {
+        border-color: var(--line);
+        background: #ffffff;
+        color: var(--teal);
+      }
+
+      .nav-item {
+        display: flex;
+        width: 100%;
+        height: 36px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 9px;
+        border-radius: 8px;
+        background: transparent;
+        color: #26323a;
+        cursor: pointer;
+      }
+
+      .nav-item-main {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        min-width: 0;
+      }
+
+      .nav-item:hover,
+      .nav-item.active {
+        background: #ffffff;
+      }
+
+      .nav-count {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .sidebar-footer {
+        margin-top: auto;
+        padding: 12px;
+        border-top: 1px solid rgba(203, 213, 221, 0.8);
+      }
+
+      .sync-box {
+        display: grid;
+        gap: 9px;
+        margin-bottom: 12px;
+        padding: 11px;
+        border: 1px solid #d5e6df;
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      .sync-box.offline {
+        border-color: #fda4af;
+        background: #fff1f2;
+      }
+
+      .sync-box.unsynced {
+        border-color: #fcd34d;
+        background: #fffbeb;
+      }
+
+      .sync-box.synced {
+        border-color: #bcdcd6;
+        background: #eff8f6;
+      }
+
+      .sync-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .sync-row > span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 24px;
+        padding: 0 8px;
+        border: 1px solid transparent;
+        border-radius: 999px;
+        background: var(--teal-soft);
+        color: var(--teal);
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 720;
+      }
+
+      .status-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: currentColor;
+      }
+
+      .sidebar-tool-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 4px;
+        margin-bottom: 12px;
+        padding: 4px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      .sidebar-tool-grid .mini-button {
+        width: 100%;
+        height: 32px;
+      }
+
+      .storage-box {
+        min-width: 0;
+        padding: 0 4px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .storage-box strong {
+        color: #4c5d66;
+      }
+
+      .content-list {
+        display: flex;
+        min-height: 0;
+        flex-direction: column;
+        border-right: 1px solid var(--line);
+        background: #ffffff;
+      }
+
+      .list-header {
+        display: grid;
+        gap: 11px;
+        padding: 17px 16px 12px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .list-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .list-heading h1 {
+        margin: 0;
+        font-size: 20px;
+        line-height: 1.2;
+      }
+
+      .filters {
+        display: flex;
+        gap: 8px;
+      }
+
+      .segmented {
+        display: inline-flex;
+        height: 30px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #f7f9fa;
+      }
+
+      .segmented button {
+        min-width: 64px;
+        padding: 0 10px;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+      }
+
+      .segmented button.active {
+        background: #ffffff;
+        color: var(--text);
+        box-shadow: inset 0 0 0 1px var(--line);
+      }
+
+      .item-list {
+        min-height: 0;
+        overflow: auto;
+        padding: 8px;
+      }
+
+      .item-row {
+        display: grid;
+        grid-template-columns: 38px minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        width: 100%;
+        min-height: 66px;
+        padding: 8px;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        background: transparent;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .item-row:hover {
+        background: #f8fafb;
+      }
+
+      .item-row.active {
+        border-color: #bcdcd6;
+        background: #eff8f6;
+      }
+
+      .item-icon {
+        display: grid;
+        width: 38px;
+        height: 38px;
+        place-items: center;
+        border-radius: 8px;
+        background: #eef0e8;
+        color: #39433d;
+        font-weight: 760;
+      }
+
+      .item-name {
+        display: block;
+        overflow: hidden;
+        color: var(--text);
+        font-weight: 720;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .item-sub {
+        display: block;
+        margin-top: 4px;
+        overflow: hidden;
+        color: var(--muted);
+        font-size: 12px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        height: 22px;
+        padding: 0 8px;
+        border-radius: 999px;
+        background: #edf1f4;
+        color: #566672;
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .detail {
+        display: flex;
+        min-height: 0;
+        flex-direction: column;
+        background: var(--bg);
+      }
+
+      .notice {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        min-height: 46px;
+        padding: 8px 18px;
+        border-bottom: 1px solid #f2d28f;
+        background: var(--amber-soft);
+        color: #6f4300;
+      }
+
+      .notice strong {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .detail-scroll {
+        min-height: 0;
+        overflow: auto;
+        padding: 18px;
+      }
+
+      .detail-head {
+        display: grid;
+        grid-template-columns: 54px minmax(0, 1fr) auto;
+        gap: 14px;
+        align-items: center;
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .detail-icon {
+        display: grid;
+        width: 54px;
+        height: 54px;
+        place-items: center;
+        border-radius: 8px;
+        background: #213330;
+        color: #ffffff;
+        font-size: 18px;
+        font-weight: 800;
+      }
+
+      .detail-title h2 {
+        margin: 0;
+        overflow-wrap: anywhere;
+        font-size: 24px;
+        line-height: 1.25;
+      }
+
+      .detail-title p {
+        margin: 6px 0 0;
+        color: var(--muted);
+      }
+
+      .head-actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 6px;
+        margin: 18px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .tab {
+        height: 34px;
+        padding: 0 12px;
+        border-bottom: 2px solid transparent;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+      }
+
+      .tab.active {
+        border-bottom-color: var(--teal);
+        color: var(--text);
+        font-weight: 720;
+      }
+
+      .fields {
+        display: grid;
+        max-width: 820px;
+        gap: 12px;
+      }
+
+      .field-row {
+        display: grid;
+        grid-template-columns: 154px minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        min-height: 46px;
+        padding: 9px 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      .field-label {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .field-value {
+        overflow-wrap: anywhere;
+        color: #182128;
+      }
+
+      .field-value.secret {
+        font-family: "SFMono-Regular", Consolas, monospace;
+        letter-spacing: 0;
+      }
+
+      .copy-inline {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+        color: var(--muted);
+        cursor: pointer;
+      }
+
+      .copy-inline:hover {
+        color: var(--teal);
+      }
+
+      .section-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 22px 0 10px;
+        color: var(--text);
+        font-weight: 760;
+      }
+
+      .activity-list {
+        display: grid;
+        max-width: 820px;
+        gap: 10px;
+      }
+
+      .activity {
+        display: grid;
+        grid-template-columns: 130px minmax(0, 1fr);
+        gap: 12px;
+        padding: 11px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      .activity time {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .strength {
+        display: grid;
+        max-width: 820px;
+        gap: 12px;
+      }
+
+      .meter {
+        height: 8px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #e7ecef;
+      }
+
+      .meter span {
+        display: block;
+        width: 74%;
+        height: 100%;
+        background: linear-gradient(90deg, var(--amber), var(--green));
+      }
+
+      .drawer,
+      .modal-layer,
+      .lock-layer,
+      .quick-layer {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: none;
+      }
+
+      .drawer {
+        z-index: 70;
+      }
+
+      .lock-layer {
+        z-index: 80;
+      }
+
+      .drawer.open,
+      .modal-layer.open,
+      .lock-layer.open,
+      .quick-layer.open {
+        display: block;
+      }
+
+      .scrim {
+        position: absolute;
+        inset: 0;
+        background: rgba(21, 31, 39, 0.38);
+      }
+
+      .drawer-panel {
+        position: absolute;
+        top: 0;
+        right: 0;
+        display: flex;
+        width: 420px;
+        max-width: 94vw;
+        height: 100%;
+        flex-direction: column;
+        border-left: 1px solid var(--line);
+        background: #ffffff;
+        box-shadow: var(--shadow);
+      }
+
+      .panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 56px;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .panel-head h3 {
+        margin: 0;
+        font-size: 16px;
+      }
+
+      .panel-body {
+        display: grid;
+        flex: 1;
+        align-content: start;
+        min-height: 0;
+        overflow: auto;
+        gap: 16px;
+        padding: 16px;
+      }
+
+      .form-grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .form-field {
+        display: grid;
+        gap: 7px;
+      }
+
+      .form-field label {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 760;
+      }
+
+      .required-mark {
+        margin-left: 3px;
+        color: #c2410c;
+      }
+
+      .form-error {
+        padding: 9px 10px;
+        border: 1px solid #fecdd3;
+        border-radius: 8px;
+        background: #fff1f2;
+        color: #be123c;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .input,
+      .textarea,
+      .select {
+        width: 100%;
+        min-height: 36px;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        outline: none;
+        background: #ffffff;
+        color: var(--text);
+      }
+
+      .textarea {
+        min-height: 92px;
+        resize: vertical;
+      }
+
+      .input:focus,
+      .textarea:focus,
+      .select:focus {
+        border-color: var(--teal);
+        box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.13);
+      }
+
+      .input-action-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .type-fields {
+        display: grid;
+        gap: 12px;
+        padding-top: 2px;
+      }
+
+      .upload-box {
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+        border: 1px dashed #b8c8d1;
+        border-radius: 8px;
+        background: #f8fbfc;
+      }
+
+      .upload-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .upload-head span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .file-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .file-row {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        padding: 8px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      .file-row.previewable {
+        cursor: pointer;
+      }
+
+      .file-row.previewable:hover {
+        border-color: #bcdcd6;
+        background: #f3fbf8;
+      }
+
+      .file-icon {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border-radius: 8px;
+        background: var(--panel-soft);
+        color: var(--teal);
+        font-weight: 760;
+      }
+
+      .file-name {
+        display: block;
+        overflow: hidden;
+        font-weight: 720;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .file-meta {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .range-row {
+        display: grid;
+        grid-template-columns: 1fr 42px;
+        gap: 10px;
+        align-items: center;
+      }
+
+      input[type="range"] {
+        accent-color: var(--teal);
+      }
+
+      .checks {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 9px;
+      }
+
+      .check {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        padding: 0 8px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      .check input {
+        accent-color: var(--teal);
+      }
+
+      .generated {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+        align-items: center;
+        padding: 10px;
+        border: 1px solid #bcdcd6;
+        border-radius: 8px;
+        background: #eff8f6;
+      }
+
+      .generated code {
+        overflow-wrap: anywhere;
+        font-family: "SFMono-Regular", Consolas, monospace;
+        letter-spacing: 0;
+      }
+
+      .image-preview-modal {
+        width: min(860px, 94vw);
+      }
+
+      .image-preview-frame {
+        display: grid;
+        min-height: 360px;
+        place-items: center;
+        overflow: hidden;
+        border-radius: 8px;
+        background: #101820;
+      }
+
+      .image-preview-frame img {
+        display: block;
+        max-width: 100%;
+        max-height: 68vh;
+        object-fit: contain;
+      }
+
+      .image-preview-fallback {
+        display: grid;
+        gap: 8px;
+        place-items: center;
+        padding: 42px;
+        color: #ffffff;
+        text-align: center;
+      }
+
+      .image-preview-fallback strong {
+        font-size: 18px;
+      }
+
+      .modal {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        display: flex;
+        width: 560px;
+        max-width: 94vw;
+        max-height: 92vh;
+        flex-direction: column;
+        transform: translate(-50%, -50%);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: var(--shadow);
+      }
+
+      .modal-body {
+        min-height: 0;
+        overflow: auto;
+        padding: 16px;
+      }
+
+      .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        padding: 14px 16px;
+        border-top: 1px solid var(--line);
+      }
+
+      .quick-box {
+        position: absolute;
+        top: 9vh;
+        left: 50%;
+        width: 680px;
+        max-width: 94vw;
+        overflow: hidden;
+        transform: translateX(-50%);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: var(--shadow);
+      }
+
+      .quick-input {
+        position: relative;
+        padding: 14px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .quick-input input {
+        width: 100%;
+        height: 42px;
+        padding: 0 12px 0 40px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        outline: none;
+      }
+
+      .quick-input i,
+      .quick-input svg {
+        position: absolute;
+        top: 50%;
+        left: 27px;
+        width: 18px;
+        height: 18px;
+        transform: translateY(-50%);
+        color: var(--faint);
+      }
+
+      .quick-results {
+        max-height: 410px;
+        overflow: auto;
+        padding: 8px;
+      }
+
+      .quick-result {
+        display: grid;
+        grid-template-columns: 38px minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        width: 100%;
+        min-height: 58px;
+        padding: 8px;
+        border-radius: 8px;
+        background: transparent;
+        cursor: pointer;
+        text-align: left;
+      }
+
+      .quick-result:hover,
+      .quick-result.active {
+        background: #eff8f6;
+      }
+
+      .lock-layer {
+        display: none;
+        background:
+          linear-gradient(135deg, rgba(15, 118, 110, 0.22), rgba(183, 110, 0, 0.14)),
+          rgba(244, 248, 248, 0.92);
+        backdrop-filter: blur(14px);
+      }
+
+      .lock-layer.open {
+        display: grid;
+        place-items: center;
+      }
+
+      .lock-card {
+        display: grid;
+        width: 380px;
+        gap: 15px;
+        padding: 22px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: var(--shadow);
+      }
+
+      .lock-card h2 {
+        margin: 0;
+        font-size: 22px;
+      }
+
+      .lock-card p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .conflict-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .conflict-card {
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      .conflict-card.active {
+        border-color: #f0c36c;
+        background: #fffaf0;
+      }
+
+      .action-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .action-card {
+        display: grid;
+        grid-template-columns: 38px minmax(0, 1fr) auto;
+        gap: 11px;
+        align-items: center;
+        min-height: 64px;
+        padding: 11px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      .action-card strong,
+      .toggle-row strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .action-card span,
+      .toggle-row span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .action-icon {
+        display: grid;
+        width: 38px;
+        height: 38px;
+        place-items: center;
+        border-radius: 8px;
+        background: var(--teal-soft);
+        color: var(--teal);
+      }
+
+      .qr-placeholder {
+        display: grid;
+        width: min(100%, 220px);
+        aspect-ratio: 1;
+        place-items: center;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background:
+          linear-gradient(90deg, #111827 10px, transparent 10px) 0 0 / 28px 28px,
+          linear-gradient(#111827 10px, transparent 10px) 0 0 / 28px 28px,
+          #ffffff;
+        color: #111827;
+        font-size: 12px;
+        font-weight: 800;
+        text-align: center;
+      }
+
+      .sync-card-grid {
+        display: grid;
+        align-content: start;
+        gap: 12px;
+      }
+
+      .sync-state-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      .sync-state-card.connected {
+        border-color: #bcdcd6;
+        background: #eff8f6;
+      }
+
+      .sync-state-card.offline {
+        border-color: #fda4af;
+        background: #fff1f2;
+      }
+
+      .sync-state-card.unsynced {
+        border-color: #fcd34d;
+        background: #fffbeb;
+      }
+
+      .sync-state-card p,
+      .sync-note {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .sync-state-card p {
+        text-align: right;
+      }
+
+      .sync-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .sync-note {
+        padding: 10px;
+        border: 1px solid #dbe6ea;
+        border-radius: 8px;
+        background: #f8fbfc;
+      }
+
+      .status-pill.offline {
+        border-color: #fda4af;
+        background: #ffe4e6;
+        color: #be123c;
+      }
+
+      .status-pill.unsynced {
+        border-color: #fcd34d;
+        background: #fef3c7;
+        color: #92400e;
+      }
+
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        min-height: 54px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .toggle-row:last-child {
+        border-bottom: 0;
+      }
+
+      .switch {
+        position: relative;
+        display: inline-flex;
+        width: 42px;
+        height: 24px;
+        flex: 0 0 auto;
+        align-items: center;
+        border-radius: 999px;
+        background: #cbd5dd;
+        cursor: pointer;
+      }
+
+      .switch input {
+        position: absolute;
+        opacity: 0;
+      }
+
+      .switch span {
+        width: 18px;
+        height: 18px;
+        margin-left: 3px;
+        border-radius: 999px;
+        background: #ffffff;
+        box-shadow: 0 1px 3px rgba(21, 31, 39, 0.2);
+        transition:
+          margin 140ms ease,
+          background 140ms ease;
+      }
+
+      .switch input:checked + span {
+        margin-left: 21px;
+      }
+
+      .switch:has(input:checked) {
+        background: var(--teal);
+      }
+
+      .toast {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 80;
+        display: none;
+        min-width: 220px;
+        padding: 12px 14px;
+        border: 1px solid #bcdcd6;
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: var(--shadow);
+        color: var(--text);
+      }
+
+      .toast.show {
+        display: block;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      @media (max-width: 1180px) {
+        :root {
+          --sidebar-width: 216px;
+          --list-width: 320px;
+        }
+
+        .main-grid {
+          grid-template-columns: var(--sidebar-width) 6px var(--list-width) 6px minmax(420px, 1fr);
+        }
+
+        .brand {
+          min-width: 216px;
+        }
+
+        .global-search {
+          width: min(400px, 34vw);
+        }
+
+        .toolbar {
+          min-width: 262px;
+        }
+
+        .field-row {
+          grid-template-columns: 124px minmax(0, 1fr) auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="titlebar">
+        <div class="brand">
+          <div class="brand-mark"><i data-lucide="lock-keyhole"></i></div>
+          <div>
+            LockPass Next
+            <small>Desktop Prototype</small>
+          </div>
+        </div>
+        <label class="global-search">
+          <i data-lucide="search"></i>
+          <input id="globalSearch" type="search" placeholder="搜索条目、网址、账号" autocomplete="off" />
+        </label>
+        <div class="toolbar">
+          <button class="button icon-only" id="quickOpen" title="快速搜索" aria-label="快速搜索">
+            <i data-lucide="command"></i>
+          </button>
+          <button class="button" id="generatorOpen">
+            <i data-lucide="wand-sparkles"></i>
+            生成
+          </button>
+          <button class="button primary" id="newItemOpen">
+            <i data-lucide="plus"></i>
+            新建
+          </button>
+          <button class="button icon-only" id="lockApp" title="锁定" aria-label="锁定">
+            <i data-lucide="lock"></i>
+          </button>
+        </div>
+      </header>
+
+      <main class="main-grid" aria-label="LockPass 桌面端原型">
+        <aside class="sidebar">
+          <div class="profile">
+            <button class="profile-button" id="profileButton" type="button" aria-expanded="false">
+              <div class="avatar" id="profileAvatar">ZY</div>
+              <div>
+                <strong id="profileName">张宇新</strong>
+                <span id="profileStatus">本地保险库已解锁</span>
+              </div>
+              <i data-lucide="chevron-down"></i>
+            </button>
+            <div class="profile-menu hidden" id="profileMenu">
+              <div class="profile-menu-title">切换用户</div>
+              <div id="profileUserList"></div>
+              <div class="profile-menu-actions">
+                <button id="addUserFromProfile" type="button"><i data-lucide="user-plus"></i><span>新增用户</span></button>
+                <button id="showRecoveryKeyFromProfile" type="button"><i data-lucide="key-round"></i><span>显示安全密钥 / 新设备迁移预留</span></button>
+                <button class="danger" id="removeUserFromProfile" type="button"><i data-lucide="user-minus"></i><span>从此设备移除用户</span></button>
+                <button id="lockFromProfile" type="button"><i data-lucide="lock"></i><span>锁定</span></button>
+              </div>
+            </div>
+          </div>
+
+          <nav class="nav-section" aria-label="保险库">
+            <div class="section-heading">
+              <div class="section-label">保险库</div>
+              <button class="mini-button" id="addVaultOpen" title="新增保险库" aria-label="新增保险库">
+                <i data-lucide="plus"></i>
+              </button>
+            </div>
+            <div id="vaultNav"></div>
+          </nav>
+
+          <div class="sidebar-footer">
+            <div class="sync-box offline" id="syncSidebarBox">
+              <div class="sync-row">
+                <strong>同步</strong>
+                <button class="status-pill offline" id="syncSidebarPill" type="button"><span class="status-dot"></span><span id="syncSidebarStatus">未登录</span></button>
+              </div>
+              <div class="sync-row">
+                <span id="syncSidebarHost" style="color: var(--muted); font-size: 12px">点击配置同步</span>
+                <span style="display: flex; gap: 6px">
+                  <button class="button icon-only" id="syncNow" title="立即同步" aria-label="立即同步">
+                    <i data-lucide="refresh-cw"></i>
+                  </button>
+                  <button class="button icon-only" id="syncManage" title="同步设置" aria-label="同步设置">
+                    <i data-lucide="server-cog"></i>
+                  </button>
+                </span>
+              </div>
+            </div>
+            <div class="sidebar-tool-grid" aria-label="工具">
+              <button class="mini-button" id="showConflicts" title="同步冲突" aria-label="同步冲突">
+                <i data-lucide="triangle-alert"></i>
+              </button>
+              <button class="mini-button" id="backupAction" title="备份恢复" aria-label="备份恢复">
+                <i data-lucide="archive-restore"></i>
+              </button>
+              <button class="mini-button" id="settingsAction" title="设置" aria-label="设置">
+                <i data-lucide="settings"></i>
+              </button>
+            </div>
+            <div class="storage-box">
+              <strong>存储</strong>
+              <span>系统应用数据目录</span>
+            </div>
+          </div>
+        </aside>
+
+        <div
+          class="resize-handle"
+          data-resize-target="sidebar"
+          role="separator"
+          tabindex="0"
+          aria-label="调整保险库栏宽度"
+          aria-orientation="vertical"
+        ></div>
+
+        <section class="content-list">
+          <div class="list-header">
+            <div class="list-heading">
+              <h1 id="listTitle">全部条目</h1>
+              <span class="tag" id="listCount">0 项</span>
+            </div>
+            <div class="filters">
+              <div class="segmented" aria-label="条目类型">
+                <button class="active" data-type="all">全部</button>
+                <button data-type="login">登录</button>
+                <button data-type="card">银行卡</button>
+                <button data-type="note">笔记</button>
+              </div>
+            </div>
+          </div>
+          <div class="item-list" id="itemList"></div>
+        </section>
+
+        <div
+          class="resize-handle"
+          data-resize-target="itemList"
+          role="separator"
+          tabindex="0"
+          aria-label="调整条目列表宽度"
+          aria-orientation="vertical"
+        ></div>
+
+        <section class="detail">
+          <div class="notice" id="conflictNotice">
+            <strong><i data-lucide="triangle-alert"></i> GitHub 有一个未处理的同步冲突</strong>
+            <button class="button" id="openConflictFromNotice">
+              <i data-lucide="git-compare-arrows"></i>
+              查看
+            </button>
+          </div>
+          <div class="detail-scroll">
+            <div class="detail-head">
+              <div class="detail-icon" id="detailIcon">GH</div>
+              <div class="detail-title">
+                <h2 id="detailTitle">GitHub</h2>
+                <p id="detailSubtitle">github.com</p>
+              </div>
+              <div class="head-actions">
+                <button class="button" id="toggleSecrets" title="显示敏感字段">
+                  <i data-lucide="eye"></i>
+                  显示敏感字段
+                </button>
+                <button class="button" id="editButton">
+                  <i data-lucide="pencil"></i>
+                  编辑
+                </button>
+              </div>
+            </div>
+
+            <div class="tabs" role="tablist">
+              <button class="tab active" data-tab="details">详情</button>
+              <button class="tab" data-tab="history">历史</button>
+              <button class="tab" data-tab="security">安全</button>
+            </div>
+
+            <div id="tabDetails" class="tab-panel">
+              <div class="fields" id="detailFields"></div>
+            </div>
+
+            <div id="tabHistory" class="tab-panel hidden">
+              <div class="activity-list" id="historyList"></div>
+            </div>
+
+            <div id="tabSecurity" class="tab-panel hidden">
+              <div class="strength">
+                <div class="field-row">
+                  <span class="field-label">密码强度</span>
+                  <div>
+                    <div class="meter"><span id="strengthMeter"></span></div>
+                  </div>
+                  <span class="tag" id="strengthText">强</span>
+                </div>
+                <div class="field-row">
+                  <span class="field-label">泄露检查</span>
+                  <span class="field-value" id="leakStatus">未发现风险</span>
+                  <button class="copy-inline" id="runAudit" title="检查" aria-label="检查">
+                    <i data-lucide="shield-check"></i>
+                  </button>
+                </div>
+                <div class="field-row">
+                  <span class="field-label">上次修改</span>
+                  <span class="field-value" id="securityUpdated">2026-05-15 21:18</span>
+                  <span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="drawer" id="generatorDrawer" aria-hidden="true">
+      <div class="scrim" data-close="generatorDrawer"></div>
+      <aside class="drawer-panel">
+        <div class="panel-head">
+          <h3>密码生成器</h3>
+          <button class="button icon-only" data-close="generatorDrawer" title="关闭" aria-label="关闭">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="panel-body">
+          <div class="generated">
+            <code id="generatedPassword">Vast-River-42!Stone</code>
+            <button class="copy-inline" id="copyGenerated" title="复制" aria-label="复制">
+              <i data-lucide="copy"></i>
+            </button>
+          </div>
+          <div class="form-field">
+            <label for="lengthRange">长度</label>
+            <div class="range-row">
+              <input id="lengthRange" type="range" min="8" max="32" value="18" />
+              <strong id="lengthValue">18</strong>
+            </div>
+          </div>
+          <div class="checks">
+            <label class="check"><input type="checkbox" id="useUpper" checked /> 大写</label>
+            <label class="check"><input type="checkbox" id="useNumber" checked /> 数字</label>
+            <label class="check"><input type="checkbox" id="useSymbol" checked /> 符号</label>
+            <label class="check"><input type="checkbox" id="useReadable" /> 易读</label>
+          </div>
+          <button class="button primary" id="regenerate">
+            <i data-lucide="refresh-cw"></i>
+            重新生成
+          </button>
+          <button class="button hidden" id="useGeneratedPassword">
+            <i data-lucide="save"></i>
+            使用此密码
+          </button>
+        </div>
+      </aside>
+    </div>
+
+    <div class="drawer" id="conflictDrawer" aria-hidden="true">
+      <div class="scrim" data-close="conflictDrawer"></div>
+      <aside class="drawer-panel">
+        <div class="panel-head">
+          <h3>同步冲突</h3>
+          <button class="button icon-only" data-close="conflictDrawer" title="关闭" aria-label="关闭">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="panel-body">
+          <div class="conflict-list">
+            <div class="conflict-card active">
+              <strong>GitHub</strong>
+              <span style="color: var(--muted)">本机修改了恢复码，远端修改了备注。</span>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                <button class="button" data-conflict-action="remote">
+                  <i data-lucide="cloud-download"></i>
+                  保留远端
+                </button>
+                <button class="button" data-conflict-action="local">
+                  <i data-lucide="hard-drive-download"></i>
+                  保留本机
+                </button>
+                <button class="button primary" data-conflict-action="merge">
+                  <i data-lucide="merge"></i>
+                  合并
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="drawer" id="backupDrawer" aria-hidden="true">
+      <div class="scrim" data-close="backupDrawer"></div>
+      <aside class="drawer-panel">
+        <div class="panel-head">
+          <h3>备份恢复</h3>
+          <button class="button icon-only" data-close="backupDrawer" title="关闭" aria-label="关闭">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="panel-body">
+          <div class="action-list">
+            <div class="action-card">
+              <span class="action-icon"><i data-lucide="package-plus"></i></span>
+              <div>
+                <strong>创建加密备份</strong>
+                <span>导出 .lpb 备份包，包含条目密文、附件密文和 manifest；不包含安全密钥明文。</span>
+              </div>
+              <button class="button" data-backup-action="export">导出</button>
+            </div>
+            <div class="action-card">
+              <span class="action-icon"><i data-lucide="archive-restore"></i></span>
+              <div>
+                <strong>从备份恢复</strong>
+                <span>选择备份包，校验完整性后恢复到本机；仍需主密码 + 安全密钥。</span>
+              </div>
+              <button class="button" data-backup-action="restore">恢复</button>
+            </div>
+            <div class="action-card">
+              <span class="action-icon"><i data-lucide="database-backup"></i></span>
+              <div>
+                <strong>导入旧版 LockPass</strong>
+                <span>读取旧 SQLite 和 secret.key，转换为新版密文格式。</span>
+              </div>
+              <button class="button" data-backup-action="legacy">导入</button>
+            </div>
+            <div class="action-card">
+              <span class="action-icon"><i data-lucide="file-spreadsheet"></i></span>
+              <div>
+                <strong>CSV 导入导出</strong>
+                <span>用于 Chrome、Edge 等浏览器密码迁移。</span>
+              </div>
+              <button class="button" data-backup-action="csv">打开</button>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="drawer" id="settingsDrawer" aria-hidden="true">
+      <div class="scrim" data-close="settingsDrawer"></div>
+      <aside class="drawer-panel">
+        <div class="panel-head">
+          <h3>设置</h3>
+          <button class="button icon-only" data-close="settingsDrawer" title="关闭" aria-label="关闭">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="panel-body">
+          <div>
+            <div class="section-title" style="margin-top: 0"><i data-lucide="users"></i>用户</div>
+            <div class="form-grid">
+              <div class="form-field">
+                <label for="settingsUser">当前用户</label>
+                <select id="settingsUser" class="select"></select>
+              </div>
+              <button class="button" id="settingsAddUser" type="button">
+                <i data-lucide="user-plus"></i>
+                新增用户
+              </button>
+              <button class="button danger" id="settingsRemoveUser" type="button">
+                <i data-lucide="user-minus"></i>
+                从此设备移除当前用户
+              </button>
+            </div>
+          </div>
+          <div>
+            <div class="section-title"><i data-lucide="languages"></i>界面语言</div>
+            <select id="languageSelect" class="select">
+              <option value="zh-CN">简体中文</option>
+              <option value="en-US">English</option>
+            </select>
+          </div>
+          <div>
+            <div class="section-title"><i data-lucide="shield"></i>安全</div>
+            <div class="toggle-row">
+              <div>
+                <strong>系统锁屏时自动锁定</strong>
+                <span>清理会话密钥。</span>
+              </div>
+              <label class="switch"><input type="checkbox" checked /><span></span></label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <strong>复制后清理剪贴板</strong>
+                <span>45 秒后清理。</span>
+              </div>
+              <label class="switch"><input type="checkbox" checked /><span></span></label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <strong>启动后最小化到托盘</strong>
+                <span>快捷键呼出搜索。</span>
+              </div>
+              <label class="switch"><input type="checkbox" /><span></span></label>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="drawer" id="syncDrawer" aria-hidden="true">
+      <div class="scrim" data-close="syncDrawer"></div>
+      <aside class="drawer-panel">
+        <div class="panel-head">
+          <h3>同步</h3>
+          <button class="button icon-only" data-close="syncDrawer" title="关闭" aria-label="关闭">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="panel-body">
+          <div class="sync-card-grid">
+            <div class="sync-state-card offline" id="syncStatusCard">
+              <strong id="syncStatusTitle">未登录</strong>
+              <p id="syncStatusBody">选择官方登录，或连接自部署服务器。</p>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-field">
+                <label for="syncMode">同步模式</label>
+                <select id="syncMode" class="select">
+                  <option value="official">LockPass 官方托管</option>
+                  <option value="selfhost">自建服务器</option>
+                </select>
+              </div>
+              <div class="form-field" id="selfHostServerField">
+                <label for="serverUrl">服务器地址</label>
+                <input id="serverUrl" class="input" placeholder="https://lockpass.example.com" />
+              </div>
+              <div class="form-field" id="selfHostSessionField">
+                <label for="syncSessionToken">登录 Token</label>
+                <input id="syncSessionToken" class="input" placeholder="登录后获得的 Web session token" />
+              </div>
+            </div>
+
+            <div class="sync-actions">
+              <button class="button primary" id="syncLogin">
+                <i data-lucide="log-in"></i>
+                跳转官方登录
+              </button>
+              <button class="button hidden" id="syncLogout">
+                <i data-lucide="log-out"></i>
+                退出登录
+              </button>
+              <button class="button hidden" id="syncNowSettings">
+                <i data-lucide="refresh-cw"></i>
+                立即同步
+              </button>
+            </div>
+
+            <button class="button" id="saveSyncSettings">
+              <i data-lucide="save"></i>
+              保存自部署设置
+            </button>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="modal-layer" id="vaultModal" aria-hidden="true">
+      <div class="scrim" data-close="vaultModal"></div>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="vaultModalTitle">
+        <div class="panel-head">
+          <h3 id="vaultModalTitle">新增保险库</h3>
+          <button class="button icon-only" data-close="vaultModal" title="关闭" aria-label="关闭">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-grid" id="vaultFields">
+            <div class="form-field">
+              <label for="vaultName">名称</label>
+              <input id="vaultName" class="input" value="个人" />
+            </div>
+            <div class="form-field">
+              <label for="vaultIcon">图标</label>
+              <select id="vaultIcon" class="select">
+                <option value="folder-lock">保险库</option>
+                <option value="briefcase-business">工作</option>
+                <option value="house">家庭</option>
+                <option value="credit-card">财务</option>
+                <option value="key-round">密钥</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="button" data-close="vaultModal">取消</button>
+          <button class="button primary" id="saveVault">
+            <i data-lucide="save"></i>
+            保存
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal-layer" id="itemModal" aria-hidden="true">
+      <div class="scrim" data-close="itemModal"></div>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="itemModalTitle">
+        <div class="panel-head">
+          <h3 id="itemModalTitle">新建条目</h3>
+          <button class="button icon-only" data-close="itemModal" title="关闭" aria-label="关闭">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="newType">类型<span class="required-mark">*</span></label>
+              <select id="newType" class="select">
+                <option value="login">登录密码</option>
+                <option value="card">银行卡</option>
+                <option value="note">安全笔记</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="newVault">保险库<span class="required-mark">*</span></label>
+              <select id="newVault" class="select"></select>
+            </div>
+            <div class="form-field">
+              <label for="newName">名称<span class="required-mark">*</span></label>
+              <input id="newName" class="input" value="登录密码" />
+            </div>
+            <div id="typeFields" class="type-fields"></div>
+            <div class="form-error hidden" id="itemError"></div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="button" data-close="itemModal">取消</button>
+          <button class="button primary" id="saveNewItem">
+            <i data-lucide="save"></i>
+            保存
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal-layer" id="userModal" aria-hidden="true">
+      <div class="scrim" data-close="userModal"></div>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="userModalTitle">
+        <div class="panel-head">
+          <h3 id="userModalTitle">新增用户</h3>
+          <button class="button icon-only" data-close="userModal" title="关闭" aria-label="关闭">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-grid" id="userStartChoice">
+            <h2>你是新用户还是已有用户？</h2>
+            <button class="action-card" id="startFirstDevice" type="button">
+              <span class="action-icon"><i data-lucide="user-plus"></i></span>
+              <div>
+                <strong>我是新用户</strong>
+                <span>创建新用户，并生成安全密钥。</span>
+              </div>
+            </button>
+            <button class="action-card" id="startOldDevice" type="button">
+              <span class="action-icon"><i data-lucide="cloud"></i></span>
+              <div>
+                <strong>我是已有用户</strong>
+                <span>输入主密码和安全密钥；完整恢复待同步服务接入。</span>
+              </div>
+            </button>
+          </div>
+          <div class="form-grid hidden" id="oldDeviceGuide">
+            <button class="button" id="backUserChoice" type="button">
+              <i data-lucide="arrow-left"></i>
+              返回上一步
+            </button>
+            <h2>已有用户恢复（预留）</h2>
+            <div class="form-field">
+              <label for="existingPassword">主密码<span class="required-mark">*</span></label>
+              <input id="existingPassword" class="input" type="password" />
+            </div>
+            <div class="form-field">
+              <label for="existingRecoveryKey">安全密钥<span class="required-mark">*</span></label>
+              <textarea id="existingRecoveryKey" class="input" rows="4" spellcheck="false" placeholder="输入安全密钥，或扫描旧设备二维码后自动填入"></textarea>
+            </div>
+            <div class="modal-actions" style="padding: 0">
+              <button class="button" id="scanRecoveryQr" type="button">
+                <i data-lucide="scan-line"></i>
+                扫描二维码
+              </button>
+              <button class="button primary" id="recoverExistingVault" type="button">
+                <i data-lucide="unlock"></i>
+                恢复并解锁
+              </button>
+            </div>
+          </div>
+          <div class="form-grid hidden" id="userSetupFields">
+            <button class="button" id="backUserChoiceFromSetup" type="button" style="justify-self: start">
+              <i data-lucide="arrow-left"></i>
+              返回上一步
+            </button>
+            <h2>创建新用户</h2>
+            <div class="form-field">
+              <label for="userName">用户名<span class="required-mark">*</span></label>
+              <input id="userName" class="input" placeholder="例如 zhangsan" />
+            </div>
+            <div class="form-field">
+              <label for="userPassword">主密码<span class="required-mark">*</span></label>
+              <input id="userPassword" class="input" type="password" />
+            </div>
+            <div class="form-field">
+              <label for="userConfirmPassword">确认主密码<span class="required-mark">*</span></label>
+              <input id="userConfirmPassword" class="input" type="password" />
+            </div>
+            <div class="form-error hidden" id="userError"></div>
+          </div>
+          <div class="form-grid hidden" id="recoveryKeyPanel">
+            <button class="button" id="backUserSetupFromRecovery" type="button" style="justify-self: start">
+              <i data-lucide="arrow-left"></i>
+              返回上一步
+            </button>
+            <h2>保存安全密钥</h2>
+            <textarea class="input" id="generatedRecoveryKey" readonly rows="4"></textarea>
+            <label class="form-field" style="grid-template-columns: 20px minmax(0, 1fr); align-items: center">
+              <input id="savedRecoveryKeyOffline" type="checkbox" />
+              我已离线保存安全密钥
+            </label>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="button" data-close="userModal">取消</button>
+          <button class="button primary" id="saveUser">
+            <i data-lucide="save"></i>
+            创建并生成安全密钥
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal-layer" id="removeUserModal" aria-hidden="true">
+      <div class="scrim" data-close="removeUserModal"></div>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="removeUserTitle">
+        <div class="panel-head">
+          <h3 id="removeUserTitle">从此设备移除用户</h3>
+          <button class="button icon-only" data-close="removeUserModal" title="关闭" aria-label="关闭">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <p class="form-error" id="removeUserSummary"></p>
+            <p class="sync-note">只移除此设备上的本地用户、保险库密文和已保存的安全密钥；其他设备和服务器账号不受影响。</p>
+            <label class="form-field" style="grid-template-columns: 20px minmax(0, 1fr); align-items: center">
+              <input id="removeUserConfirmed" type="checkbox" />
+              我确认已保存安全密钥，或不再需要此用户
+            </label>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="button" data-close="removeUserModal">取消</button>
+          <button class="button danger" id="confirmRemoveUser" type="button" disabled>
+            <i data-lucide="user-minus"></i>
+            从此设备移除
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal-layer" id="switchUserConfirmModal" aria-hidden="true">
+      <div class="scrim" data-close="switchUserConfirmModal"></div>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="switchUserConfirmTitle">
+        <div class="panel-head">
+          <h3 id="switchUserConfirmTitle">确认切换用户</h3>
+          <button class="button icon-only" data-close="switchUserConfirmModal" title="关闭" aria-label="关闭">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p class="sync-note" id="switchUserConfirmBody"></p>
+        </div>
+        <div class="modal-actions">
+          <button class="button" data-close="switchUserConfirmModal">取消</button>
+          <button class="button primary" id="confirmSwitchUser" type="button">
+            <i data-lucide="log-in"></i>
+            切换用户
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal-layer" id="recoveryExportModal" aria-hidden="true">
+      <div class="scrim" data-close="recoveryExportModal"></div>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="recoveryExportTitle">
+        <div class="panel-head">
+          <h3 id="recoveryExportTitle">显示安全密钥 / 新设备迁移预留</h3>
+          <button class="button icon-only" data-close="recoveryExportModal" title="关闭" aria-label="关闭">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-grid" id="recoveryVerifyPanel">
+              <p class="sync-note">请重新验证主密码。验证后可显示安全密钥；新设备二维码迁移仍为预留流程，二维码内容等价于安全密钥。</p>
+              <div class="form-field">
+                <label for="recoveryExportPassword">主密码</label>
+                <input id="recoveryExportPassword" class="input" type="password" autocomplete="current-password" />
+              </div>
+              <button class="button primary" id="verifyRecoveryExport" type="button">
+                <i data-lucide="shield-check"></i>
+                验证并显示
+              </button>
+              <p class="form-error hidden" id="recoveryExportError"></p>
+              <div class="form-grid hidden" id="recoveryTrustPanel">
+                <textarea class="input" id="recoveryTrustKey" rows="3" placeholder="输入已离线保存的安全密钥"></textarea>
+                <button class="button" id="saveRecoveryTrust" type="button">
+                  <i data-lucide="save"></i>
+                  保存到此设备并显示
+                </button>
+              </div>
+            </div>
+            <div class="form-grid hidden" id="recoveryExportResult">
+              <textarea class="input" id="revealedRecoveryKey" readonly rows="3"></textarea>
+              <div class="qr-placeholder" aria-label="二维码占位">QR<br />安全密钥</div>
+              <p class="sync-note">新设备迁移需要同步服务和 wrappedVaultKey 恢复闭环接入后完成。本机只演示流程，不生成真实二维码图片。</p>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="button" data-close="recoveryExportModal">关闭</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal-layer" id="imagePreviewModal" aria-hidden="true">
+      <div class="scrim" data-close="imagePreviewModal"></div>
+      <section class="modal image-preview-modal" role="dialog" aria-modal="true" aria-labelledby="imagePreviewTitle">
+        <div class="panel-head">
+          <h3 id="imagePreviewTitle">图片预览</h3>
+          <button class="button icon-only" data-close="imagePreviewModal" title="关闭" aria-label="关闭">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="image-preview-frame">
+            <img id="imagePreviewImage" alt="附件图片预览" />
+            <div class="image-preview-fallback hidden" id="imagePreviewFallback">
+              <i data-lucide="image"></i>
+              <strong>原型示意预览</strong>
+              <span id="imagePreviewFallbackText"></span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="quick-layer" id="quickLayer" aria-hidden="true">
+      <div class="scrim" data-close="quickLayer"></div>
+      <section class="quick-box" role="dialog" aria-modal="true">
+        <label class="quick-input">
+          <i data-lucide="search"></i>
+          <input id="quickInput" type="search" placeholder="输入名称、账号、网址" autocomplete="off" />
+        </label>
+        <div class="quick-results" id="quickResults"></div>
+      </section>
+    </div>
+
+    <div class="lock-layer" id="lockLayer" aria-hidden="true">
+      <section class="lock-card">
+        <div class="brand" id="unlockBrand" style="min-width: 0">
+          <div class="brand-mark"><i data-lucide="lock-keyhole"></i></div>
+          <div>
+            LockPass Next
+            <small>已锁定</small>
+          </div>
+        </div>
+        <h2 id="unlockTitle">解锁保险库</h2>
+        <p id="unlockBody">输入主密码。受信任设备会从系统安全存储读取安全密钥。</p>
+        <input class="input" id="unlockPassword" type="password" placeholder="主密码" />
+        <div class="form-grid hidden" id="recoveryChoicePanel">
+          <button class="button" id="backToPasswordUnlock" type="button">
+            <i data-lucide="arrow-left"></i>
+            返回解锁
+          </button>
+          <button class="action-card" id="createNewUserFromLock" type="button">
+            <span class="action-icon"><i data-lucide="user-plus"></i></span>
+            <div>
+              <strong>我是新用户</strong>
+              <span>创建新用户并生成安全密钥。</span>
+            </div>
+          </button>
+          <button class="action-card" id="showExistingUserRecovery" type="button">
+            <span class="action-icon"><i data-lucide="cloud"></i></span>
+            <div>
+              <strong>我是已有用户</strong>
+              <span>我已有保险库或旧设备；完整恢复待同步服务接入。</span>
+            </div>
+          </button>
+        </div>
+        <div class="form-grid hidden" id="recoveryKeyUnlockFields">
+          <button class="button" id="backToRecoveryChoice" type="button">
+            <i data-lucide="arrow-left"></i>
+            返回上一步
+          </button>
+          <textarea class="input" id="unlockRecoveryKey" rows="3" spellcheck="false" placeholder="安全密钥"></textarea>
+        </div>
+        <button class="button" id="showRecoveryKeyUnlock" type="button">
+          <i data-lucide="rotate-ccw"></i>
+          新用户 / 已有用户恢复预留
+        </button>
+        <button class="button primary" id="unlockApp">
+          <i data-lucide="unlock"></i>
+          解锁
+        </button>
+      </section>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+      const vaults = [
+        { id: "all", name: "全部条目", icon: "layout-grid", system: true },
+        { id: "work", name: "工作", icon: "briefcase-business" },
+        { id: "home", name: "家庭", icon: "house" },
+        { id: "finance", name: "财务", icon: "credit-card" }
+      ]
+
+      const users = [
+        { id: "user-zhang", name: "张宇新", initials: "ZY" },
+        { id: "user-demo", name: "Demo User", initials: "DU" }
+      ]
+
+      const items = [
+        {
+          id: "github",
+          name: "GitHub",
+          vault: "work",
+          type: "login",
+          icon: "GH",
+          url: "github.com",
+          username: "zyx@example.com",
+          password: "Raven-Glass-91!Field",
+          totp: "842 195",
+          notes: "恢复码保存在该条目的附件中。",
+          updated: "2026-05-15 21:18",
+          favorite: true,
+          strength: 82,
+          attachments: [
+            {
+              name: "github-recovery-codes.png",
+              kind: "图片",
+              size: "842 KB",
+              encryptedSize: "916 KB",
+              checksum: "sha256:a8f2...9c31"
+            }
+          ],
+          history: [
+            ["2026-05-15 21:18", "本机更新了备注"],
+            ["2026-05-14 09:42", "Windows 设备复制了密码"],
+            ["2026-05-13 23:10", "从旧版 LockPass 导入"]
+          ]
+        },
+        {
+          id: "aliyun",
+          name: "阿里云盘",
+          vault: "home",
+          type: "login",
+          icon: "云",
+          url: "aliyundrive.com",
+          username: "whyzi@qq.com",
+          password: "Cedar-Bridge-23#Lake",
+          totp: "127 044",
+          notes: "用于备份旧版数据。",
+          updated: "2026-05-14 18:20",
+          favorite: false,
+          strength: 76,
+          history: [
+            ["2026-05-14 18:20", "更新了登录密码"],
+            ["2026-05-12 11:31", "创建条目"]
+          ]
+        },
+        {
+          id: "bank",
+          name: "招商银行卡",
+          vault: "finance",
+          type: "card",
+          icon: "卡",
+          url: "cmbchina.com",
+          username: "张宇新",
+          password: "6225 **** **** 2037",
+          totp: "",
+          notes: "账单日 12 号。",
+          updated: "2026-05-11 08:03",
+          favorite: false,
+          strength: 0,
+          attachments: [
+            {
+              name: "card-front-backup.jpg",
+              kind: "图片",
+              size: "1.8 MB",
+              encryptedSize: "1.9 MB",
+              checksum: "sha256:7f2d...41be"
+            }
+          ],
+          history: [
+            ["2026-05-11 08:03", "更新有效期"],
+            ["2026-05-01 13:12", "创建条目"]
+          ]
+        },
+        {
+          id: "wifi",
+          name: "家庭 Wi-Fi",
+          vault: "home",
+          type: "note",
+          icon: "WF",
+          url: "客厅路由器",
+          username: "LockPass-Home",
+          password: "GreenTea_2026",
+          totp: "",
+          notes: "访客网络每月轮换。",
+          updated: "2026-05-10 22:08",
+          favorite: false,
+          strength: 54,
+          history: [
+            ["2026-05-10 22:08", "更新访客密码"],
+            ["2026-04-26 20:44", "创建条目"]
+          ]
+        },
+        {
+          id: "openai",
+          name: "OpenAI",
+          vault: "work",
+          type: "login",
+          icon: "AI",
+          url: "platform.openai.com",
+          username: "team@example.com",
+          password: "North-Canvas-77@Grid",
+          totp: "552 021",
+          notes: "团队 API 账户。",
+          updated: "2026-05-09 16:15",
+          favorite: true,
+          strength: 88,
+          history: [
+            ["2026-05-09 16:15", "同步到服务器"],
+            ["2026-05-04 10:02", "创建条目"]
+          ]
+        }
+      ]
+
+      const state = {
+        vault: "all",
+        type: "all",
+        selectedId: "github",
+        editingId: null,
+        pendingAttachments: [],
+        passwordTarget: null,
+        showSecrets: false,
+        search: "",
+        quickIndex: 0,
+        tab: "details",
+        activeUserId: "user-zhang",
+        pendingSwitchUserId: "",
+        layout: {
+          sidebarWidth: 236,
+          itemListWidth: 358
+        },
+        sync: {
+          mode: "official",
+          connected: false,
+          serverUrl: "",
+          sessionToken: "",
+          account: "",
+          lastSync: "从未同步"
+        }
+      }
+
+      const $ = (selector) => document.querySelector(selector)
+      const $$ = (selector) => Array.from(document.querySelectorAll(selector))
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;")
+      }
+
+      function currentItem() {
+        return items.find((item) => item.id === state.selectedId) || items[0]
+      }
+
+      function activeUser() {
+        return users.find((user) => user.id === state.activeUserId) || users[0] || null
+      }
+
+      function renderProfile() {
+        const user = activeUser()
+        if (!user) {
+          $("#profileAvatar").textContent = "LP"
+          $("#profileName").textContent = "未设置用户"
+          $("#profileStatus").textContent = "需要创建用户"
+          $("#profileUserList").innerHTML = '<button type="button" disabled><strong>暂无用户</strong><span></span></button>'
+          renderUserOptions()
+          ;["showRecoveryKeyFromProfile", "removeUserFromProfile", "lockFromProfile", "settingsRemoveUser"].forEach((id) => {
+            const button = document.getElementById(id)
+            if (button) button.disabled = true
+          })
+          return
+        }
+
+        $("#profileAvatar").textContent = user.initials
+        $("#profileName").textContent = user.name
+        $("#profileStatus").textContent = "本地保险库已解锁"
+        $("#profileButton").setAttribute("aria-expanded", String(!$("#profileMenu").classList.contains("hidden")))
+        $("#profileUserList").innerHTML = users
+          .map(
+            (entry) => `
+              <button type="button" data-switch-user="${entry.id}">
+                <strong>${escapeHtml(entry.name)}</strong>
+                ${entry.id === state.activeUserId ? '<i data-lucide="check"></i>' : "<span></span>"}
+              </button>
+            `
+          )
+          .join("")
+        renderUserOptions()
+        $$("[data-switch-user]").forEach((button) => {
+          button.addEventListener("click", () => requestSwitchUser(button.dataset.switchUser))
+        })
+        ;["showRecoveryKeyFromProfile", "removeUserFromProfile", "lockFromProfile", "settingsRemoveUser"].forEach((id) => {
+          const button = document.getElementById(id)
+          if (button) button.disabled = false
+        })
+      }
+
+      function renderUserOptions() {
+        const select = $("#settingsUser")
+        if (!select) return
+        select.innerHTML = users.length
+          ? users.map((user) => `<option value="${user.id}">${escapeHtml(user.name)}</option>`).join("")
+          : '<option value="">未设置用户</option>'
+        select.value = state.activeUserId || ""
+        select.disabled = users.length === 0
+      }
+
+      function switchUser(userId) {
+        const user = users.find((entry) => entry.id === userId)
+        if (!user) return
+        state.activeUserId = user.id
+        state.pendingSwitchUserId = ""
+        $("#profileMenu").classList.add("hidden")
+        closeLayer("settingsDrawer")
+        renderProfile()
+        openLayer("lockLayer")
+        toast(`已切换到 ${user.name}，请重新输入主密码`)
+      }
+
+      function requestSwitchUser(userId) {
+        const user = users.find((entry) => entry.id === userId)
+        const current = activeUser()
+        renderUserOptions()
+        $("#profileMenu").classList.add("hidden")
+        if (!user || user.id === state.activeUserId) return
+
+        state.pendingSwitchUserId = user.id
+        $("#switchUserConfirmBody").textContent = `将从「${current?.name || "当前用户"}」切换到「${user.name}」，当前保险库会锁定。`
+        openLayer("switchUserConfirmModal")
+      }
+
+      function confirmSwitchUser() {
+        const userId = state.pendingSwitchUserId
+        closeLayer("switchUserConfirmModal")
+        if (!userId) return
+        switchUser(userId)
+      }
+
+      function openRemoveUserModal() {
+        const user = activeUser()
+        $("#profileMenu").classList.add("hidden")
+        closeLayer("settingsDrawer")
+
+        if (!user) {
+          toast("当前没有可移除的用户")
+          return
+        }
+
+        $("#removeUserConfirmed").checked = false
+        $("#confirmRemoveUser").disabled = true
+        $("#removeUserSummary").textContent = `即将从此设备移除「${user.name}」。`
+        openLayer("removeUserModal")
+      }
+
+      function removeActiveUserFromDevice() {
+        const user = activeUser()
+        if (!user) return
+
+        const index = users.findIndex((entry) => entry.id === user.id)
+        const [removed] = users.splice(index, 1)
+        const nextUser = users[Math.min(index, users.length - 1)] || null
+        state.activeUserId = nextUser?.id || ""
+        closeLayer("removeUserModal")
+        $("#profileMenu").classList.add("hidden")
+        renderProfile()
+
+        if (nextUser) {
+          openLayer("lockLayer")
+          toast(`已从此设备移除 ${removed.name}，请解锁 ${nextUser.name}`)
+          return
+        }
+
+        closeLayer("lockLayer")
+        openUserModal()
+        toast(`已从此设备移除 ${removed.name}`)
+      }
+
+      function resetUserModalState() {
+        $("#userName").value = ""
+        $("#userPassword").value = ""
+        $("#userConfirmPassword").value = ""
+        $("#existingPassword").value = ""
+        $("#existingRecoveryKey").value = ""
+        $("#generatedRecoveryKey").value = ""
+        $("#savedRecoveryKeyOffline").checked = false
+        $("#userStartChoice").classList.remove("hidden")
+        $("#oldDeviceGuide").classList.add("hidden")
+        $("#recoveryKeyPanel").classList.add("hidden")
+        $("#userSetupFields").classList.add("hidden")
+        $("#saveUser").classList.add("hidden")
+        $("#saveUser").disabled = false
+        $("#saveUser").innerHTML = '<i data-lucide="save"></i>创建并生成安全密钥'
+        $("#userError").classList.add("hidden")
+      }
+
+      function openUserModal() {
+        $("#profileMenu").classList.add("hidden")
+        closeLayer("settingsDrawer")
+        resetUserModalState()
+        openLayer("userModal")
+        setTimeout(() => $("#startFirstDevice").focus(), 0)
+      }
+
+      function showUserSetupFields() {
+        $("#userStartChoice").classList.add("hidden")
+        $("#oldDeviceGuide").classList.add("hidden")
+        $("#recoveryKeyPanel").classList.add("hidden")
+        $("#userSetupFields").classList.remove("hidden")
+        $("#saveUser").classList.remove("hidden")
+        $("#saveUser").disabled = false
+        $("#saveUser").innerHTML = '<i data-lucide="save"></i>创建并生成安全密钥'
+        $("#savedRecoveryKeyOffline").checked = false
+        refreshIcons()
+        setTimeout(() => $("#userName").focus(), 0)
+      }
+
+      function showOldDeviceGuide() {
+        $("#userStartChoice").classList.add("hidden")
+        $("#userSetupFields").classList.add("hidden")
+        $("#recoveryKeyPanel").classList.add("hidden")
+        $("#saveUser").classList.add("hidden")
+        $("#oldDeviceGuide").classList.remove("hidden")
+        setTimeout(() => $("#existingPassword").focus(), 0)
+      }
+
+      function showUserRecoveryKeyPanel() {
+        $("#generatedRecoveryKey").value = generateRecoveryKey()
+        $("#savedRecoveryKeyOffline").checked = false
+        $("#userStartChoice").classList.add("hidden")
+        $("#userSetupFields").classList.add("hidden")
+        $("#oldDeviceGuide").classList.add("hidden")
+        $("#recoveryKeyPanel").classList.remove("hidden")
+        $("#saveUser").classList.remove("hidden")
+        $("#saveUser").disabled = true
+        $("#saveUser").innerHTML = '<i data-lucide="check"></i>进入保险库'
+        refreshIcons()
+      }
+
+      function saveUser() {
+        if (!$("#recoveryKeyPanel").classList.contains("hidden")) {
+          if (!$("#savedRecoveryKeyOffline").checked) {
+            toast("请先确认已离线保存安全密钥")
+            return
+          }
+
+          const name = $("#userName").value.trim()
+          const initials = /^[a-z0-9\s]+$/i.test(name)
+            ? name
+                .trim()
+                .split(/\s+/)
+                .slice(0, 2)
+                .map((part) => part[0])
+                .join("")
+                .toUpperCase()
+            : name.slice(0, 2).toUpperCase()
+          const user = { id: `user-${Date.now().toString(36)}`, name, initials }
+          users.push(user)
+          state.activeUserId = user.id
+          renderProfile()
+          closeLayer("userModal")
+          resetUserModalState()
+          toast(`已创建用户：${name}。安全密钥已确认保存`)
+          return
+        }
+
+        const name = $("#userName").value.trim()
+        const password = $("#userPassword").value
+        const confirmPassword = $("#userConfirmPassword").value
+        const error = $("#userError")
+
+        let message = ""
+        if (!name) message = "请输入用户名"
+        else if (password.length < 8) message = "主密码至少需要 8 位"
+        else if (password !== confirmPassword) message = "两次输入的主密码不一致"
+
+        if (message) {
+          error.textContent = message
+          error.classList.remove("hidden")
+          return
+        }
+
+        error.classList.add("hidden")
+        showUserRecoveryKeyPanel()
+        toast("请离线保存安全密钥")
+      }
+
+      function openRecoveryExportModal() {
+        $("#profileMenu").classList.add("hidden")
+        closeLayer("settingsDrawer")
+        $("#recoveryExportPassword").value = ""
+        $("#revealedRecoveryKey").value = ""
+        $("#recoveryTrustKey").value = ""
+        $("#recoveryExportError").classList.add("hidden")
+        $("#recoveryTrustPanel").classList.add("hidden")
+        $("#recoveryVerifyPanel").classList.remove("hidden")
+        $("#recoveryExportResult").classList.add("hidden")
+        openLayer("recoveryExportModal")
+        setTimeout(() => $("#recoveryExportPassword").focus(), 0)
+      }
+
+      function verifyRecoveryExport() {
+        const password = $("#recoveryExportPassword").value.trim()
+        if (!password) {
+          toast("请先重新验证主密码")
+          return
+        }
+        $("#recoveryExportError").classList.add("hidden")
+        $("#recoveryTrustPanel").classList.add("hidden")
+        $("#revealedRecoveryKey").value = "LP-TRUSTED-DEVICE-7K9D-M4Q2-H6VR-P8CX"
+        $("#recoveryVerifyPanel").classList.add("hidden")
+        $("#recoveryExportResult").classList.remove("hidden")
+        refreshIcons()
+        toast("已验证，安全密钥已显示；新设备迁移仍为预留流程")
+      }
+
+      function saveRecoveryTrust() {
+        const password = $("#recoveryExportPassword").value.trim()
+        const recoveryKey = $("#recoveryTrustKey").value.trim()
+        if (!password) {
+          $("#recoveryExportError").textContent = "请先重新验证主密码"
+          $("#recoveryExportError").classList.remove("hidden")
+          return
+        }
+        if (!recoveryKey) {
+          $("#recoveryExportError").textContent = "请输入已离线保存的安全密钥"
+          $("#recoveryExportError").classList.remove("hidden")
+          return
+        }
+        $("#recoveryExportError").classList.add("hidden")
+        $("#revealedRecoveryKey").value = recoveryKey
+        $("#recoveryTrustPanel").classList.add("hidden")
+        $("#recoveryVerifyPanel").classList.add("hidden")
+        $("#recoveryExportResult").classList.remove("hidden")
+        refreshIcons()
+        toast("安全密钥已保存到此设备")
+      }
+
+      function generateRecoveryKey() {
+        const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+        const bytes = new Uint8Array(32)
+        crypto.getRandomValues(bytes)
+        const text = Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("")
+        return `LP-${text.match(/.{1,4}/g).join("-")}`
+      }
+
+      function applyLayout() {
+        document.documentElement.style.setProperty("--sidebar-width", `${state.layout.sidebarWidth}px`)
+        document.documentElement.style.setProperty("--list-width", `${state.layout.itemListWidth}px`)
+      }
+
+      function clamp(value, min, max) {
+        return Math.round(Math.min(max, Math.max(min, value)))
+      }
+
+      function startResize(event, target) {
+        event.preventDefault()
+        const grid = $(".main-grid")
+        if (!grid) return
+        const handle = event.currentTarget
+        handle.classList.add("active")
+        document.body.style.cursor = "col-resize"
+        document.body.style.userSelect = "none"
+
+        function onMove(moveEvent) {
+          const rect = grid.getBoundingClientRect()
+          const pointerX = moveEvent.clientX - rect.left
+          if (target === "sidebar") {
+            const max = Math.min(360, rect.width - 6 * 2 - 260 - 420)
+            state.layout.sidebarWidth = clamp(pointerX, 190, Math.max(190, max))
+          } else {
+            const listStart = state.layout.sidebarWidth + 6
+            const max = Math.min(560, rect.width - state.layout.sidebarWidth - 6 * 2 - 420)
+            state.layout.itemListWidth = clamp(pointerX - listStart, 260, Math.max(260, max))
+          }
+          applyLayout()
+        }
+
+        function onUp() {
+          handle.classList.remove("active")
+          document.body.style.cursor = ""
+          document.body.style.userSelect = ""
+          window.removeEventListener("pointermove", onMove)
+        }
+
+        window.addEventListener("pointermove", onMove)
+        window.addEventListener("pointerup", onUp, { once: true })
+      }
+
+      function resizeByKeyboard(target, delta) {
+        if (target === "sidebar") {
+          state.layout.sidebarWidth = clamp(state.layout.sidebarWidth + delta, 190, 360)
+        } else {
+          state.layout.itemListWidth = clamp(state.layout.itemListWidth + delta, 260, 560)
+        }
+        applyLayout()
+      }
+
+      function filteredItems() {
+        const query = state.search.trim().toLowerCase()
+        return items.filter((item) => {
+          const matchVault = state.vault === "all" || item.vault === state.vault
+          const matchType = state.type === "all" || item.type === state.type
+          const attachmentText = (item.attachments || []).map((file) => file.name).join(" ")
+          const text = `${item.name} ${item.url || ""} ${item.username || ""} ${item.notes || ""} ${attachmentText}`.toLowerCase()
+          return matchVault && matchType && (!query || text.includes(query))
+        })
+      }
+
+      function typeLabel(type) {
+        return { login: "登录", card: "银行卡", note: "笔记" }[type] || "条目"
+      }
+
+      function defaultNameForType(type) {
+        return { login: "登录密码", card: "银行卡", note: "安全笔记" }[type] || "新条目"
+      }
+
+      function vaultLabel(vault) {
+        return vaults.find((item) => item.id === vault)?.name || "全部条目"
+      }
+
+      function defaultFieldsForType(type) {
+        if (type === "card") {
+          return {
+            issuer: "",
+            cardNumber: "",
+            holder: "",
+            expiry: "",
+            cvc: "",
+            pin: "",
+            site: "",
+            notes: "",
+            attachments: []
+          }
+        }
+        if (type === "note") {
+          return {
+            noteText: "",
+            recoveryCode: "",
+            notes: "",
+            attachments: []
+          }
+        }
+        return {
+          url: "",
+          username: "",
+          password: "",
+          totp: "",
+          notes: "",
+          attachments: []
+        }
+      }
+
+      function fieldsFromItem(item) {
+        if (item.fields) return { ...defaultFieldsForType(item.type), ...item.fields, attachments: item.attachments || item.fields.attachments || [] }
+        if (item.type === "card") {
+          return {
+            ...defaultFieldsForType("card"),
+            issuer: item.url || "招商银行",
+            cardNumber: item.password || "",
+            holder: item.username || "",
+            notes: item.notes || "",
+            attachments: item.attachments || []
+          }
+        }
+        if (item.type === "note") {
+          return {
+            ...defaultFieldsForType("note"),
+            noteText: item.notes || "",
+            attachments: item.attachments || []
+          }
+        }
+        return {
+          ...defaultFieldsForType("login"),
+          url: item.url || "",
+          username: item.username || "",
+          password: item.password || "",
+          totp: item.totp || "",
+          notes: item.notes || "",
+          attachments: item.attachments || []
+        }
+      }
+
+      function itemSubtitle(item) {
+        const fields = fieldsFromItem(item)
+        if (item.type === "card") return `${fields.holder || "持卡人"} · ${fields.issuer || "发卡机构"}`
+        if (item.type === "note") return fields.noteText || "安全笔记"
+        return `${fields.username || "账号"} · ${fields.url || "网址"}`
+      }
+
+      function itemDetailSubtitle(item) {
+        const fields = fieldsFromItem(item)
+        if (item.type === "card") return fields.issuer || "银行卡"
+        if (item.type === "note") return "安全笔记"
+        return fields.url || "登录密码"
+      }
+
+      function vaultCount(vaultId) {
+        if (vaultId === "all") return items.length
+        return items.filter((item) => item.vault === vaultId).length
+      }
+
+      function renderVaultNav() {
+        $("#vaultNav").innerHTML = vaults
+          .map(
+            (vault) => `
+              <button class="nav-item ${vault.id === state.vault ? "active" : ""}" data-vault="${escapeHtml(vault.id)}">
+                <span class="nav-item-main"><i data-lucide="${escapeHtml(vault.icon)}"></i>${escapeHtml(vault.name)}</span>
+                <span class="nav-count">${vaultCount(vault.id)}</span>
+              </button>
+            `
+          )
+          .join("")
+
+        $$(".nav-item[data-vault]").forEach((button) => {
+          button.addEventListener("click", () => {
+            state.vault = button.dataset.vault
+            render()
+          })
+        })
+      }
+
+      function renderVaultOptions() {
+        const writableVaults = vaults.filter((vault) => !vault.system)
+        $("#newVault").innerHTML = writableVaults
+          .map((vault) => `<option value="${escapeHtml(vault.id)}">${escapeHtml(vault.name)}</option>`)
+          .join("")
+      }
+
+      function renderList() {
+        const list = filteredItems()
+        $("#listTitle").textContent = vaultLabel(state.vault)
+        $("#listCount").textContent = `${list.length} 项`
+        $("#itemList").innerHTML = list
+          .map(
+            (item) => `
+              <button class="item-row ${item.id === state.selectedId ? "active" : ""}" data-item-id="${item.id}">
+                <span class="item-icon">${escapeHtml(item.icon)}</span>
+                <span>
+                  <span class="item-name">${escapeHtml(item.name)}</span>
+                  <span class="item-sub">${escapeHtml(itemSubtitle(item))}</span>
+                </span>
+                <span class="tag">${typeLabel(item.type)}</span>
+              </button>
+            `
+          )
+          .join("")
+
+        $$(".item-row").forEach((button) => {
+          button.addEventListener("click", () => {
+            state.selectedId = button.dataset.itemId
+            state.showSecrets = false
+            render()
+          })
+        })
+      }
+
+      function field(label, value, action, secret = false) {
+        const masked = secret && !state.showSecrets ? "••••••••••••••••" : value
+        return `
+          <div class="field-row">
+            <span class="field-label">${escapeHtml(label)}</span>
+            <span class="field-value ${secret ? "secret" : ""}">${escapeHtml(masked)}</span>
+            <button class="copy-inline" data-copy="${escapeHtml(value)}" data-secret="${secret}" title="${escapeHtml(action)}" aria-label="${escapeHtml(action)}">
+              <i data-lucide="${secret && !state.showSecrets ? "eye" : "copy"}"></i>
+            </button>
+          </div>
+        `
+      }
+
+      function attachmentIcon(file) {
+        const name = (file.name || "").toLowerCase()
+        if (isImageAttachment(file)) return "IMG"
+        if (file.kind === "压缩包" || /\.(zip|7z|rar|tar|gz)$/i.test(name)) return "ZIP"
+        if (/\.pdf$/i.test(name)) return "PDF"
+        return "FILE"
+      }
+
+      function isImageAttachment(file) {
+        const name = (file.name || "").toLowerCase()
+        return file.kind === "图片" || (file.mimeType || "").startsWith("image/") || /\.(png|jpg|jpeg|webp|gif|bmp|heic|avif|svg)$/i.test(name)
+      }
+
+      function attachmentList(files = [], options = {}) {
+        const source = options.source || "detail"
+        if (!files.length) {
+          return `
+            <div class="file-list">
+              <div class="file-row">
+                <span class="file-icon"><i data-lucide="paperclip"></i></span>
+                <span>
+                  <span class="file-name">暂无附件</span>
+                  <span class="file-meta">可以上传图片、压缩包、PDF、密钥文件等</span>
+                </span>
+                <span></span>
+              </div>
+            </div>
+          `
+        }
+        return `
+          <div class="file-list">
+            ${files
+              .map(
+                (file, index) => `
+                  <div class="file-row ${isImageAttachment(file) ? "previewable" : ""}" ${isImageAttachment(file) ? `data-preview-attachment="${index}" data-preview-source="${source}"` : ""}>
+                    <span class="file-icon">${escapeHtml(attachmentIcon(file))}</span>
+                    <span>
+                      <span class="file-name">${escapeHtml(file.name)}</span>
+                      <span class="file-meta">${escapeHtml(file.kind || "文件")} · ${escapeHtml(file.size || "未知大小")} · 加密后 ${escapeHtml(file.encryptedSize || file.size || "未知")}</span>
+                    </span>
+                    ${
+                      options.removable
+                        ? `<button class="copy-inline" data-remove-attachment="${index}" title="移除" aria-label="移除"><i data-lucide="x"></i></button>`
+                        : `<span style="display: flex; gap: 6px">
+                            ${
+                              isImageAttachment(file)
+                                ? `<button class="copy-inline" data-preview-attachment="${index}" data-preview-source="${source}" title="预览图片" aria-label="预览图片"><i data-lucide="image"></i></button>`
+                                : ""
+                            }
+                            <button class="copy-inline" data-copy="${escapeHtml(file.name)}" title="复制文件名" aria-label="复制文件名"><i data-lucide="copy"></i></button>
+                          </span>`
+                    }
+                  </div>
+                `
+              )
+              .join("")}
+          </div>
+        `
+      }
+
+      function bindAttachmentPreviewButtons() {
+        $$("[data-preview-attachment]").forEach((node) => {
+          node.addEventListener("click", (event) => {
+            event.stopPropagation()
+            const source = node.dataset.previewSource
+            const index = Number(node.dataset.previewAttachment)
+            const files = source === "draft" ? state.pendingAttachments : currentItem().attachments || []
+            const file = files[index]
+            if (file) openImagePreview(file)
+          })
+        })
+      }
+
+      function openImagePreview(file) {
+        $("#imagePreviewTitle").textContent = file.name || "图片预览"
+        const img = $("#imagePreviewImage")
+        const fallback = $("#imagePreviewFallback")
+        const fallbackText = $("#imagePreviewFallbackText")
+        if (file.previewUrl) {
+          img.src = file.previewUrl
+          img.classList.remove("hidden")
+          fallback.classList.add("hidden")
+        } else {
+          img.removeAttribute("src")
+          img.classList.add("hidden")
+          fallbackText.textContent = `${file.name || "图片附件"} · 原型中没有真实文件内容，上传本地图片后会显示实际预览。`
+          fallback.classList.remove("hidden")
+        }
+        openLayer("imagePreviewModal")
+        refreshIcons()
+      }
+
+      function renderDetails() {
+        const item = currentItem()
+        const itemFields = fieldsFromItem(item)
+        $("#detailIcon").textContent = item.icon
+        $("#detailTitle").textContent = item.name
+        $("#detailSubtitle").textContent = itemDetailSubtitle(item)
+        $("#toggleSecrets").innerHTML = `<i data-lucide="eye"></i>${state.showSecrets ? "隐藏敏感字段" : "显示敏感字段"}`
+
+        let fields = ""
+        if (item.type === "card") {
+          fields = [
+            field("发卡机构", itemFields.issuer, "复制发卡机构"),
+            field("持卡人", itemFields.holder, "复制持卡人"),
+            field("卡号", itemFields.cardNumber, "复制卡号", true),
+            field("有效期", itemFields.expiry, "复制有效期"),
+            field("CVC", itemFields.cvc, "复制 CVC", true),
+            itemFields.pin ? field("交易密码", itemFields.pin, "复制交易密码", true) : "",
+            itemFields.site ? field("官网", itemFields.site, "复制官网") : "",
+            field("备注", itemFields.notes, "复制备注")
+          ]
+            .filter(Boolean)
+            .join("")
+        } else if (item.type === "note") {
+          fields = [
+            field("笔记内容", itemFields.noteText, "复制笔记"),
+            itemFields.recoveryCode ? field("恢复码", itemFields.recoveryCode, "复制恢复码", true) : "",
+            itemFields.notes ? field("备注", itemFields.notes, "复制备注") : ""
+          ]
+            .filter(Boolean)
+            .join("")
+        } else {
+          fields = [
+            field("网址", itemFields.url, "复制网址"),
+            field("账号", itemFields.username, "复制账号"),
+            field("密码", itemFields.password, "复制密码", true),
+            itemFields.totp ? field("一次性验证码", itemFields.totp, "复制验证码") : "",
+            field("备注", itemFields.notes, "复制备注")
+          ]
+            .filter(Boolean)
+            .join("")
+        }
+
+        $("#detailFields").innerHTML = `${fields}<div class="section-title"><i data-lucide="paperclip"></i>附件</div>${attachmentList(item.attachments || [], { source: "detail" })}`
+
+        $("#historyList").innerHTML = item.history
+          .map(
+            ([time, text]) => `
+              <div class="activity">
+                <time>${escapeHtml(time)}</time>
+                <span>${escapeHtml(text)}</span>
+              </div>
+            `
+          )
+          .join("")
+
+        $("#strengthMeter").style.width = `${Math.max(item.strength, 8)}%`
+        $("#strengthText").textContent = item.strength > 80 ? "很强" : item.strength > 65 ? "强" : "一般"
+        $("#securityUpdated").textContent = item.updated
+
+        $$(".copy-inline[data-copy]").forEach((button) => {
+          button.addEventListener("click", (event) => {
+            event.stopPropagation()
+            if (button.dataset.secret === "true" && !state.showSecrets) {
+              state.showSecrets = true
+              render()
+              return
+            }
+            copyValue(button.dataset.copy)
+          })
+        })
+        bindAttachmentPreviewButtons()
+      }
+
+      function renderTabs() {
+        $$(".tab").forEach((tab) => {
+          tab.classList.toggle("active", tab.dataset.tab === state.tab)
+        })
+        $("#tabDetails").classList.toggle("hidden", state.tab !== "details")
+        $("#tabHistory").classList.toggle("hidden", state.tab !== "history")
+        $("#tabSecurity").classList.toggle("hidden", state.tab !== "security")
+      }
+
+      function formInput(id, label, value, options = {}) {
+        const type = options.type || "text"
+        const generate = options.generate ? `<button class="button" type="button" data-generate-target="${id}"><i data-lucide="wand-sparkles"></i>生成</button>` : ""
+        const placeholder = options.placeholder ? ` placeholder="${escapeHtml(options.placeholder)}"` : ""
+        const required = options.required ? '<span class="required-mark">*</span>' : ""
+        const control =
+          options.multiline
+            ? `<textarea id="${id}" class="textarea">${escapeHtml(value)}</textarea>`
+            : `<input id="${id}" class="input" type="${type}" value="${escapeHtml(value)}"${placeholder} />`
+
+        return `
+          <div class="form-field">
+            <label for="${id}">${escapeHtml(label)}${required}</label>
+            ${generate ? `<div class="input-action-row">${control}${generate}</div>` : control}
+          </div>
+        `
+      }
+
+      function uploadBlock() {
+        return `
+          <div class="form-field">
+            <label for="attachmentFiles">附件</label>
+            <div class="upload-box">
+              <div class="upload-head">
+                <div>
+                  <strong>上传图片或文件</strong>
+                  <span>支持多选，文件会在客户端加密后保存和同步。</span>
+                </div>
+                <label class="button">
+                  <i data-lucide="upload"></i>
+                  上传
+                  <input id="attachmentFiles" type="file" multiple hidden />
+                </label>
+              </div>
+              <div id="attachmentPreview"></div>
+            </div>
+          </div>
+        `
+      }
+
+      function formatFileSize(bytes) {
+        if (!bytes) return "未知大小"
+        if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`
+        return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+      }
+
+      function detectFileKind(name = "", type = "") {
+        const lower = name.toLowerCase()
+        if (type.startsWith("image/") || /\.(png|jpg|jpeg|webp|gif|bmp|heic|avif|svg)$/i.test(lower)) return "图片"
+        if (/\.(zip|7z|rar|tar|gz|tgz)$/i.test(lower)) return "压缩包"
+        if (/\.pdf$/i.test(lower)) return "PDF"
+        return "文件"
+      }
+
+      function fakeChecksum(name) {
+        let hash = 0
+        for (let index = 0; index < name.length; index += 1) {
+          hash = (hash * 31 + name.charCodeAt(index)) >>> 0
+        }
+        return `sha256:${hash.toString(16).padStart(8, "0")}...demo`
+      }
+
+      function bindAttachmentUploader() {
+        const input = $("#attachmentFiles")
+        if (!input) return
+        input.addEventListener("change", (event) => {
+          const files = Array.from(event.target.files || []).map((file) => {
+            const size = formatFileSize(file.size)
+            const kind = detectFileKind(file.name, file.type || "")
+            return {
+              name: file.name,
+              kind,
+              mimeType: file.type || "application/octet-stream",
+              size,
+              encryptedSize: size,
+              checksum: fakeChecksum(file.name),
+              previewUrl: kind === "图片" ? URL.createObjectURL(file) : ""
+            }
+          })
+          state.pendingAttachments = [...state.pendingAttachments, ...files]
+          renderAttachmentPreview()
+          toast(`已选择 ${files.length} 个附件`)
+        })
+      }
+
+      function renderAttachmentPreview() {
+        const preview = $("#attachmentPreview")
+        if (!preview) return
+        preview.innerHTML = attachmentList(state.pendingAttachments, { removable: true, source: "draft" })
+        $$("[data-remove-attachment]").forEach((button) => {
+          button.addEventListener("click", (event) => {
+            event.stopPropagation()
+            const [removed] = state.pendingAttachments.splice(Number(button.dataset.removeAttachment), 1)
+            if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl)
+            renderAttachmentPreview()
+          })
+        })
+        bindAttachmentPreviewButtons()
+        refreshIcons()
+      }
+
+      function renderTypeFields(type, values = defaultFieldsForType(type)) {
+        let html = ""
+        state.pendingAttachments = [...(values.attachments || [])]
+        if (type === "card") {
+          html = [
+            formInput("cardIssuer", "发卡机构", values.issuer || ""),
+            formInput("cardHolder", "持卡人", values.holder || ""),
+            formInput("cardNumber", "卡号", values.cardNumber || "", { required: true }),
+            formInput("cardExpiry", "有效期", values.expiry || ""),
+            formInput("cardCvc", "CVC", values.cvc || ""),
+            formInput("cardPin", "交易密码", values.pin || "", { generate: true }),
+            formInput("cardSite", "官网", values.site || ""),
+            formInput("cardNotes", "备注", values.notes || "", { multiline: true }),
+            uploadBlock()
+          ].join("")
+        } else if (type === "note") {
+          html = [
+            formInput("noteText", "笔记内容", values.noteText || "", { multiline: true, required: true }),
+            formInput("noteRecoveryCode", "恢复码", values.recoveryCode || "", { generate: true }),
+            formInput("noteNotes", "备注", values.notes || "", { multiline: true }),
+            uploadBlock()
+          ].join("")
+        } else {
+          const totpField = values.totp
+            ? formInput("loginTotp", "一次性验证码密钥", values.totp || "")
+            : `<button class="button" id="addTotpField" type="button"><i data-lucide="plus"></i>添加二步验证码</button><div id="totpPlaceholder"></div>`
+          html = [
+            formInput("loginUrl", "网址", values.url || ""),
+            formInput("loginUsername", "账号", values.username || ""),
+            formInput("loginPassword", "密码", values.password || "", { generate: true, required: true }),
+            totpField,
+            formInput("loginNotes", "备注", values.notes || "", { multiline: true }),
+            uploadBlock()
+          ].join("")
+        }
+
+        $("#typeFields").innerHTML = html
+        $$("[data-generate-target]").forEach((button) => {
+          button.addEventListener("click", () => {
+            openPasswordGenerator(button.dataset.generateTarget)
+          })
+        })
+        const addTotp = $("#addTotpField")
+        if (addTotp) {
+          addTotp.addEventListener("click", () => {
+            $("#totpPlaceholder").innerHTML = formInput("loginTotp", "一次性验证码密钥", "", {
+              placeholder: "粘贴 otpauth://... 或手动输入密钥"
+            })
+            addTotp.remove()
+            refreshIcons()
+          })
+        }
+        bindAttachmentUploader()
+        renderAttachmentPreview()
+        refreshIcons()
+      }
+
+      function readTypeFields(type) {
+        if (type === "card") {
+          return {
+            issuer: $("#cardIssuer").value.trim(),
+            holder: $("#cardHolder").value.trim(),
+            cardNumber: $("#cardNumber").value.trim(),
+            expiry: $("#cardExpiry").value.trim(),
+            cvc: $("#cardCvc").value.trim(),
+            pin: $("#cardPin").value.trim(),
+            site: $("#cardSite").value.trim(),
+            notes: $("#cardNotes").value.trim(),
+            attachments: [...state.pendingAttachments]
+          }
+        }
+        if (type === "note") {
+          return {
+            noteText: $("#noteText").value.trim(),
+            recoveryCode: $("#noteRecoveryCode").value.trim(),
+            notes: $("#noteNotes").value.trim(),
+            attachments: [...state.pendingAttachments]
+          }
+        }
+        return {
+          url: $("#loginUrl").value.trim(),
+          username: $("#loginUsername").value.trim(),
+          password: $("#loginPassword").value,
+          totp: $("#loginTotp")?.value.trim() || "",
+          notes: $("#loginNotes").value.trim(),
+          attachments: [...state.pendingAttachments]
+        }
+      }
+
+      function renderQuickResults(query = "") {
+        const q = query.toLowerCase()
+        const results = items.filter((item) => {
+          const attachmentText = (item.attachments || []).map((file) => file.name).join(" ")
+          return `${item.name} ${item.url || ""} ${item.username || ""} ${item.notes || ""} ${attachmentText}`.toLowerCase().includes(q)
+        })
+        state.quickIndex = Math.min(state.quickIndex, Math.max(results.length - 1, 0))
+        $("#quickResults").innerHTML = results
+          .map(
+            (item, index) => `
+              <button class="quick-result ${index === state.quickIndex ? "active" : ""}" data-quick-id="${item.id}">
+                <span class="item-icon">${escapeHtml(item.icon)}</span>
+                <span>
+                  <span class="item-name">${escapeHtml(item.name)}</span>
+                  <span class="item-sub">${escapeHtml(itemSubtitle(item))}</span>
+                </span>
+                <span class="tag">复制</span>
+              </button>
+            `
+          )
+          .join("")
+        $$(".quick-result").forEach((button) => {
+          button.addEventListener("click", () => {
+            state.selectedId = button.dataset.quickId
+            closeLayer("quickLayer")
+            render()
+            copyValue(currentItem().password, "已复制密码")
+          })
+        })
+        refreshIcons()
+      }
+
+      function render() {
+        applyLayout()
+        renderProfile()
+        renderVaultNav()
+        renderVaultOptions()
+        renderList()
+        renderDetails()
+        renderTabs()
+        renderSyncStatus()
+        refreshIcons()
+      }
+
+      function refreshIcons() {
+        if (window.lucide) {
+          window.lucide.createIcons()
+          document.body.classList.remove("icons-fallback")
+        } else {
+          document.body.classList.add("icons-fallback")
+        }
+      }
+
+      function openLayer(id) {
+        const layer = document.getElementById(id)
+        layer.classList.add("open")
+        layer.setAttribute("aria-hidden", "false")
+      }
+
+      function closeLayer(id) {
+        const layer = document.getElementById(id)
+        layer.classList.remove("open")
+        layer.setAttribute("aria-hidden", "true")
+      }
+
+      function toast(message) {
+        const node = $("#toast")
+        node.textContent = message
+        node.classList.add("show")
+        window.clearTimeout(window.toastTimer)
+        window.toastTimer = window.setTimeout(() => node.classList.remove("show"), 1800)
+      }
+
+      function syncHostLabel() {
+        if (state.sync.mode === "official") return "LockPass 官方托管"
+        return state.sync.serverUrl.replace(/^https?:\/\//, "").replace(/\/$/, "") || "自建服务器"
+      }
+
+      function renderSyncStatus(hydrateForm = false) {
+        const connected = state.sync.connected
+        const syncState = !connected ? "offline" : state.sync.lastSync === "从未同步" ? "unsynced" : "synced"
+        const selfHost = state.sync.mode === "selfhost"
+        const sidebarBox = $("#syncSidebarBox")
+        const sidebarPill = $("#syncSidebarPill")
+        const sidebarStatus = $("#syncSidebarStatus")
+        const sidebarHost = $("#syncSidebarHost")
+        const card = $("#syncStatusCard")
+        const title = $("#syncStatusTitle")
+        const body = $("#syncStatusBody")
+
+        if (sidebarBox) {
+          sidebarBox.classList.toggle("offline", syncState === "offline")
+          sidebarBox.classList.toggle("unsynced", syncState === "unsynced")
+          sidebarBox.classList.toggle("synced", syncState === "synced")
+        }
+        if (sidebarPill) {
+          sidebarPill.classList.toggle("offline", syncState === "offline")
+          sidebarPill.classList.toggle("unsynced", syncState === "unsynced")
+        }
+        if (sidebarStatus) sidebarStatus.textContent = syncState === "offline" ? "未登录" : syncState === "unsynced" ? "未同步" : "已连接"
+        if (sidebarHost) sidebarHost.textContent = connected ? syncHostLabel() : "点击配置同步"
+
+        if (card) {
+          card.classList.toggle("connected", syncState === "synced")
+          card.classList.toggle("offline", syncState === "offline")
+          card.classList.toggle("unsynced", syncState === "unsynced")
+        }
+        if (title) title.textContent = syncState === "offline" ? "未登录" : syncState === "unsynced" ? "已连接，尚未同步" : "已登录"
+        if (body) {
+          body.textContent =
+            syncState === "synced"
+              ? `当前用户：${state.sync.account}`
+              : syncState === "unsynced"
+                ? "请先执行一次同步，上传和下载加密数据。"
+                : "选择官方登录，或连接自部署服务器。"
+        }
+
+        const loginButton = $("#syncLogin")
+        const logoutButton = $("#syncLogout")
+        const syncButton = $("#syncNowSettings")
+        const saveButton = $("#saveSyncSettings")
+        const serverField = $("#selfHostServerField")
+        const sessionField = $("#selfHostSessionField")
+        if (serverField) serverField.classList.toggle("hidden", !selfHost)
+        if (sessionField) sessionField.classList.toggle("hidden", !selfHost)
+        if (saveButton) saveButton.classList.toggle("hidden", !selfHost)
+        if (loginButton) {
+          loginButton.classList.toggle("hidden", connected)
+          loginButton.innerHTML = `<i data-lucide="log-in"></i>${selfHost ? "绑定设备" : "跳转官方登录"}`
+        }
+        if (logoutButton) logoutButton.classList.toggle("hidden", !connected)
+        if (syncButton) syncButton.classList.toggle("hidden", !connected)
+        if (window.lucide) window.lucide.createIcons()
+
+        if (!hydrateForm) return
+        const mode = $("#syncMode")
+        const serverUrl = $("#serverUrl")
+        const sessionToken = $("#syncSessionToken")
+        if (mode) mode.value = state.sync.mode
+        if (serverUrl) serverUrl.value = state.sync.serverUrl
+        if (sessionToken) sessionToken.value = state.sync.sessionToken
+      }
+
+      function openSyncSettings() {
+        openLayer("syncDrawer")
+        renderSyncStatus(true)
+        setTimeout(() => {
+          if (state.sync.mode === "selfhost") $("#serverUrl")?.focus()
+          else $("#syncLogin")?.focus()
+        }, 0)
+      }
+
+      function saveSyncSettings() {
+        state.sync.mode = $("#syncMode")?.value || "official"
+        state.sync.serverUrl = $("#serverUrl")?.value.trim() || ""
+        state.sync.sessionToken = $("#syncSessionToken")?.value.trim() || ""
+        renderSyncStatus()
+        toast("同步设置已保存")
+      }
+
+      function loginSyncAccount() {
+        state.sync.mode = $("#syncMode")?.value || "official"
+        state.sync.serverUrl = $("#serverUrl")?.value.trim() || ""
+        state.sync.sessionToken = $("#syncSessionToken")?.value.trim() || ""
+        if (state.sync.mode === "selfhost") {
+          if (!state.sync.serverUrl || !state.sync.sessionToken) {
+            toast("请输入自建服务器地址和登录 Token")
+            ;(!state.sync.serverUrl ? $("#serverUrl") : $("#syncSessionToken"))?.focus()
+            return
+          }
+          state.sync.account = `self-host@${syncHostLabel()}`
+          state.sync.connected = true
+          state.sync.lastSync = "从未同步"
+          renderSyncStatus()
+          toast("已连接自建同步服务器")
+          return
+        }
+
+        toast("已打开官方登录页面")
+        window.setTimeout(() => {
+          state.sync.account = "zyx@example.com"
+          state.sync.connected = true
+          state.sync.lastSync = "从未同步"
+          renderSyncStatus()
+          toast("官方登录回调成功，已登录 zyx@example.com")
+        }, 900)
+      }
+
+      function logoutSyncAccount() {
+        state.sync.connected = false
+        state.sync.account = ""
+        state.sync.lastSync = "从未同步"
+        renderSyncStatus()
+        toast("已退出登录，本地保险库仍可离线使用")
+      }
+
+      function runSyncNow() {
+        if (!state.sync.connected) {
+          openSyncSettings()
+          toast("请先登录")
+          return
+        }
+        state.sync.lastSync = "刚刚"
+        renderSyncStatus()
+        toast("同步完成：上传 1 条，下载 0 条，冲突 0 条")
+      }
+
+      async function copyValue(value, message = "已复制，稍后自动清理剪贴板") {
+        try {
+          await navigator.clipboard.writeText(value)
+        } catch (error) {
+          // Local file pages may not have clipboard permission in every browser.
+        }
+        toast(message)
+      }
+
+      function buildPasswordFromOptions() {
+        const length = Number($("#lengthRange").value)
+        const base = $("#useReadable").checked ? "abcdefghjkmnpqrstuvwxyz" : "abcdefghijklmnopqrstuvwxyz"
+        const upper = $("#useUpper").checked ? base.toUpperCase() : ""
+        const number = $("#useNumber").checked ? "23456789" : ""
+        const symbol = $("#useSymbol").checked ? "!@#$%+-_" : ""
+        const chars = base + upper + number + symbol
+        let output = ""
+        for (let index = 0; index < length; index += 1) {
+          output += chars[Math.floor(Math.random() * chars.length)]
+        }
+        return output
+      }
+
+      function generatePassword() {
+        const output = buildPasswordFromOptions()
+        $("#generatedPassword").textContent = output
+        return output
+      }
+
+      function openPasswordGenerator(targetId = null) {
+        state.passwordTarget = targetId
+        generatePassword()
+        $("#useGeneratedPassword").classList.toggle("hidden", !targetId)
+        openLayer("generatorDrawer")
+      }
+
+      function useGeneratedPassword() {
+        if (!state.passwordTarget) return
+        const target = document.getElementById(state.passwordTarget)
+        if (target) target.value = $("#generatedPassword").textContent
+        closeLayer("generatorDrawer")
+        toast("已填入生成密码")
+      }
+
+      function saveNewItem() {
+        const itemError = $("#itemError")
+        itemError.classList.add("hidden")
+        const rawName = $("#newName").value.trim()
+        const type = $("#newType").value
+        const vault = $("#newVault").value || "work"
+        const typedFields = readTypeFields(type)
+        const validationMessage =
+          !rawName || !vault
+            ? "请填写必填项"
+            : type === "login" && !typedFields.password
+              ? "请填写必填项：密码"
+              : type === "card" && !typedFields.cardNumber
+                ? "请填写必填项：卡号"
+                : type === "note" && !typedFields.noteText
+                  ? "请填写必填项：笔记内容"
+                  : ""
+        if (validationMessage) {
+          itemError.textContent = validationMessage
+          itemError.classList.remove("hidden")
+          return
+        }
+        const name = rawName
+        const attachments = typedFields.attachments || []
+        const url = typedFields.url || typedFields.issuer || typedFields.site || ""
+        const username =
+          typedFields.username ||
+          typedFields.holder ||
+          (type === "note" ? "安全笔记" : "")
+        const password = typedFields.password || typedFields.cardNumber || typedFields.recoveryCode || ""
+        const notes = typedFields.notes || typedFields.noteText || ""
+        const iconByType = { card: "卡", note: "文" }
+        if (state.editingId) {
+          const item = items.find((entry) => entry.id === state.editingId)
+          if (item) {
+            item.name = name
+            item.type = type
+            item.vault = vault
+            item.icon = item.icon || iconByType[type] || name.slice(0, 2).toUpperCase()
+            item.fields = typedFields
+            item.url = url
+            item.username = username
+            item.password = password
+            item.notes = notes
+            item.attachments = attachments
+            item.totp = typedFields.totp || ""
+            item.updated = "2026-05-16 12:00"
+            item.history.unshift(["2026-05-16 12:00", "本机编辑了条目"])
+          }
+          state.selectedId = state.editingId
+          state.editingId = null
+          closeLayer("itemModal")
+          render()
+          toast("条目已更新")
+          return
+        }
+        const id = `item-${Date.now()}`
+        items.unshift({
+          id,
+          name,
+          vault,
+          type,
+          icon: iconByType[type] || name.slice(0, 2).toUpperCase(),
+          fields: typedFields,
+          url,
+          username,
+          password,
+          totp: typedFields.totp || "",
+          notes,
+          attachments,
+          tags: [],
+          updated: "2026-05-16 12:00",
+          favorite: false,
+          strength: 72,
+          history: [["2026-05-16 12:00", "创建条目"]]
+        })
+        state.selectedId = id
+        state.vault = "all"
+        state.type = "all"
+        state.search = ""
+        $("#globalSearch").value = ""
+        closeLayer("itemModal")
+        render()
+        toast("条目已保存到本地保险库")
+      }
+
+      function saveVault() {
+        const name = $("#vaultName").value.trim() || "新保险库"
+        const id = `vault-${Date.now()}`
+        vaults.push({
+          id,
+          name,
+          icon: $("#vaultIcon").value || "folder-lock"
+        })
+        state.vault = id
+        closeLayer("vaultModal")
+        render()
+        toast(`已创建保险库：${name}`)
+      }
+
+      $$(".segmented button").forEach((button) => {
+        button.addEventListener("click", () => {
+          state.type = button.dataset.type
+          $$(".segmented button").forEach((item) => item.classList.toggle("active", item === button))
+          render()
+        })
+      })
+
+      $$(".tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          state.tab = tab.dataset.tab
+          renderTabs()
+        })
+      })
+
+      $("#globalSearch").addEventListener("input", (event) => {
+        state.search = event.target.value
+        renderList()
+        refreshIcons()
+      })
+
+      $("#newType").addEventListener("change", (event) => {
+        $("#itemError").classList.add("hidden")
+        $("#newName").value = defaultNameForType(event.target.value)
+        renderTypeFields(event.target.value, defaultFieldsForType(event.target.value))
+      })
+      $("#addVaultOpen").addEventListener("click", () => {
+        $("#vaultName").value = "个人"
+        $("#vaultIcon").value = "folder-lock"
+        openLayer("vaultModal")
+      })
+      $("#generatorOpen").addEventListener("click", () => openPasswordGenerator())
+      $("#newItemOpen").addEventListener("click", () => {
+        state.editingId = null
+        $("#itemError").classList.add("hidden")
+        $("#itemModalTitle").textContent = "新建条目"
+        $("#newType").value = "login"
+        $("#newVault").value = state.vault === "all" ? "work" : state.vault
+        $("#newName").value = defaultNameForType("login")
+        renderTypeFields("login", defaultFieldsForType("login"))
+        openLayer("itemModal")
+      })
+      $("#quickOpen").addEventListener("click", () => {
+        openLayer("quickLayer")
+        $("#quickInput").value = ""
+        state.quickIndex = 0
+        renderQuickResults()
+        setTimeout(() => $("#quickInput").focus(), 0)
+      })
+      $("#showConflicts").addEventListener("click", () => openLayer("conflictDrawer"))
+      $("#openConflictFromNotice").addEventListener("click", () => openLayer("conflictDrawer"))
+      $("#backupAction").addEventListener("click", () => openLayer("backupDrawer"))
+      $("#settingsAction").addEventListener("click", () => {
+        openLayer("settingsDrawer")
+        renderUserOptions()
+      })
+      $("#syncManage").addEventListener("click", openSyncSettings)
+      $("#syncSidebarPill").addEventListener("click", openSyncSettings)
+      $("#syncSidebarHost").addEventListener("click", openSyncSettings)
+      $("#syncNow").addEventListener("click", runSyncNow)
+      $("#profileButton").addEventListener("click", () => {
+        $("#profileMenu").classList.toggle("hidden")
+        $("#profileButton").setAttribute("aria-expanded", String(!$("#profileMenu").classList.contains("hidden")))
+      })
+      $("#addUserFromProfile").addEventListener("click", openUserModal)
+      $("#showRecoveryKeyFromProfile").addEventListener("click", openRecoveryExportModal)
+      $("#removeUserFromProfile").addEventListener("click", openRemoveUserModal)
+      $("#lockFromProfile").addEventListener("click", () => {
+        $("#profileMenu").classList.add("hidden")
+        openLayer("lockLayer")
+      })
+      $("#settingsAddUser").addEventListener("click", openUserModal)
+      $("#settingsRemoveUser").addEventListener("click", openRemoveUserModal)
+      $("#settingsUser").addEventListener("change", (event) => requestSwitchUser(event.target.value))
+      $("#confirmSwitchUser").addEventListener("click", confirmSwitchUser)
+      $("#languageSelect").addEventListener("change", (event) => toast(`界面语言已切换：${event.target.selectedOptions[0].textContent}`))
+      $("#verifyRecoveryExport").addEventListener("click", verifyRecoveryExport)
+      $("#saveRecoveryTrust").addEventListener("click", saveRecoveryTrust)
+      $("#editButton").addEventListener("click", () => {
+        const item = currentItem()
+        state.editingId = item.id
+        $("#itemError").classList.add("hidden")
+        $("#itemModalTitle").textContent = "编辑条目"
+        $("#newType").value = item.type
+        $("#newVault").value = item.vault
+        $("#newName").value = item.name
+        renderTypeFields(item.type, fieldsFromItem(item))
+        openLayer("itemModal")
+      })
+      $("#toggleSecrets").addEventListener("click", () => {
+        state.showSecrets = !state.showSecrets
+        render()
+      })
+      $("#runAudit").addEventListener("click", () => toast("安全检查完成"))
+      $("#saveNewItem").addEventListener("click", saveNewItem)
+      $("#saveVault").addEventListener("click", saveVault)
+      $("#saveUser").addEventListener("click", saveUser)
+      $("#startFirstDevice").addEventListener("click", showUserSetupFields)
+      $("#startOldDevice").addEventListener("click", showOldDeviceGuide)
+      $("#backUserChoice").addEventListener("click", resetUserModalState)
+      $("#backUserChoiceFromSetup").addEventListener("click", resetUserModalState)
+      $("#backUserSetupFromRecovery").addEventListener("click", showUserSetupFields)
+      $("#savedRecoveryKeyOffline").addEventListener("change", (event) => {
+        $("#saveUser").disabled = !event.target.checked
+      })
+      $("#removeUserConfirmed").addEventListener("change", (event) => {
+        $("#confirmRemoveUser").disabled = !event.target.checked
+      })
+      $("#confirmRemoveUser").addEventListener("click", removeActiveUserFromDevice)
+      $("#scanRecoveryQr").addEventListener("click", () => {
+        $("#existingRecoveryKey").value = "LP-TRUSTED-DEVICE-7K9D-M4Q2-H6VR-P8CX"
+        toast("已填入旧设备二维码中的安全密钥")
+      })
+      $("#recoverExistingVault").addEventListener("click", () => {
+        if (!$("#existingPassword").value.trim() || !$("#existingRecoveryKey").value.trim()) {
+          toast("请输入主密码和安全密钥")
+          return
+        }
+        toast("已有用户恢复需要同步服务接入后完成")
+      })
+      $("#saveSyncSettings").addEventListener("click", saveSyncSettings)
+      $("#syncMode").addEventListener("change", () => {
+        state.sync.mode = $("#syncMode")?.value || "official"
+        state.sync.serverUrl = $("#serverUrl")?.value.trim() || ""
+        state.sync.sessionToken = $("#syncSessionToken")?.value.trim() || ""
+        if (state.sync.connected) {
+          state.sync.connected = false
+          state.sync.account = ""
+          state.sync.lastSync = "从未同步"
+        }
+        renderSyncStatus()
+      })
+      $("#syncLogin").addEventListener("click", loginSyncAccount)
+      $("#syncLogout").addEventListener("click", logoutSyncAccount)
+      $("#syncNowSettings").addEventListener("click", runSyncNow)
+      $("#lockApp").addEventListener("click", () => openLayer("lockLayer"))
+      function showPasswordUnlockStep() {
+        $("#unlockBrand").classList.remove("hidden")
+        $("#unlockTitle").classList.remove("hidden")
+        $("#unlockBody").classList.remove("hidden")
+        $("#unlockPassword").classList.remove("hidden")
+        $("#recoveryChoicePanel").classList.add("hidden")
+        $("#recoveryKeyUnlockFields").classList.add("hidden")
+        $("#showRecoveryKeyUnlock").classList.remove("hidden")
+        $("#unlockApp").classList.remove("hidden")
+      }
+
+      function showRecoveryChoiceStep() {
+        $("#unlockBrand").classList.add("hidden")
+        $("#unlockTitle").classList.add("hidden")
+        $("#unlockBody").classList.add("hidden")
+        $("#unlockPassword").classList.add("hidden")
+        $("#recoveryChoicePanel").classList.remove("hidden")
+        $("#recoveryKeyUnlockFields").classList.add("hidden")
+        $("#showRecoveryKeyUnlock").classList.add("hidden")
+        $("#unlockApp").classList.add("hidden")
+      }
+
+      function showExistingRecoveryStep() {
+        $("#unlockBrand").classList.add("hidden")
+        $("#unlockTitle").classList.add("hidden")
+        $("#unlockBody").classList.add("hidden")
+        $("#unlockPassword").classList.remove("hidden")
+        $("#recoveryChoicePanel").classList.add("hidden")
+        $("#recoveryKeyUnlockFields").classList.remove("hidden")
+        $("#showRecoveryKeyUnlock").classList.add("hidden")
+        $("#unlockApp").classList.remove("hidden")
+        $("#unlockRecoveryKey").focus()
+      }
+
+      $("#showRecoveryKeyUnlock").addEventListener("click", showRecoveryChoiceStep)
+      $("#backToPasswordUnlock").addEventListener("click", showPasswordUnlockStep)
+      $("#backToRecoveryChoice").addEventListener("click", showRecoveryChoiceStep)
+      $("#showExistingUserRecovery").addEventListener("click", showExistingRecoveryStep)
+      $("#createNewUserFromLock").addEventListener("click", () => {
+        closeLayer("lockLayer")
+        showPasswordUnlockStep()
+        openUserModal()
+        toast("新用户会在创建后生成安全密钥")
+      })
+      $("#unlockApp").addEventListener("click", () => {
+        const password = $("#unlockPassword").value.trim()
+        const recoveryKey = $("#unlockRecoveryKey").value.trim()
+        const manualRecovery = !$("#recoveryKeyUnlockFields").classList.contains("hidden")
+        if (!password) {
+          toast("请输入主密码")
+          return
+        }
+        if (manualRecovery && !recoveryKey) {
+          toast("请输入安全密钥")
+          return
+        }
+        closeLayer("lockLayer")
+        $("#unlockPassword").value = ""
+        $("#unlockRecoveryKey").value = ""
+        showPasswordUnlockStep()
+        toast(manualRecovery ? "已使用安全密钥解锁" : "已使用本机系统安全存储中的安全密钥解锁")
+      })
+      $("#lengthRange").addEventListener("input", (event) => {
+        $("#lengthValue").textContent = event.target.value
+        generatePassword()
+      })
+      ;["useUpper", "useNumber", "useSymbol", "useReadable"].forEach((id) => {
+        document.getElementById(id).addEventListener("change", generatePassword)
+      })
+      $("#regenerate").addEventListener("click", generatePassword)
+      $("#copyGenerated").addEventListener("click", () => copyValue($("#generatedPassword").textContent))
+      $("#useGeneratedPassword").addEventListener("click", useGeneratedPassword)
+
+      $$("[data-resize-target]").forEach((handle) => {
+        handle.addEventListener("pointerdown", (event) => startResize(event, handle.dataset.resizeTarget))
+        handle.addEventListener("keydown", (event) => {
+          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
+          event.preventDefault()
+          const direction = event.key === "ArrowLeft" ? -1 : 1
+          resizeByKeyboard(handle.dataset.resizeTarget, direction * (event.shiftKey ? 32 : 12))
+        })
+      })
+
+      document.addEventListener("click", (event) => {
+        if (!event.target.closest(".profile")) $("#profileMenu").classList.add("hidden")
+      })
+
+      $$("[data-close]").forEach((node) => {
+        node.addEventListener("click", () => closeLayer(node.dataset.close))
+      })
+
+      $$("[data-conflict-action]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const action = button.dataset.conflictAction
+          const label = action === "merge" ? "已生成合并版本" : action === "local" ? "已保留本机副本" : "已保留远端版本"
+          closeLayer("conflictDrawer")
+          $("#conflictNotice").classList.add("hidden")
+          toast(label)
+        })
+      })
+
+      $$("[data-backup-action]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const messages = {
+            export: "已创建加密备份包：lockpass-backup-2026-05-16.lpb",
+            restore: "已打开备份包选择流程",
+            legacy: "已打开旧版 LockPass 导入向导",
+            csv: "已打开 CSV 导入导出面板"
+          }
+          toast(messages[button.dataset.backupAction])
+        })
+      })
+
+      $("#quickInput").addEventListener("input", (event) => renderQuickResults(event.target.value))
+      $("#quickInput").addEventListener("keydown", (event) => {
+        const resultCount = $$(".quick-result").length
+        if (event.key === "ArrowDown") {
+          event.preventDefault()
+          state.quickIndex = Math.min(state.quickIndex + 1, resultCount - 1)
+          renderQuickResults(event.target.value)
+        }
+        if (event.key === "ArrowUp") {
+          event.preventDefault()
+          state.quickIndex = Math.max(state.quickIndex - 1, 0)
+          renderQuickResults(event.target.value)
+        }
+        if (event.key === "Enter") {
+          event.preventDefault()
+          const target = $$(".quick-result")[state.quickIndex]
+          if (target) target.click()
+        }
+      })
+
+      document.addEventListener("keydown", (event) => {
+        const key = event.key.toLowerCase()
+        if ((event.ctrlKey || event.metaKey) && key === "k") {
+          event.preventDefault()
+          $("#quickOpen").click()
+        }
+        if (event.key === "Escape") {
+          ;[
+            "generatorDrawer",
+            "conflictDrawer",
+            "backupDrawer",
+            "settingsDrawer",
+            "syncDrawer",
+            "vaultModal",
+            "itemModal",
+            "userModal",
+            "removeUserModal",
+            "recoveryExportModal",
+            "imagePreviewModal",
+            "quickLayer"
+          ].forEach(closeLayer)
+        }
+      })
+
+      generatePassword()
+      render()
+    </script>
+  </body>
+</html>

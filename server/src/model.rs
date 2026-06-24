@@ -321,6 +321,8 @@ pub struct InstanceConfig {
     pub sms_enabled: bool,
     pub google_enabled: bool,
     pub wechat_enabled: bool,
+    #[serde(default)]
+    pub email: EmailServiceConfig,
     pub official_hosted: bool,
     pub max_devices_per_account: i64,
     pub max_storage_bytes: i64,
@@ -334,6 +336,7 @@ impl Default for InstanceConfig {
             sms_enabled: false,
             google_enabled: false,
             wechat_enabled: false,
+            email: EmailServiceConfig::default(),
             official_hosted: false,
             max_devices_per_account: 10,
             max_storage_bytes: 1_073_741_824,
@@ -341,8 +344,125 @@ impl Default for InstanceConfig {
     }
 }
 
+impl InstanceConfig {
+    pub fn to_admin_view(&self) -> AdminInstanceConfigView {
+        AdminInstanceConfigView {
+            public_base_url: self.public_base_url.clone(),
+            registration_enabled: self.registration_enabled,
+            sms_enabled: self.sms_enabled,
+            google_enabled: self.google_enabled,
+            wechat_enabled: self.wechat_enabled,
+            email: self.email.to_admin_view(),
+            official_hosted: self.official_hosted,
+            max_devices_per_account: self.max_devices_per_account,
+            max_storage_bytes: self.max_storage_bytes,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminInstanceConfigView {
+    pub public_base_url: String,
+    pub registration_enabled: bool,
+    pub sms_enabled: bool,
+    pub google_enabled: bool,
+    pub wechat_enabled: bool,
+    pub email: AdminEmailServiceConfigView,
+    pub official_hosted: bool,
+    pub max_devices_per_account: i64,
+    pub max_storage_bytes: i64,
+}
+
 fn default_public_base_url() -> String {
     "http://127.0.0.1:1480".to_string()
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct EmailServiceConfig {
+    #[serde(default)]
+    pub mode: EmailServiceMode,
+    #[serde(default = "default_mailer_from")]
+    pub from: String,
+    #[serde(default)]
+    pub smtp_host: Option<String>,
+    #[serde(default = "default_smtp_port")]
+    pub smtp_port: u16,
+    #[serde(default)]
+    pub smtp_username: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub smtp_password: Option<String>,
+    #[serde(default)]
+    pub smtp_password_set: bool,
+    #[serde(default = "default_email_code_secret")]
+    pub code_secret: String,
+}
+
+impl Default for EmailServiceConfig {
+    fn default() -> Self {
+        Self {
+            mode: EmailServiceMode::Log,
+            from: default_mailer_from(),
+            smtp_host: None,
+            smtp_port: default_smtp_port(),
+            smtp_username: None,
+            smtp_password: None,
+            smtp_password_set: false,
+            code_secret: default_email_code_secret(),
+        }
+    }
+}
+
+impl EmailServiceConfig {
+    pub fn to_admin_view(&self) -> AdminEmailServiceConfigView {
+        AdminEmailServiceConfigView {
+            mode: self.mode,
+            from: self.from.clone(),
+            smtp_host: self.smtp_host.clone(),
+            smtp_port: self.smtp_port,
+            smtp_username: self.smtp_username.clone(),
+            smtp_password_set: self.smtp_password.is_some() || self.smtp_password_set,
+            code_secret_set: !self.code_secret.trim().is_empty(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminEmailServiceConfigView {
+    pub mode: EmailServiceMode,
+    pub from: String,
+    pub smtp_host: Option<String>,
+    pub smtp_port: u16,
+    pub smtp_username: Option<String>,
+    pub smtp_password_set: bool,
+    pub code_secret_set: bool,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum EmailServiceMode {
+    Log,
+    Smtp,
+}
+
+impl Default for EmailServiceMode {
+    fn default() -> Self {
+        Self::Log
+    }
+}
+
+fn default_mailer_from() -> String {
+    "LockPass <no-reply@lockpass.local>".to_string()
+}
+
+fn default_smtp_port() -> u16 {
+    587
+}
+
+fn default_email_code_secret() -> String {
+    "lockpass-dev-email-code-secret-change-me".to_string()
 }
 
 #[derive(Deserialize)]
@@ -358,6 +478,63 @@ pub struct EmailRegisterRequest {
 pub struct EmailLoginRequest {
     pub email: String,
     pub password: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmailStartRequest {
+    pub email: String,
+    pub display_name: Option<String>,
+    pub purpose: EmailChallengePurpose,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum EmailChallengePurpose {
+    Register,
+    Login,
+}
+
+impl EmailChallengePurpose {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Register => "register",
+            Self::Login => "login",
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmailVerifyRequest {
+    pub challenge_id: Uuid,
+    pub code: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountCompleteRequest {
+    pub device_name: String,
+    pub client_device_id: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmailStartResponse {
+    pub challenge_id: Uuid,
+    pub email: String,
+    pub expires_at: DateTime<Utc>,
+    pub resend_after_seconds: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmailVerifyResponse {
+    pub account_setup_token: String,
+    pub email: String,
+    pub display_name: Option<String>,
+    pub purpose: EmailChallengePurpose,
+    pub expires_at: DateTime<Utc>,
 }
 
 #[derive(Deserialize)]
@@ -759,9 +936,22 @@ pub struct AdminConfigPatchRequest {
     pub sms_enabled: Option<bool>,
     pub google_enabled: Option<bool>,
     pub wechat_enabled: Option<bool>,
+    pub email: Option<AdminEmailServicePatchRequest>,
     pub official_hosted: Option<bool>,
     pub max_devices_per_account: Option<i64>,
     pub max_storage_bytes: Option<i64>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminEmailServicePatchRequest {
+    pub mode: Option<EmailServiceMode>,
+    pub from: Option<String>,
+    pub smtp_host: Option<String>,
+    pub smtp_port: Option<u16>,
+    pub smtp_username: Option<String>,
+    pub smtp_password: Option<String>,
+    pub code_secret: Option<String>,
 }
 
 #[derive(Deserialize)]

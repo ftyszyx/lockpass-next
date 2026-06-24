@@ -101,20 +101,35 @@ const NONCE_BYTES = 12
 const TAG_BYTES = 16
 const RECOVERY_KEY_BYTES = 32
 const RECOVERY_KEY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+const ARGON2_DEFAULT_MEMORY_KIB = 32_768
+const ARGON2_DEFAULT_ITERATIONS = 2
+const ARGON2_DEFAULT_PARALLELISM = 1
 
 export function createKdfParams(): KdfParams {
   return {
     version: 1,
     name: 'argon2id',
-    memoryKiB: 65_536,
-    iterations: 3,
-    parallelism: 1,
+    memoryKiB: ARGON2_DEFAULT_MEMORY_KIB,
+    iterations: ARGON2_DEFAULT_ITERATIONS,
+    parallelism: ARGON2_DEFAULT_PARALLELISM,
     salt: bytesToBase64url(randomBytes(SALT_BYTES)),
     keyLengthBytes: KEY_BYTES,
     inputEncoding: 'domain-tagged-length-prefixed-utf8',
     passwordNormalization: 'NFKC',
     purpose: UNLOCK_PURPOSE
   }
+}
+
+function usesCurrentKdfProfile(params: KdfParams): boolean {
+  return params.version === 1
+    && params.name === 'argon2id'
+    && params.memoryKiB === ARGON2_DEFAULT_MEMORY_KIB
+    && params.iterations === ARGON2_DEFAULT_ITERATIONS
+    && params.parallelism === ARGON2_DEFAULT_PARALLELISM
+    && params.keyLengthBytes === KEY_BYTES
+    && params.inputEncoding === 'domain-tagged-length-prefixed-utf8'
+    && params.passwordNormalization === 'NFKC'
+    && params.purpose === UNLOCK_PURPOSE
 }
 
 export function generateRecoveryKey(): string {
@@ -476,7 +491,7 @@ function encodeUnlockInput(password: string, recoveryKey: string): Uint8Array {
 
 function decodeRecoveryKey(value: string): Uint8Array {
   const normalized = normalizeRecoveryKeyText(value)
-  if (!normalized) throw new Error('Recovery key is required')
+  if (!normalized) throw new Error('Secret Key is required')
   if (/^[A-HJ-NP-Z2-9]+$/i.test(normalized) && normalized.length === 52) {
     return recoveryKeyTextToBytes(normalized)
   }
@@ -484,17 +499,7 @@ function decodeRecoveryKey(value: string): Uint8Array {
 }
 
 function assertSupportedKdf(params: KdfParams): void {
-  if (
-    params.version !== 1 ||
-    params.name !== 'argon2id' ||
-    params.memoryKiB < 65_536 ||
-    params.iterations < 3 ||
-    params.parallelism < 1 ||
-    params.keyLengthBytes !== KEY_BYTES ||
-    params.inputEncoding !== 'domain-tagged-length-prefixed-utf8' ||
-    params.passwordNormalization !== 'NFKC' ||
-    params.purpose !== UNLOCK_PURPOSE
-  ) {
+  if (!usesCurrentKdfProfile(params)) {
     throw new Error('Unsupported or weak KDF parameters')
   }
 }
@@ -560,7 +565,7 @@ function recoveryKeyTextToBytes(value: string): Uint8Array {
 
   for (const character of value.toUpperCase()) {
     const index = RECOVERY_KEY_ALPHABET.indexOf(character)
-    if (index < 0) throw new Error('Invalid recovery key')
+    if (index < 0) throw new Error('Invalid Secret Key')
 
     buffer = (buffer << 5) | index
     bits += 5
@@ -571,7 +576,7 @@ function recoveryKeyTextToBytes(value: string): Uint8Array {
     }
   }
 
-  if (output.length !== RECOVERY_KEY_BYTES) throw new Error('Invalid recovery key length')
+  if (output.length !== RECOVERY_KEY_BYTES) throw new Error('Invalid Secret Key length')
   return Uint8Array.from(output)
 }
 

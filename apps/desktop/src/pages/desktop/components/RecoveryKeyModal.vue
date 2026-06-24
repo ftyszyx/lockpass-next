@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { Copy, KeyRound, QrCode as QrCodeIcon, Save, X } from '@lucide/vue'
+import { ChevronDown, Copy, QrCode as QrCodeIcon, Save, X } from '@lucide/vue'
 import QRCode from 'qrcode'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useVaultStore } from '@/stores/vault'
 
 const props = defineProps<{
-  revealPassword: string
   revealedRecoveryKey: string
   revealError: string
   revealIssue: 'missing' | 'unsupported' | ''
@@ -16,8 +15,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   copyValue: [value: string]
-  updateRevealPassword: [value: string]
-  revealRecoveryKey: []
   saveRecoveryKeyToDevice: [recoveryKey: string]
 }>()
 
@@ -25,7 +22,16 @@ const { t } = useI18n()
 const vaultStore = useVaultStore()
 const recoveryKeyQrDataUrl = ref('')
 const recoveryKeyToSave = ref('')
+const detailsOpen = ref(false)
 const canSaveRecoveryKeyToDevice = computed(() => props.revealIssue === 'missing' && !props.revealedRecoveryKey)
+const activeUser = computed(() => vaultStore.activeUser)
+const accountLabel = computed(() => activeUser.value?.sync?.accountLabel || activeUser.value?.displayName || activeUser.value?.username || '')
+const serverLabel = computed(() => {
+  const sync = activeUser.value?.sync ?? vaultStore.settings.sync
+  if (sync.mode === 'official') return t('sync.officialHosted')
+  return sync.serverUrl.replace(/^https?:\/\//i, '').replace(/\/$/, '')
+})
+const maskedRecoveryKey = computed(() => props.revealedRecoveryKey ? '••••••••••••••••' : '')
 
 watch(
   () => props.revealedRecoveryKey,
@@ -37,7 +43,7 @@ watch(
       recoveryKeyQrDataUrl.value = await QRCode.toDataURL(recoveryKey, {
         errorCorrectionLevel: 'M',
         margin: 2,
-        width: 176,
+        width: 236,
         color: {
           dark: '#111827',
           light: '#ffffff'
@@ -61,32 +67,76 @@ watch(
 <template>
   <div class="fixed inset-0 z-[80] grid place-items-center bg-slate-950/40 p-4">
     <button class="absolute inset-0 cursor-default" :aria-label="t('editor.cancel')" @click="emit('close')"></button>
-    <section class="relative grid w-[520px] max-w-[94vw] gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-2xl" :class="{ 'pt-11': revealedRecoveryKey }">
-      <button class="icon-button absolute right-3 top-3 z-10" type="button" @click="emit('close')"><X class="size-4" /></button>
+    <section class="relative grid w-[680px] max-w-[94vw] gap-5 rounded-lg border border-slate-200 bg-white p-5 shadow-2xl">
+      <div class="flex items-start justify-between gap-4">
+        <h2 class="text-xl font-black text-slate-950">{{ t('settings.setupAnotherDeviceTitle') }}</h2>
+        <button class="icon-button" type="button" @click="emit('close')"><X class="size-4" /></button>
+      </div>
 
-      <form v-if="!revealedRecoveryKey" class="grid gap-4" @submit.prevent="emit('revealRecoveryKey')">
-        <div class="grid gap-1 pr-10">
-          <div class="flex items-center gap-2 font-bold text-slate-950">
-            <KeyRound class="size-4" />
-            {{ t('settings.recoveryKeyTitle') }}
+      <div v-if="revealedRecoveryKey" class="grid gap-4">
+        <div class="grid gap-5 md:grid-cols-[260px_minmax(0,1fr)] md:items-center">
+          <div class="mx-auto grid size-[260px] place-items-center rounded-lg border border-slate-200 bg-white p-3 text-slate-700">
+            <img v-if="recoveryKeyQrDataUrl" class="size-full rounded-md" :src="recoveryKeyQrDataUrl" :alt="t('settings.recoveryKeyQrAlt')" />
+            <div v-else class="grid place-items-center gap-1 text-xs font-bold">
+              <QrCodeIcon class="size-12" />
+              <span>QR</span>
+            </div>
           </div>
-          <p class="text-sm leading-6 text-slate-500">{{ t('settings.recoveryKeyBody') }}</p>
+          <div class="grid content-center gap-4">
+            <h3 class="text-base font-black text-slate-950">{{ t('settings.setupAnotherDeviceQrTitle') }}</h3>
+            <ol class="grid gap-3 text-sm leading-6 text-slate-600">
+              <li class="grid grid-cols-[24px_minmax(0,1fr)] gap-2">
+                <span class="grid size-6 place-items-center rounded-full bg-blue-50 text-xs font-black text-blue-700">1</span>
+                <span>{{ t('settings.setupAnotherDeviceStepOne') }}</span>
+              </li>
+              <li class="grid grid-cols-[24px_minmax(0,1fr)] gap-2">
+                <span class="grid size-6 place-items-center rounded-full bg-blue-50 text-xs font-black text-blue-700">2</span>
+                <span>{{ t('settings.setupAnotherDeviceStepTwo') }}</span>
+              </li>
+              <li class="grid grid-cols-[24px_minmax(0,1fr)] gap-2">
+                <span class="grid size-6 place-items-center rounded-full bg-blue-50 text-xs font-black text-blue-700">3</span>
+                <span>{{ t('settings.setupAnotherDeviceStepThree') }}</span>
+              </li>
+            </ol>
+          </div>
         </div>
 
-        <input
-          class="form-input"
-          type="password"
-          autocomplete="current-password"
-          :disabled="!vaultStore.unlocked"
-          :value="revealPassword"
-          :placeholder="t('settings.recoveryKeyPasswordPlaceholder')"
-          @input="emit('updateRevealPassword', ($event.target as HTMLInputElement).value)"
-        />
-        <button class="plain-button justify-self-start" type="submit" :disabled="!vaultStore.unlocked">
-          <KeyRound class="size-4" />
-          {{ t('settings.recoveryKeyReveal') }}
+        <button
+          class="plain-button justify-center"
+          type="button"
+          @click="detailsOpen = !detailsOpen"
+        >
+          {{ detailsOpen ? t('settings.hideAccountDetails') : t('settings.showAccountDetails') }}
+          <ChevronDown class="size-4" :class="{ 'rotate-180': detailsOpen }" />
         </button>
 
+        <div v-if="detailsOpen" class="overflow-hidden rounded-lg border border-slate-200">
+          <div class="grid border-b border-slate-200 px-4 py-3">
+            <span class="text-xs font-semibold text-violet-700">{{ t('settings.loginAddress') }}</span>
+            <span class="truncate text-sm font-medium text-slate-900">{{ serverLabel || t('settings.accountDetailUnavailable') }}</span>
+          </div>
+          <div class="grid border-b border-slate-200 px-4 py-3">
+            <span class="text-xs font-semibold text-violet-700">{{ t('settings.emailAddress') }}</span>
+            <span class="truncate text-sm font-medium text-slate-900">{{ accountLabel || t('settings.accountDetailUnavailable') }}</span>
+          </div>
+          <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center bg-blue-50">
+            <div class="min-w-0 px-4 py-3">
+              <span class="block text-xs font-semibold text-violet-700">{{ t('user.recoveryKey') }}</span>
+              <span class="block truncate font-mono text-sm font-bold tracking-wide text-slate-900">{{ maskedRecoveryKey }}</span>
+            </div>
+            <button
+              class="flex h-full min-h-12 items-center gap-2 border-l border-blue-100 px-4 text-sm font-bold text-slate-800 hover:bg-blue-100"
+              type="button"
+              @click="emit('copyValue', revealedRecoveryKey)"
+            >
+              <Copy class="size-4" />
+              {{ t('quick.copy') }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div v-else class="grid gap-4">
         <p v-if="revealError" class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{{ revealError }}</p>
 
         <div v-if="canSaveRecoveryKeyToDevice" class="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -107,24 +157,6 @@ watch(
             {{ t('settings.recoveryKeySaveToDevice') }}
           </button>
         </div>
-      </form>
-
-      <div v-if="revealedRecoveryKey" class="grid gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-        <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_8rem]">
-          <code class="break-words font-mono text-sm leading-6">{{ revealedRecoveryKey }}</code>
-          <div class="grid aspect-square place-items-center rounded-lg border border-amber-300 bg-white text-amber-900">
-            <img v-if="recoveryKeyQrDataUrl" class="size-full rounded-lg" :src="recoveryKeyQrDataUrl" :alt="t('settings.recoveryKeyQrAlt')" />
-            <div v-else class="grid place-items-center gap-1 text-xs font-bold">
-              <QrCodeIcon class="size-10" />
-              <span>QR</span>
-            </div>
-          </div>
-        </div>
-        <p class="text-xs text-amber-800">{{ t('settings.recoveryKeyQrHint') }}</p>
-        <button class="plain-button justify-self-start" type="button" @click="emit('copyValue', revealedRecoveryKey)">
-          <Copy class="size-4" />
-          {{ t('quick.copy') }}
-        </button>
       </div>
     </section>
   </div>

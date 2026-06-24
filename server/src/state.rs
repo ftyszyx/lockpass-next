@@ -8,6 +8,7 @@ use tracing::info;
 use crate::{
     config::Config,
     error::{AppError, AppResult},
+    mailer::Mailer,
     model::HealthResponse,
     storage::AppStore,
 };
@@ -15,6 +16,7 @@ use crate::{
 #[derive(Clone)]
 pub struct AppState {
     pub config: Arc<Config>,
+    pub mailer: Mailer,
     pub store: AppStore,
     pg_pool: PgPool,
     started_at: chrono::DateTime<Utc>,
@@ -46,6 +48,7 @@ impl AppState {
         migrator.run(&pool).await?;
         info!("database migrations completed");
 
+        let mailer = Mailer;
         let store = AppStore::new(pool.clone());
         info!("initializing application storage");
         store.initialize().await?;
@@ -53,6 +56,7 @@ impl AppState {
 
         Ok(Self {
             config: Arc::new(config),
+            mailer,
             store,
             pg_pool: pool,
             started_at: Utc::now(),

@@ -31,6 +31,34 @@ create table if not exists auth_sessions (
   created_at timestamptz not null
 );
 
+create table if not exists email_challenges (
+  id uuid primary key,
+  email text not null,
+  display_name text,
+  purpose text not null,
+  code_hash text not null,
+  attempts integer not null default 0,
+  expires_at timestamptz not null,
+  resend_after timestamptz not null,
+  verified_at timestamptz,
+  consumed_at timestamptz,
+  created_at timestamptz not null
+);
+
+create index if not exists idx_email_challenges_email_created
+  on email_challenges (email, created_at desc);
+
+create table if not exists account_setup_tokens (
+  token_hash text primary key,
+  challenge_id uuid not null references email_challenges(id) on delete cascade,
+  email text not null,
+  display_name text,
+  purpose text not null,
+  expires_at timestamptz not null,
+  consumed_at timestamptz,
+  created_at timestamptz not null
+);
+
 -- OAuth 登录临时状态：用于校验 第三方登录回调流程。
 create table if not exists oauth_states (
   id uuid primary key, -- OAuth 登录流程记录 id。

@@ -10,7 +10,7 @@ use std::net::SocketAddr;
 use crate::{
     api::{auth_principal, auth_principal_with_client_ip, client_ip, ok},
     error::{AppError, AppResult},
-    model::{DeviceBindRequest, EmailLoginRequest, EmailRegisterRequest},
+    model::{AccountCompleteRequest, DeviceBindRequest, EmailStartRequest, EmailVerifyRequest},
     state::AppState,
 };
 
@@ -18,8 +18,9 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/me", get(me))
         .route("/logout", post(logout))
-        .route("/email/register", post(email_register))
-        .route("/email/login", post(email_login))
+        .route("/email/start", post(email_start))
+        .route("/email/verify", post(email_verify))
+        .route("/account/complete", post(account_complete))
         .route("/sms/send", post(sms_placeholder))
         .route("/sms/verify", post(sms_placeholder))
         .route("/oauth/:provider/start", get(oauth_placeholder))
@@ -43,24 +44,53 @@ async fn logout(State(state): State<AppState>, headers: HeaderMap) -> AppResult<
     Ok(ok())
 }
 
-async fn email_register(
+async fn email_start(
     State(state): State<AppState>,
-    Json(payload): Json<EmailRegisterRequest>,
+    Json(payload): Json<EmailStartRequest>,
 ) -> AppResult<Json<Value>> {
-    Ok(Json(json!(state.store.register_email(
-        &payload.email,
-        &payload.password,
-        payload.display_name
+    let display_name = payload.display_name.clone();
+    let (response, code, email_config) =
+        state
+            .store
+            .start_email_challenge(&payload.email, payload.display_name, payload.purpose)?;
+    state
+        .mailer
+        .send_email_code(
+            &email_config,
+            &response.email,
+            display_name.as_deref(),
+            &code,
+            (response.expires_at - chrono::Utc::now())
+                .num_minutes()
+                .max(1),
+        )
+        .await?;
+    Ok(Json(json!(response)))
+}
+
+async fn email_verify(
+    State(state): State<AppState>,
+    Json(payload): Json<EmailVerifyRequest>,
+) -> AppResult<Json<Value>> {
+    Ok(Json(json!(state.store.verify_email_challenge(
+        payload.challenge_id,
+        &payload.code
     )?)))
 }
 
-async fn email_login(
+async fn account_complete(
     State(state): State<AppState>,
-    Json(payload): Json<EmailLoginRequest>,
+    connect_info: Option<ConnectInfo<SocketAddr>>,
+    headers: HeaderMap,
+    Json(payload): Json<AccountCompleteRequest>,
 ) -> AppResult<Json<Value>> {
-    Ok(Json(json!(state
-        .store
-        .login_email(&payload.email, &payload.password)?)))
+    let setup_token = bearer_token(&headers)?;
+    Ok(Json(json!(state.store.complete_email_account_setup(
+        setup_token,
+        payload.device_name,
+        payload.client_device_id,
+        client_ip(&headers, connect_info.as_ref())
+    )?)))
 }
 
 async fn device_bind(
@@ -88,4 +118,13 @@ async fn oauth_placeholder(Path(provider): Path<String>) -> AppResult<Json<Value
     Err(AppError::NotImplemented(format!(
         "{provider} oauth is reserved for the provider integration phase"
     )))
+}
+
+fn bearer_token(headers: &HeaderMap) -> AppResult<&str> {
+    headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .filter(|token| !token.trim().is_empty())
+        .ok_or(AppError::Unauthorized)
 }

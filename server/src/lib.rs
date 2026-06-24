@@ -1,6 +1,7 @@
 pub mod api;
 pub mod config;
 pub mod error;
+pub mod mailer;
 pub mod model;
 pub mod rbac;
 pub mod state;

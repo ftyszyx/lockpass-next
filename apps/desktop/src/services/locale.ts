@@ -2,8 +2,12 @@ import { invoke } from '@tauri-apps/api/core'
 import type { SupportedLocale } from '@/i18n'
 
 const DEFAULT_LOCALE: SupportedLocale = 'en-US'
+const WEB_LOCALE_STORAGE_KEY = 'lockpass.web.locale'
 
 export async function loadSystemLocale(): Promise<SupportedLocale> {
+  const savedLocale = loadSavedWebLocale()
+  if (savedLocale) return savedLocale
+
   const candidates: Array<string | null | undefined> = []
 
   if (isTauriRuntime()) {
@@ -15,7 +19,18 @@ export async function loadSystemLocale(): Promise<SupportedLocale> {
 }
 
 export function detectBrowserLocale(): SupportedLocale {
-  return toSupportedLocale([...navigator.languages, navigator.language])
+  return loadSavedWebLocale() ?? toSupportedLocale([...navigator.languages, navigator.language])
+}
+
+export function saveWebLocale(locale: SupportedLocale): void {
+  if (typeof localStorage === 'undefined') return
+  localStorage.setItem(WEB_LOCALE_STORAGE_KEY, locale)
+}
+
+export function loadSavedWebLocale(): SupportedLocale | null {
+  if (typeof localStorage === 'undefined') return null
+  const saved = localStorage.getItem(WEB_LOCALE_STORAGE_KEY)
+  return saved === 'zh-CN' || saved === 'en-US' ? saved : null
 }
 
 export function toSupportedLocale(candidates: Array<string | null | undefined>): SupportedLocale {

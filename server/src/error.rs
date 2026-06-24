@@ -22,6 +22,11 @@ pub enum AppError {
     Conflict(String),
     #[error("{message}")]
     ConflictCode { code: &'static str, message: String },
+    #[error("{message}")]
+    TooManyRequests {
+        retry_after_seconds: i64,
+        message: String,
+    },
     #[error("{0}")]
     NotImplemented(String),
     #[error("{0}")]
@@ -33,10 +38,19 @@ pub enum AppError {
 struct ErrorBody {
     error: &'static str,
     message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    retry_after_seconds: Option<i64>,
 }
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
+        let retry_after_seconds = match &self {
+            AppError::TooManyRequests {
+                retry_after_seconds,
+                ..
+            } => Some(*retry_after_seconds),
+            _ => None,
+        };
         let (status, code) = match &self {
             AppError::BadRequest(_) => (StatusCode::BAD_REQUEST, "bad_request"),
             AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "unauthorized"),
@@ -44,6 +58,9 @@ impl IntoResponse for AppError {
             AppError::NotFound(_) => (StatusCode::NOT_FOUND, "not_found"),
             AppError::Conflict(_) => (StatusCode::CONFLICT, "conflict"),
             AppError::ConflictCode { code, .. } => (StatusCode::CONFLICT, *code),
+            AppError::TooManyRequests { .. } => {
+                (StatusCode::TOO_MANY_REQUESTS, "too_many_requests")
+            }
             AppError::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, "not_implemented"),
             AppError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal_error"),
         };
@@ -54,6 +71,7 @@ impl IntoResponse for AppError {
             Json(ErrorBody {
                 error: code,
                 message,
+                retry_after_seconds,
             }),
         )
             .into_response()

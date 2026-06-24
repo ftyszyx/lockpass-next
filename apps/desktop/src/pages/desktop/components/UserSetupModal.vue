@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ArrowLeft, Check, Cloud, Eye, EyeOff, KeyRound, LockKeyhole, Save, ScanLine, Unlock, UserPlus } from '@lucide/vue'
+import { ArrowLeft, Check, Cloud, Eye, EyeOff, KeyRound, LogIn, Save, ScanLine, Unlock, UserPlus, X } from '@lucide/vue'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import type { SyncMode } from '@/services/syncClient'
 import type { UserDraft } from '../types'
 
 const props = defineProps<{
@@ -13,6 +14,12 @@ const props = defineProps<{
   recoveryKey: string
   createdUserName: string
   initialMode: 'choice' | 'new' | 'restore'
+  serverFirst: boolean
+  serverConnected: boolean
+  serverAccountLabel: string
+  serverMode: SyncMode
+  serverUrl: string
+  serverBusy: boolean
 }>()
 
 const emit = defineEmits<{
@@ -22,6 +29,9 @@ const emit = defineEmits<{
   backToNewUser: []
   restoreExisting: [payload: { password: string; recoveryKey: string }]
   scanRecoveryQr: []
+  updateServerMode: [mode: SyncMode]
+  updateServerUrl: [serverUrl: string]
+  openServerLogin: []
 }>()
 
 const { t } = useI18n()
@@ -33,8 +43,13 @@ const restorePassword = ref('')
 const restoreRecoveryKey = ref('')
 const masterPasswordVisible = ref(false)
 const confirmPasswordVisible = ref(false)
+const showSelfhostDialog = ref(false)
+const selfhostUrlDraft = ref('')
+const selfhostUrlError = ref(false)
+const serverSetupDone = computed(() => !props.serverFirst || props.serverConnected)
 const showSetupChoice = computed(() => !props.recoveryKey && !props.isLegacyImport)
 const canRestoreExisting = computed(() => restorePassword.value.length > 0 && restoreRecoveryKey.value.trim().length > 0)
+const showServerStep = computed(() => props.serverFirst && !props.recoveryKey && !props.isLegacyImport && !serverSetupDone.value)
 
 watch(
   () => [props.recoveryKey, props.isLegacyImport, props.initialMode] as const,
@@ -67,6 +82,16 @@ function showChoice(): void {
 }
 
 function handleSubmit(): void {
+  if (showServerStep.value) {
+    if (props.serverMode === 'selfhost' && !props.serverUrl.trim()) {
+      selfhostUrlDraft.value = ''
+      showSelfhostDialog.value = true
+      return
+    }
+    emit('openServerLogin')
+    return
+  }
+
   if (props.recoveryKey) {
     if (savedOfflineConfirmed.value) {
       emit('submit')
@@ -108,24 +133,73 @@ function submitRestoreExisting(): void {
     recoveryKey: restoreRecoveryKey.value.trim()
   })
 }
+
+function updateServerMode(event: Event): void {
+  const mode = (event.target as HTMLSelectElement).value as SyncMode
+  const previousMode = props.serverMode
+  emit('updateServerMode', mode)
+  if (mode === 'selfhost') {
+    selfhostUrlDraft.value = previousMode === 'selfhost' ? props.serverUrl.trim() : ''
+    selfhostUrlError.value = false
+    showSelfhostDialog.value = true
+  }
+}
+
+function closeSelfhostDialog(restoreOfficial: boolean): void {
+  showSelfhostDialog.value = false
+  selfhostUrlError.value = false
+  if (restoreOfficial && props.serverMode === 'selfhost') {
+    emit('updateServerMode', 'official')
+  }
+}
+
+function saveSelfhostUrl(): void {
+  const serverUrl = selfhostUrlDraft.value.trim()
+  if (!serverUrl) {
+    selfhostUrlError.value = true
+    return
+  }
+  emit('updateServerUrl', serverUrl)
+  selfhostUrlError.value = false
+  showSelfhostDialog.value = false
+}
 </script>
 
 <template>
   <div class="fixed inset-0 z-50 grid place-items-center bg-[#f6f8fb]">
     <form class="grid w-[500px] max-w-[94vw] gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-2xl" @submit.prevent="handleSubmit">
-      <div class="flex items-center gap-3 font-bold">
-        <span class="grid size-10 place-items-center rounded-lg bg-[#10201e] text-white"><LockKeyhole class="size-5" /></span>
-        <span>
-          LockPass 
-          <small class="block text-xs text-slate-500">{{ isAdding ? t('user.addUserTitle') : t('user.firstRunTitle') }}</small>
-        </span>
-      </div>
-
-      <div v-if="!recoveryKey && showSetupChoice && setupMode === 'choice'" class="grid gap-3">
+      <div v-if="showServerStep" class="grid gap-4">
         <button v-if="isAdding" class="plain-button justify-self-start" type="button" @click="emit('close')">
           <ArrowLeft class="size-4" />
           {{ t('user.backToPrevious') }}
         </button>
+        <div class="grid gap-1">
+          <h2 class="text-2xl font-black">{{ t('user.serverAccountTitle') }}</h2>
+        </div>
+        <div class="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2 max-sm:grid-cols-1">
+          <label class="form-label">
+            {{ t('sync.mode') }}
+            <select class="form-input" :value="serverMode" :disabled="serverBusy" @change="updateServerMode">
+              <option value="official">{{ t('sync.officialHosted') }}</option>
+              <option value="selfhost">{{ t('sync.selfHosted') }}</option>
+            </select>
+          </label>
+          <button class="primary-button justify-center" type="submit" :disabled="serverBusy">
+            <LogIn class="size-4" />
+            {{ serverBusy ? t('sync.officialLoginPending') : t('user.serverLoginAction') }}
+          </button>
+        </div>
+        <p v-if="authError" class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{{ authError }}</p>
+      </div>
+
+      <div v-else-if="!recoveryKey && showSetupChoice && setupMode === 'choice'" class="grid gap-3">
+        <button v-if="isAdding" class="plain-button justify-self-start" type="button" @click="emit('close')">
+          <ArrowLeft class="size-4" />
+          {{ t('user.backToPrevious') }}
+        </button>
+        <div v-if="serverFirst" class="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-900">
+          {{ t('user.serverConnectedBody', { account: serverAccountLabel || t('sync.connected') }) }}
+        </div>
         <h2 class="text-2xl font-black">{{ t('user.setupChoiceTitle') }}</h2>
         <button class="grid min-h-20 gap-1 rounded-lg border border-teal-200 bg-teal-50 p-4 text-left hover:border-teal-400" type="button" @click="setupMode = 'new'">
           <span class="flex items-center gap-2 font-bold text-teal-950"><UserPlus class="size-4" />{{ t('user.firstDeviceTitle') }}</span>
@@ -177,7 +251,7 @@ function submitRestoreExisting(): void {
         </button>
         <h2 class="text-2xl font-black">{{ isLegacyImport ? t('user.firstRunTitle') : t('user.newUserCreateTitle') }}</h2>
         <p v-if="isLegacyImport" class="text-sm text-slate-500">{{ t('user.legacyImportBody') }}</p>
-        <label class="form-label">
+        <label v-if="!serverFirst" class="form-label">
           {{ t('user.username') }}
           <input v-model="draft.username" class="form-input" autocomplete="username" :placeholder="t('user.usernamePlaceholder')" />
         </label>
@@ -249,6 +323,27 @@ function submitRestoreExisting(): void {
         </div>
       </div>
     </form>
+
+    <div v-if="showSelfhostDialog" class="fixed inset-0 z-10 grid place-items-center bg-slate-950/30 p-4">
+      <section class="grid w-[440px] max-w-[94vw] gap-4 rounded-lg bg-white p-5 shadow-2xl">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-xl font-black">{{ t('sync.selfHosted') }}</h2>
+          <button class="plain-button size-9 justify-center p-0" type="button" :aria-label="t('editor.close')" @click="closeSelfhostDialog(true)">
+            <X class="size-4" />
+          </button>
+        </div>
+        <label class="form-label">
+          {{ t('sync.serverUrl') }}
+          <input v-model="selfhostUrlDraft" class="form-input" :placeholder="t('sync.serverUrlPlaceholder')" />
+          <span class="text-xs font-semibold leading-5 text-slate-500">{{ t('sync.selfHostedUrlHelp') }}</span>
+        </label>
+        <p v-if="selfhostUrlError" class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{{ t('sync.syncServerRequired') }}</p>
+        <div class="flex justify-end gap-2">
+          <button class="plain-button" type="button" @click="closeSelfhostDialog(true)">{{ t('editor.cancel') }}</button>
+          <button class="primary-button" type="button" @click="saveSelfhostUrl">{{ t('editor.save') }}</button>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 

@@ -79,10 +79,12 @@ fn cors_layer(state: &AppState) -> CorsLayer {
 }
 
 #[cfg(debug_assertions)]
-fn default_dev_cors_origins() -> [HeaderValue; 9] {
+fn default_dev_cors_origins() -> [HeaderValue; 11] {
     [
         HeaderValue::from_static("http://127.0.0.1:1432"),
         HeaderValue::from_static("http://localhost:1432"),
+        HeaderValue::from_static("http://127.0.0.1:1431"),
+        HeaderValue::from_static("http://localhost:1431"),
         HeaderValue::from_static("http://127.0.0.1:1430"),
         HeaderValue::from_static("http://localhost:1430"),
         HeaderValue::from_static("http://127.0.0.1:5173"),

@@ -1,5 +1,5 @@
 import type { EncryptedSyncObjectPayload } from '@/services/masterPassword'
-import { DEFAULT_SELF_HOST_SYNC_SERVER_URL, normalizeServerUrl } from '@/services/appConfig'
+import { normalizeServerUrl } from '@/services/appConfig'
 
 export type SyncMode = 'official' | 'selfhost'
 
@@ -237,5 +237,5 @@ export class SyncApiClient {
 }
 
 export function normalizeSyncServerUrl(value: string): string {
-  return normalizeServerUrl(value, DEFAULT_SELF_HOST_SYNC_SERVER_URL)
+  return normalizeServerUrl(value)
 }

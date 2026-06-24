@@ -3,13 +3,15 @@ use std::{
     future::Future,
 };
 
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
+use hmac::{Hmac, Mac};
 use lockpass_server_auth::{
     AuthServices, EmailAuthStore, EmailLoginInput, EmailRegisterInput, NewEmailAccount,
     StoredEmailAccount, DEVICE_TOKEN_PREFIX,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use sha2::Sha256;
 use sqlx::{postgres::PgRow, PgConnection, PgPool, Postgres, Row, Transaction};
 use tracing::info;
 use uuid::Uuid;
@@ -19,6 +21,7 @@ use crate::{
     model::{
         AccountRecord, AccountView, AdminAccountPatchRequest, AdminConfigPatchRequest,
         AuditLogView, AuthPrincipal, AuthResponse, DeviceBindResponse, DeviceRecord, DeviceView,
+        EmailChallengePurpose, EmailServiceConfig, EmailStartResponse, EmailVerifyResponse,
         IdentityRecord, IdentityView, InstanceConfig, MeResponse, SyncConflict, SyncEventView,
         SyncObjectRecord, SyncObjectView, SyncPullResponse, SyncPushAccepted, SyncPushObject,
         SyncPushRejected, SyncPushResponse, SyncSnapshotQuery, SyncSnapshotResponse,
@@ -30,6 +33,11 @@ use crate::{
 };
 
 const INSTANCE_CONFIG_KEY: &str = "server";
+const EMAIL_CODE_TTL_MINUTES: i64 = 10;
+const EMAIL_CODE_RESEND_SECONDS: i64 = 60;
+const EMAIL_CODE_MAX_ATTEMPTS: i32 = 5;
+const ACCOUNT_SETUP_TOKEN_TTL_MINUTES: i64 = 15;
+const ACCOUNT_SETUP_TOKEN_PREFIX: &str = "lp_setup";
 const MAX_SYNC_OBJECT_BYTES: usize = 256 * 1024;
 const MAX_PUSH_OBJECTS: usize = 100;
 const MAX_PUSH_BATCH_PAYLOAD_BYTES: usize = 5 * 1024 * 1024;
@@ -56,6 +64,290 @@ impl PostgresStore {
         seed_rbac(&mut connection).await?;
         info!("ensuring instance config");
         save_instance_config_if_missing(&mut connection, InstanceConfig::default()).await
+    }
+
+    pub fn start_email_challenge(
+        &self,
+        email: &str,
+        display_name: Option<String>,
+        purpose: EmailChallengePurpose,
+    ) -> AppResult<(EmailStartResponse, String, EmailServiceConfig)> {
+        let identity = self.auth.email().normalize_email(email)?;
+        let email = identity.subject().to_string();
+        let display_name = normalize_display_name(display_name);
+        let pool = self.pool.clone();
+        let auth = self.auth.clone();
+
+        run_blocking(async move {
+            let config = load_instance_config(&pool).await?;
+            if !config.registration_enabled && purpose == EmailChallengePurpose::Register {
+                return Err(AppError::Forbidden);
+            }
+
+            let identity_exists: bool = sqlx::query_scalar(
+                "select exists(select 1 from account_identities where provider = 'email' and provider_subject = $1)",
+            )
+            .bind(&email)
+            .fetch_one(&pool)
+            .await?;
+
+            match purpose {
+                EmailChallengePurpose::Register if identity_exists => {
+                    return Err(AppError::ConflictCode {
+                        code: "account_exists",
+                        message: "account already exists".to_string(),
+                    });
+                }
+                EmailChallengePurpose::Login if !identity_exists => {
+                    return Err(AppError::NotFound("account not found".to_string()));
+                }
+                _ => {}
+            }
+
+            let now = Utc::now();
+            let recent_resend_after: Option<DateTime<Utc>> = sqlx::query_scalar(
+                "select resend_after from email_challenges \
+                 where email = $1 and purpose = $2 and consumed_at is null and resend_after > $3 \
+                 order by created_at desc limit 1",
+            )
+            .bind(&email)
+            .bind(purpose.as_str())
+            .bind(now)
+            .fetch_optional(&pool)
+            .await?;
+            if let Some(resend_after) = recent_resend_after {
+                let remaining = (resend_after - now).num_seconds().max(1);
+                return Err(AppError::TooManyRequests {
+                    retry_after_seconds: remaining,
+                    message: "email code was sent recently".to_string(),
+                });
+            }
+
+            let challenge_id = Uuid::new_v4();
+            let code = generate_email_code(&auth);
+            let code_hash =
+                hash_email_code(&config.email.code_secret, challenge_id, &email, purpose, &code);
+            let expires_at = now + Duration::minutes(EMAIL_CODE_TTL_MINUTES);
+            let resend_after = now + Duration::seconds(EMAIL_CODE_RESEND_SECONDS);
+
+            sqlx::query(
+                "insert into email_challenges \
+                 (id, email, display_name, purpose, code_hash, attempts, expires_at, resend_after, verified_at, consumed_at, created_at) \
+                 values ($1, $2, $3, $4, $5, 0, $6, $7, null, null, $8)",
+            )
+            .bind(challenge_id)
+            .bind(&email)
+            .bind(&display_name)
+            .bind(purpose.as_str())
+            .bind(code_hash)
+            .bind(expires_at)
+            .bind(resend_after)
+            .bind(now)
+            .execute(&pool)
+            .await?;
+
+            Ok((
+                EmailStartResponse {
+                    challenge_id,
+                    email,
+                    expires_at,
+                    resend_after_seconds: EMAIL_CODE_RESEND_SECONDS,
+                },
+                code,
+                config.email,
+            ))
+        })
+    }
+
+    pub fn verify_email_challenge(
+        &self,
+        challenge_id: Uuid,
+        code: &str,
+    ) -> AppResult<EmailVerifyResponse> {
+        let code = normalize_email_code(code)?;
+        let pool = self.pool.clone();
+        let auth = self.auth.clone();
+
+        run_blocking(async move {
+            let now = Utc::now();
+            let config = load_instance_config(&pool).await?;
+            let mut tx = pool.begin().await?;
+            let Some(row) = sqlx::query(
+                "select id, email, display_name, purpose, code_hash, attempts, expires_at, verified_at, consumed_at \
+                 from email_challenges where id = $1 for update",
+            )
+            .bind(challenge_id)
+            .fetch_optional(&mut *tx)
+            .await?
+            else {
+                return Err(AppError::BadRequest("invalid email challenge".to_string()));
+            };
+
+            let email: String = row.try_get("email")?;
+            let display_name: Option<String> = row.try_get("display_name")?;
+            let purpose = parse_email_challenge_purpose(row.try_get::<String, _>("purpose")?)?;
+            let code_hash: String = row.try_get("code_hash")?;
+            let attempts: i32 = row.try_get("attempts")?;
+            let expires_at: DateTime<Utc> = row.try_get("expires_at")?;
+            let verified_at: Option<DateTime<Utc>> = row.try_get("verified_at")?;
+            let consumed_at: Option<DateTime<Utc>> = row.try_get("consumed_at")?;
+
+            if consumed_at.is_some() {
+                return Err(AppError::BadRequest(
+                    "email challenge was already used".to_string(),
+                ));
+            }
+            if verified_at.is_some() {
+                return Err(AppError::BadRequest(
+                    "email challenge was already verified".to_string(),
+                ));
+            }
+            if expires_at <= now {
+                return Err(AppError::BadRequest("email code expired".to_string()));
+            }
+            if attempts >= EMAIL_CODE_MAX_ATTEMPTS {
+                return Err(AppError::TooManyRequests {
+                    retry_after_seconds: (expires_at - now).num_seconds().max(1),
+                    message: "too many email code attempts".to_string(),
+                });
+            }
+
+            let expected =
+                hash_email_code(&config.email.code_secret, challenge_id, &email, purpose, &code);
+            if !constant_time_eq(expected.as_bytes(), code_hash.as_bytes()) {
+                sqlx::query("update email_challenges set attempts = attempts + 1 where id = $1")
+                    .bind(challenge_id)
+                    .execute(&mut *tx)
+                    .await?;
+                tx.commit().await?;
+                return Err(AppError::Unauthorized);
+            }
+
+            sqlx::query("update email_challenges set verified_at = $1 where id = $2")
+                .bind(now)
+                .bind(challenge_id)
+                .execute(&mut *tx)
+                .await?;
+
+            let token = auth.secrets().issue(ACCOUNT_SETUP_TOKEN_PREFIX);
+            let token_expires_at = now + Duration::minutes(ACCOUNT_SETUP_TOKEN_TTL_MINUTES);
+            sqlx::query(
+                "insert into account_setup_tokens \
+                 (token_hash, challenge_id, email, display_name, purpose, expires_at, consumed_at, created_at) \
+                 values ($1, $2, $3, $4, $5, $6, null, $7)",
+            )
+            .bind(token.hash())
+            .bind(challenge_id)
+            .bind(&email)
+            .bind(&display_name)
+            .bind(purpose.as_str())
+            .bind(token_expires_at)
+            .bind(now)
+            .execute(&mut *tx)
+            .await?;
+
+            tx.commit().await?;
+
+            Ok(EmailVerifyResponse {
+                account_setup_token: token.into_value(),
+                email,
+                display_name,
+                purpose,
+                expires_at: token_expires_at,
+            })
+        })
+    }
+
+    pub fn complete_email_account_setup(
+        &self,
+        setup_token: &str,
+        device_name: String,
+        client_device_id: Option<String>,
+        client_ip: Option<String>,
+    ) -> AppResult<DeviceBindResponse> {
+        if device_name.trim().is_empty() {
+            return Err(AppError::BadRequest("device name is required".to_string()));
+        }
+        let pool = self.pool.clone();
+        let auth = self.auth.clone();
+        let token_hash = self.auth.secrets().hash(setup_token);
+        let name = device_name.trim().to_string();
+        let client_device_id = normalize_client_device_id(client_device_id);
+
+        run_blocking(async move {
+            let now = Utc::now();
+            let mut tx = pool.begin().await?;
+            let Some(row) = sqlx::query(
+                "select token_hash, challenge_id, email, display_name, purpose, expires_at, consumed_at \
+                 from account_setup_tokens where token_hash = $1 for update",
+            )
+            .bind(&token_hash)
+            .fetch_optional(&mut *tx)
+            .await?
+            else {
+                return Err(AppError::Unauthorized);
+            };
+
+            let challenge_id: Uuid = row.try_get("challenge_id")?;
+            let email: String = row.try_get("email")?;
+            let display_name: Option<String> = row.try_get("display_name")?;
+            let purpose = parse_email_challenge_purpose(row.try_get::<String, _>("purpose")?)?;
+            let expires_at: DateTime<Utc> = row.try_get("expires_at")?;
+            let consumed_at: Option<DateTime<Utc>> = row.try_get("consumed_at")?;
+
+            if purpose != EmailChallengePurpose::Register {
+                return Err(AppError::Forbidden);
+            }
+            if consumed_at.is_some() || expires_at <= now {
+                return Err(AppError::Unauthorized);
+            }
+
+            let existing_account =
+                fetch_account_by_identity_in_tx(&mut tx, "email", &email).await?;
+            if existing_account.is_some() {
+                return Err(AppError::ConflictCode {
+                    code: "account_exists",
+                    message: "account already exists".to_string(),
+                });
+            }
+
+            let account = create_email_account_without_password_tx(
+                &mut tx,
+                "email",
+                &email,
+                &email,
+                display_name.as_deref().unwrap_or(&email),
+            )
+            .await?;
+            sqlx::query("update account_setup_tokens set consumed_at = $1 where token_hash = $2")
+                .bind(now)
+                .bind(&token_hash)
+                .execute(&mut *tx)
+                .await?;
+            sqlx::query("update email_challenges set consumed_at = $1 where id = $2")
+                .bind(now)
+                .bind(challenge_id)
+                .execute(&mut *tx)
+                .await?;
+            tx.commit().await?;
+
+            let (device, device_token) = create_or_update_device(
+                &pool,
+                &auth,
+                account.id,
+                client_device_id,
+                name,
+                client_ip,
+            )
+            .await?;
+
+            Ok(DeviceBindResponse {
+                account: account.to_view(),
+                device: device.to_view(),
+                device_token,
+                token_type: "Bearer".to_string(),
+            })
+        })
     }
 
     pub fn register_email(
@@ -335,7 +627,7 @@ impl PostgresStore {
     pub fn create_sync_space(
         &self,
         principal: &AuthPrincipal,
-        display_name: Option<String>,
+        _display_name: Option<String>,
         encrypted_metadata: Option<Value>,
     ) -> AppResult<SyncSpaceCreateResponse> {
         let pool = self.pool.clone();
@@ -343,7 +635,7 @@ impl PostgresStore {
         run_blocking(async move {
             ensure_sync_scope(&principal, "sync:write")?;
             let now = Utc::now();
-            let display_name = normalize_sync_space_display_name(display_name);
+            let display_name = DEFAULT_SYNC_SPACE_DISPLAY_NAME.to_string();
 
             if let Some(existing) = sqlx::query(
                 "select id, account_id, display_name, encrypted_metadata, created_at, updated_at \
@@ -1186,16 +1478,16 @@ impl PostgresStore {
         })
     }
 
-    pub fn admin_config(&self) -> AppResult<InstanceConfig> {
+    pub fn admin_config(&self) -> AppResult<crate::model::AdminInstanceConfigView> {
         let pool = self.pool.clone();
-        run_blocking(async move { load_instance_config(&pool).await })
+        run_blocking(async move { Ok(load_instance_config(&pool).await?.to_admin_view()) })
     }
 
     pub fn admin_patch_config(
         &self,
         actor: &AuthPrincipal,
         patch: AdminConfigPatchRequest,
-    ) -> AppResult<InstanceConfig> {
+    ) -> AppResult<crate::model::AdminInstanceConfigView> {
         let pool = self.pool.clone();
         let actor_account_id = actor.account_id;
         run_blocking(async move {
@@ -1215,6 +1507,43 @@ impl PostgresStore {
             if let Some(value) = patch.wechat_enabled {
                 config.wechat_enabled = value;
             }
+            if let Some(email) = patch.email {
+                if let Some(value) = email.mode {
+                    config.email.mode = value;
+                }
+                if let Some(value) = email.from {
+                    let value = value.trim();
+                    if value.is_empty() {
+                        return Err(AppError::BadRequest("email from is required".to_string()));
+                    }
+                    config.email.from = value.to_string();
+                }
+                if let Some(value) = email.smtp_host {
+                    config.email.smtp_host = normalize_optional_config_string(value);
+                }
+                if let Some(value) = email.smtp_port {
+                    config.email.smtp_port = value.max(1);
+                }
+                if let Some(value) = email.smtp_username {
+                    config.email.smtp_username = normalize_optional_config_string(value);
+                }
+                if let Some(value) = email.smtp_password {
+                    if !value.trim().is_empty() {
+                        config.email.smtp_password = Some(value);
+                        config.email.smtp_password_set = true;
+                    }
+                }
+                if let Some(value) = email.code_secret {
+                    let value = value.trim();
+                    if value.is_empty() {
+                        return Err(AppError::BadRequest(
+                            "email code secret is required".to_string(),
+                        ));
+                    }
+                    config.email.code_secret = value.to_string();
+                }
+            }
+            validate_email_service_config(&config.email)?;
             if let Some(value) = patch.official_hosted {
                 config.official_hosted = value;
             }
@@ -1235,7 +1564,7 @@ impl PostgresStore {
                 json!(config),
             )
             .await?;
-            Ok(config)
+            Ok(config.to_admin_view())
         })
     }
 
@@ -2174,21 +2503,6 @@ async fn count_account_rows(
         .map_err(AppError::from)
 }
 
-fn normalize_sync_space_display_name(display_name: Option<String>) -> String {
-    let value = display_name
-        .unwrap_or_default()
-        .trim()
-        .chars()
-        .take(80)
-        .collect::<String>();
-
-    if value.is_empty() {
-        DEFAULT_SYNC_SPACE_DISPLAY_NAME.to_string()
-    } else {
-        value
-    }
-}
-
 fn normalize_device_remark(remark: Option<String>) -> Option<String> {
     let value = remark
         .unwrap_or_default()
@@ -2202,6 +2516,51 @@ fn normalize_device_remark(remark: Option<String>) -> Option<String> {
     } else {
         Some(value)
     }
+}
+
+fn normalize_optional_config_string(value: String) -> Option<String> {
+    let value = value.trim().to_string();
+    if value.is_empty() { None } else { Some(value) }
+}
+
+fn validate_email_service_config(config: &EmailServiceConfig) -> AppResult<()> {
+    if config.from.trim().is_empty() {
+        return Err(AppError::BadRequest("email from is required".to_string()));
+    }
+    if config.code_secret.trim().is_empty() {
+        return Err(AppError::BadRequest(
+            "email code secret is required".to_string(),
+        ));
+    }
+    if matches!(config.mode, crate::model::EmailServiceMode::Smtp) {
+        if config
+            .smtp_host
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .is_none()
+        {
+            return Err(AppError::BadRequest("SMTP host is required".to_string()));
+        }
+        if config
+            .smtp_username
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .is_none()
+        {
+            return Err(AppError::BadRequest("SMTP username is required".to_string()));
+        }
+        if config
+            .smtp_password
+            .as_deref()
+            .filter(|value| !value.is_empty())
+            .is_none()
+        {
+            return Err(AppError::BadRequest("SMTP password is required".to_string()));
+        }
+    }
+    Ok(())
 }
 
 fn normalize_client_device_id(client_device_id: Option<String>) -> Option<String> {
@@ -2251,6 +2610,38 @@ async fn ensure_role(pool: &PgPool, code: &str) -> AppResult<Uuid> {
     sqlx::query_scalar::<_, Uuid>("select id from roles where code = $1")
         .bind(code)
         .fetch_one(pool)
+        .await
+        .map_err(AppError::from)
+}
+
+async fn ensure_role_tx(tx: &mut Transaction<'_, Postgres>, code: &str) -> AppResult<Uuid> {
+    if let Some(id) = sqlx::query_scalar::<_, Uuid>("select id from roles where code = $1")
+        .bind(code)
+        .fetch_optional(&mut **tx)
+        .await?
+    {
+        return Ok(id);
+    }
+
+    let name = rbac::ROLES
+        .iter()
+        .find(|(role_code, _)| *role_code == code)
+        .map(|(_, name)| *name)
+        .unwrap_or(code);
+    let id = Uuid::new_v4();
+    sqlx::query(
+        "insert into roles (id, code, name, built_in) values ($1, $2, $3, true) \
+         on conflict (code) do nothing",
+    )
+    .bind(id)
+    .bind(code)
+    .bind(name)
+    .execute(&mut **tx)
+    .await?;
+
+    sqlx::query_scalar::<_, Uuid>("select id from roles where code = $1")
+        .bind(code)
+        .fetch_one(&mut **tx)
         .await
         .map_err(AppError::from)
 }
@@ -2374,6 +2765,97 @@ async fn fetch_account_by_identity(
     let account_id: Uuid = row.try_get("id")?;
     let roles = fetch_account_roles(pool, account_id).await?;
     Ok(Some(row_to_account(row, roles)?))
+}
+
+async fn fetch_account_by_identity_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    provider: &str,
+    subject: &str,
+) -> AppResult<Option<AccountRecord>> {
+    let Some(row) = sqlx::query(
+        "select a.id, a.display_name, a.email, a.password_hash, a.disabled_at, a.created_at, a.updated_at \
+         from accounts a join account_identities i on i.account_id = a.id \
+         where i.provider = $1 and i.provider_subject = $2 for update",
+    )
+    .bind(provider)
+    .bind(subject)
+    .fetch_optional(&mut **tx)
+    .await?
+    else {
+        return Ok(None);
+    };
+    let account_id: Uuid = row.try_get("id")?;
+    let roles = fetch_account_roles_in_tx(tx, account_id).await?;
+    Ok(Some(row_to_account(row, roles)?))
+}
+
+async fn create_email_account_without_password_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    provider: &str,
+    subject: &str,
+    display_label: &str,
+    display_name: &str,
+) -> AppResult<AccountRecord> {
+    let now = Utc::now();
+    let account_id = Uuid::new_v4();
+    let account_count: i64 = sqlx::query_scalar("select count(*) from accounts")
+        .fetch_one(&mut **tx)
+        .await?;
+    let role = if account_count == 0 {
+        rbac::ROLE_ADMIN
+    } else {
+        rbac::ROLE_USER
+    };
+    let role_id = ensure_role_tx(tx, role).await?;
+
+    sqlx::query(
+        "insert into accounts (id, display_name, email, password_hash, created_at, updated_at, disabled_at) \
+         values ($1, $2, $3, $4, $5, $6, $7)",
+    )
+    .bind(account_id)
+    .bind(display_name)
+    .bind(subject)
+    .bind(Option::<String>::None)
+    .bind(now)
+    .bind(now)
+    .bind(Option::<DateTime<Utc>>::None)
+    .execute(&mut **tx)
+    .await?;
+
+    sqlx::query(
+        "insert into account_identities (id, account_id, provider, provider_subject, display_label, created_at) \
+         values ($1, $2, $3, $4, $5, $6)",
+    )
+    .bind(Uuid::new_v4())
+    .bind(account_id)
+    .bind(provider)
+    .bind(subject)
+    .bind(display_label)
+    .bind(now)
+    .execute(&mut **tx)
+    .await?;
+
+    sqlx::query(
+        "insert into account_roles (account_id, role_id, granted_by, created_at) values ($1, $2, $3::uuid, $4)",
+    )
+    .bind(account_id)
+    .bind(role_id)
+    .bind(Option::<Uuid>::None)
+    .bind(now)
+    .execute(&mut **tx)
+    .await?;
+
+    let roles = fetch_account_roles_in_tx(tx, account_id).await?;
+    Ok(AccountRecord {
+        id: account_id,
+        display_name: display_name.to_string(),
+        email: Some(subject.to_string()),
+        password_hash: None,
+        disabled_at: None,
+        created_at: now,
+        updated_at: now,
+        roles,
+    })
 }
 
 async fn fetch_account_roles(pool: &PgPool, account_id: Uuid) -> AppResult<BTreeSet<String>> {
@@ -2595,6 +3077,81 @@ fn row_to_device(row: PgRow) -> AppResult<DeviceRecord> {
         revoked_at: row.try_get("revoked_at")?,
         created_at: row.try_get("created_at")?,
     })
+}
+
+fn normalize_display_name(display_name: Option<String>) -> Option<String> {
+    display_name
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn normalize_email_code(code: &str) -> AppResult<String> {
+    let code = code.trim();
+    if code.len() == 6 && code.bytes().all(|byte| byte.is_ascii_digit()) {
+        Ok(code.to_string())
+    } else {
+        Err(AppError::BadRequest(
+            "email code must be 6 digits".to_string(),
+        ))
+    }
+}
+
+fn generate_email_code(auth: &AuthServices) -> String {
+    let raw = auth.secrets().issue("email_code").hash().to_string();
+    let mut value: u32 = 0;
+    for byte in raw.bytes().take(12) {
+        value = value.wrapping_mul(31).wrapping_add(byte as u32);
+    }
+    format!("{:06}", value % 1_000_000)
+}
+
+fn hash_email_code(
+    secret: &str,
+    challenge_id: Uuid,
+    email: &str,
+    purpose: EmailChallengePurpose,
+    code: &str,
+) -> String {
+    let mut mac =
+        Hmac::<Sha256>::new_from_slice(secret.as_bytes()).expect("HMAC accepts keys of any size");
+    mac.update(challenge_id.as_bytes());
+    mac.update(b"|");
+    mac.update(email.as_bytes());
+    mac.update(b"|");
+    mac.update(purpose.as_str().as_bytes());
+    mac.update(b"|");
+    mac.update(code.as_bytes());
+    hex_encode(&mac.finalize().into_bytes())
+}
+
+fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    left.iter()
+        .zip(right.iter())
+        .fold(0u8, |acc, (a, b)| acc | (a ^ b))
+        == 0
+}
+
+fn parse_email_challenge_purpose(value: String) -> AppResult<EmailChallengePurpose> {
+    match value.as_str() {
+        "register" => Ok(EmailChallengePurpose::Register),
+        "login" => Ok(EmailChallengePurpose::Login),
+        _ => Err(AppError::Internal(format!(
+            "invalid email challenge purpose: {value}"
+        ))),
+    }
+}
+
+fn hex_encode(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        out.push(HEX[(byte >> 4) as usize] as char);
+        out.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    out
 }
 
 async fn fetch_sync_object_for_update(

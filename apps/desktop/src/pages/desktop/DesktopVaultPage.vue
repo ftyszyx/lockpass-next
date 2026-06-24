@@ -22,9 +22,12 @@ import { startDeepLinkListener, subscribeToDeepLinks } from '@/services/deepLink
 import { openLogDir } from '@/services/logger'
 import { generateRecoveryKey } from '@/services/masterPassword'
 import { createPerfTrace } from '@/services/perfTrace'
+import { isUserWebRuntime } from '@/services/runtime'
+import type { SyncMode } from '@/services/syncClient'
 import { shortcutMatchesEvent } from '@/services/shortcuts'
-import { saveAttachmentFile, type DesktopLogLevel, type DesktopSecuritySettings, type ShortcutAction, type ShortcutScope } from '@/services/vaultRepository'
-import { useVaultStore } from '@/stores/vault'
+import { openExternalUrl, saveAttachmentFile, type DesktopLogLevel, type DesktopSecuritySettings, type ShortcutAction, type ShortcutScope } from '@/services/vaultRepository'
+import { loadWebDeviceBinding } from '@/services/webDeviceBinding'
+import { useVaultStore, type PendingSyncDeviceBindExchange } from '@/stores/vault'
 import BackupSavedModal from './components/BackupSavedModal.vue'
 import DeleteVaultConfirmModal from './components/DeleteVaultConfirmModal.vue'
 import DesktopDrawer from './components/DesktopDrawer.vue'
@@ -41,6 +44,7 @@ import RecoveryKeyModal from './components/RecoveryKeyModal.vue'
 import ResizeHandle from './components/ResizeHandle.vue'
 import SwitchUserConfirmModal from './components/SwitchUserConfirmModal.vue'
 import ToastNotice from './components/ToastNotice.vue'
+import UserManagementModal from './components/UserManagementModal.vue'
 import UserSetupModal from './components/UserSetupModal.vue'
 import VaultModal from './components/VaultModal.vue'
 import VaultSidebar from './components/VaultSidebar.vue'
@@ -71,7 +75,10 @@ const creatingUser = ref(false)
 const generatedRecoveryKey = ref('')
 const recoveryUserName = ref('')
 const userSetupInitialMode = ref<'choice' | 'new' | 'restore'>('choice')
-const revealPassword = ref('')
+const setupServerMode = ref<SyncMode>('official')
+const setupServerUrl = ref(vaultStore.settings.sync.serverUrl)
+const setupServerBusy = ref(false)
+const pendingServerExchange = ref<PendingSyncDeviceBindExchange | null>(null)
 const revealedRecoveryKey = ref('')
 const revealError = ref('')
 const revealRecoveryKeyIssue = ref<'missing' | 'unsupported' | ''>('')
@@ -89,6 +96,7 @@ let clipboardCleanupValue = ''
 let deepLinkUnlisten: (() => void) | null = null
 let deepLinkListenerStop: (() => void) | null = null
 let autoLockTimer: number | null = null
+let autoSyncTimer: number | null = null
 
 const passwordOptions = reactive<PasswordOptions>({
   length: 18,
@@ -136,12 +144,23 @@ const pendingDeleteVaultItemCount = computed(() => pendingDeleteVaultId.value ? 
 const pendingSwitchUserName = computed(() => {
   return vaultStore.users.find((user) => user.id === pendingSwitchUserId.value)?.displayName ?? ''
 })
+const setupRequiresServerLogin = computed(() => {
+  return vaultStore.hydrated && (vaultStore.needsUserSetup || activeModal.value === 'user') && !pendingServerExchange.value && !generatedRecoveryKey.value
+})
+const setupServerAccountFlow = computed(() => setupRequiresServerLogin.value || Boolean(pendingServerExchange.value))
+const setupServerConnected = computed(() => Boolean(pendingServerExchange.value) || !setupRequiresServerLogin.value)
+const setupServerAccountLabel = computed(() => {
+  const exchange = pendingServerExchange.value
+  return exchange?.account.email ?? exchange?.account.displayName ?? ''
+})
 
 onMounted(async () => {
   await initializeVaultPage()
   window.addEventListener('keydown', handleInternalShortcut)
   window.addEventListener('blur', scheduleAutoLock)
   window.addEventListener('focus', cancelAutoLock)
+  window.addEventListener('focus', handleAutoSyncWake)
+  window.addEventListener('online', handleAutoSyncWake)
   document.addEventListener('visibilitychange', handleVisibilityAutoLock)
 })
 
@@ -163,16 +182,21 @@ async function initializeVaultPage(): Promise<void> {
   }
   if (vaultStore.needsUserSetup) {
     resetUserDraft()
+    applyWebDeviceBindingIfAvailable()
   }
   initializing.value = false
+  promptServerSignInIfNeeded()
 }
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleInternalShortcut)
   window.removeEventListener('blur', scheduleAutoLock)
   window.removeEventListener('focus', cancelAutoLock)
+  window.removeEventListener('focus', handleAutoSyncWake)
+  window.removeEventListener('online', handleAutoSyncWake)
   document.removeEventListener('visibilitychange', handleVisibilityAutoLock)
   cancelAutoLock()
+  cancelAutoSync()
   deepLinkUnlisten?.()
   deepLinkUnlisten = null
   deepLinkListenerStop?.()
@@ -214,6 +238,23 @@ function resetUserDraft(): void {
   authError.value = ''
   generatedRecoveryKey.value = ''
   recoveryUserName.value = ''
+  if (!vaultStore.needsUserSetup) {
+    pendingServerExchange.value = null
+  }
+  setupServerMode.value = vaultStore.settings.sync.mode
+  setupServerUrl.value = vaultStore.settings.sync.serverUrl
+  setupServerBusy.value = false
+}
+
+function applyWebDeviceBindingIfAvailable(): void {
+  if (!isUserWebRuntime()) return
+  const exchange = loadWebDeviceBinding()
+  if (!exchange) return
+  pendingServerExchange.value = exchange
+  setupServerMode.value = exchange.mode
+  setupServerUrl.value = exchange.serverUrl
+  userDraft.username = exchange.account.email ?? exchange.account.displayName ?? exchange.account.id
+  authError.value = ''
 }
 
 function resetItemDraft(): void {
@@ -250,7 +291,6 @@ function clearSensitiveUiState(): void {
 }
 
 function clearRecoveryReveal(): void {
-  revealPassword.value = ''
   revealedRecoveryKey.value = ''
   revealError.value = ''
   revealRecoveryKeyIssue.value = ''
@@ -265,6 +305,10 @@ function openRemoveUserModal(): void {
 function closeSwitchUserConfirm(): void {
   pendingSwitchUserId.value = null
   activeModal.value = null
+}
+
+function openUserManagement(): void {
+  activeModal.value = 'userManagement'
 }
 
 function openAddUser(initialMode: 'choice' | 'new' | 'restore' = 'choice'): void {
@@ -286,7 +330,7 @@ function closeUserSetup(): void {
 }
 
 function validateUserDraft(): string {
-  if (!userDraft.username.trim()) {
+  if (!setupServerAccountFlow.value && !userDraft.username.trim()) {
     return t('user.usernameRequired')
   }
   if (userDraft.password.length < 8) {
@@ -307,7 +351,7 @@ function prepareUserRecoveryKey(): void {
   }
 
   generatedRecoveryKey.value = generateRecoveryKey()
-  recoveryUserName.value = userDraft.username.trim()
+  recoveryUserName.value = userDraft.username.trim() || setupServerAccountLabel.value || t('user.currentUser')
 }
 
 function backToUserDraftFromRecoveryKey(): void {
@@ -318,7 +362,7 @@ function backToUserDraftFromRecoveryKey(): void {
 }
 
 function showUnavailableRecoveryFlow(): void {
-  showToast(t('toast.notReady'))
+  showToast(t('user.restoreDeviceUnavailable'))
 }
 
 async function createUser(): Promise<void> {
@@ -337,10 +381,18 @@ async function createUser(): Promise<void> {
   creatingUser.value = true
   try {
     const result = await vaultStore.createUser({
-      username: userDraft.username,
+      username: userDraft.username.trim() || setupServerAccountLabel.value || 'server-user',
       password: userDraft.password,
-      recoveryKey: generatedRecoveryKey.value
+      recoveryKey: generatedRecoveryKey.value,
+      sync: {
+        mode: setupServerMode.value,
+        serverUrl: setupServerUrl.value
+      }
     })
+    if (pendingServerExchange.value) {
+      await vaultStore.applyPendingServerAccountExchange(pendingServerExchange.value)
+      pendingServerExchange.value = null
+    }
     const toastMessage =
       result.recoveryKeyStorage === 'unsupported'
         ? t('toast.recoveryKeyBrowserPreview')
@@ -349,6 +401,7 @@ async function createUser(): Promise<void> {
           : t('toast.recoveryKeySaveFailed')
     closeUserSetup()
     showToast(toastMessage)
+    promptServerSignInIfNeeded()
   } catch (error) {
     authError.value =
       error instanceof Error && error.message === 'duplicate-username'
@@ -386,6 +439,10 @@ async function confirmSwitchUser(): Promise<void> {
   const userId = pendingSwitchUserId.value
   if (!userId) return
   await switchUser(userId)
+}
+
+function openAddUserFromManagement(): void {
+  openAddUser()
 }
 
 async function removeActiveUserFromDevice(): Promise<void> {
@@ -501,7 +558,7 @@ function openStandalonePasswordGenerator(): void {
 }
 
 async function openManagement(page: ManagementPageName = 'settings'): Promise<void> {
-  if (page === 'conflicts' || page === 'backup') {
+  if (page === 'backup') {
     await vaultStore.ensureAllVaultObjectsLoaded()
   }
   activeManagementPage.value = page
@@ -515,10 +572,11 @@ function closeDrawer(): void {
   clearRecoveryReveal()
 }
 
-function openRecoveryKeyModal(): void {
+async function openRecoveryKeyModal(): Promise<void> {
   activeDrawer.value = null
   clearRecoveryReveal()
   activeModal.value = 'recoveryKey'
+  await loadRecoveryKeyForAnotherDevice()
 }
 
 function closeRecoveryKeyModal(): void {
@@ -839,16 +897,83 @@ async function handleDeepLink(url: string): Promise<void> {
   if (!url.startsWith('lockpass://auth/callback')) return
 
   try {
+    if (vaultStore.needsUserSetup && !vaultStore.activeUser?.crypto) {
+      const exchange = vaultStore.parseServerAccountAuthorizationCallback(url)
+      pendingServerExchange.value = exchange
+      setupServerMode.value = exchange.mode
+      setupServerUrl.value = exchange.serverUrl
+      setupServerBusy.value = false
+      userSetupInitialMode.value = 'choice'
+      userDraft.username = exchange.account.email ?? exchange.account.displayName ?? exchange.account.id
+      vaultStore.clearOfficialLoginState()
+      authError.value = ''
+      showToast(t('user.serverConnectedToast'))
+      return
+    }
+
     await vaultStore.completeOfficialSyncAuthorization(url)
     activeManagementPage.value = null
     activeDrawer.value = 'sync'
     vaultStore.clearOfficialLoginState()
     showToast(t('sync.connectSuccess'))
+    scheduleAutoSync('device-bound', 250)
   } catch (error) {
+    setupServerBusy.value = false
+    if (vaultStore.needsUserSetup && !vaultStore.activeUser?.crypto) {
+      authError.value = syncErrorToast(error)
+      vaultStore.setOfficialLoginError(error instanceof Error ? error.message : 'syncFailed')
+      return
+    }
     activeManagementPage.value = null
     activeDrawer.value = 'sync'
     vaultStore.setOfficialLoginError(error instanceof Error ? error.message : 'syncFailed')
     showToast(syncErrorToast(error))
+  }
+}
+
+async function openInitialServerLogin(): Promise<void> {
+  if (setupServerBusy.value) return
+  if (setupServerMode.value === 'selfhost' && !setupServerUrl.value.trim()) {
+    authError.value = t('sync.syncServerRequired')
+    return
+  }
+
+  setupServerBusy.value = true
+  authError.value = ''
+  try {
+    const authorization = vaultStore.startServerAccountAuthorization({
+      mode: setupServerMode.value,
+      serverUrl: setupServerUrl.value
+    })
+    await openExternalUrl(authorization.loginUrl)
+    showToast(t('sync.officialLoginPendingBody'))
+  } catch (error) {
+    authError.value = syncErrorToast(error)
+  } finally {
+    setupServerBusy.value = false
+  }
+}
+
+function updateSetupServerMode(mode: SyncMode): void {
+  setupServerMode.value = mode
+  authError.value = ''
+  if (mode === 'selfhost') {
+    setupServerUrl.value = ''
+  }
+}
+
+async function updateSetupServerUrl(serverUrl: string): Promise<void> {
+  setupServerUrl.value = serverUrl
+  authError.value = ''
+  if (!vaultStore.hasUsers) {
+    try {
+      await vaultStore.saveSyncSettings({
+        mode: setupServerMode.value,
+        serverUrl
+      })
+    } catch (error) {
+      authError.value = syncErrorToast(error)
+    }
   }
 }
 
@@ -891,6 +1016,30 @@ async function runSidebarSyncNow(): Promise<void> {
   }
 }
 
+function scheduleAutoSync(reason: string, delayMs = 900): void {
+  if (!vaultStore.unlocked || !vaultStore.syncConnected || vaultStore.syncConflictCount > 0) return
+  cancelAutoSync()
+  autoSyncTimer = window.setTimeout(() => {
+    autoSyncTimer = null
+    void vaultStore.tryAutoSync(reason)
+  }, delayMs)
+}
+
+function cancelAutoSync(): void {
+  if (autoSyncTimer === null) return
+  window.clearTimeout(autoSyncTimer)
+  autoSyncTimer = null
+}
+
+function handleAutoSyncWake(): void {
+  scheduleAutoSync('wake')
+}
+
+function promptServerSignInIfNeeded(): void {
+  if (!vaultStore.hydrated || !vaultStore.unlocked || vaultStore.syncConnected || activeManagementPage.value || activeModal.value) return
+  activeDrawer.value = 'sync'
+}
+
 async function lockApp(): Promise<void> {
   if (vaultStore.unlocked) await vaultStore.persist()
   clearPendingClipboard()
@@ -911,22 +1060,9 @@ async function useSavedRecoveryKey(): Promise<void> {
   unlockingVault.value = true
   await nextFrame()
   try {
-    if (vaultStore.passwordlessUnlockSupported) {
-      const fastUnlocked = await perf.measure('store.fastUnlockActiveUser', () => vaultStore.fastUnlockActiveUser())
-      if (fastUnlocked) {
-        unlockPassword.value = ''
-        activeModal.value = null
-        showToast(t('toast.unlocked'))
-        perf.done({ status: 'fast-unlocked' })
-        return
-      }
-    }
-
     if (!unlockPassword.value) {
-      authError.value = vaultStore.passwordlessUnlockSupported
-        ? t('lock.fastUnlockUnavailable')
-        : t('lock.masterPasswordRequiredForSavedKey')
-      perf.done({ status: vaultStore.passwordlessUnlockSupported ? 'fast-unlock-unavailable' : 'password-required' })
+      authError.value = t('lock.masterPasswordRequiredForSavedKey')
+      perf.done({ status: 'password-required' })
       return
     }
 
@@ -937,6 +1073,8 @@ async function useSavedRecoveryKey(): Promise<void> {
       unlockPassword.value = ''
       activeModal.value = null
       showToast(t('toast.unlocked'))
+      scheduleAutoSync('unlock')
+      promptServerSignInIfNeeded()
       perf.done({ status: 'session-cache-unlocked' })
       return
     }
@@ -957,12 +1095,14 @@ async function useSavedRecoveryKey(): Promise<void> {
       unlockPassword.value = ''
       activeModal.value = null
       showToast(t('toast.unlocked'))
+      scheduleAutoSync('unlock')
+      promptServerSignInIfNeeded()
       perf.done({ status: 'unlocked' })
       return
     }
 
     authError.value = result.status === 'unsupported'
-      ? t('lock.fastUnlockUnsupported')
+      ? t('lock.savedRecoveryKeyUnsupported')
       : t('lock.savedRecoveryKeyMissing')
     perf.done({ status: result.status })
   } catch (error) {
@@ -996,6 +1136,8 @@ async function unlockApp(): Promise<void> {
     unlockRecoveryKey.value = ''
     activeModal.value = null
     showToast(t('toast.unlocked'))
+    scheduleAutoSync('unlock')
+    promptServerSignInIfNeeded()
     perf.done({ status: 'unlocked', recoveryKeySave: 'background' })
     void saveRecoveryKeyAfterManualUnlock(recoveryKey)
   } catch {
@@ -1028,7 +1170,7 @@ async function saveRecoveryKeyAfterManualUnlock(recoveryKey: string): Promise<vo
   }
 }
 
-async function revealRecoveryKey(): Promise<void> {
+async function loadRecoveryKeyForAnotherDevice(): Promise<void> {
   revealError.value = ''
   revealedRecoveryKey.value = ''
   revealRecoveryKeyIssue.value = ''
@@ -1037,16 +1179,10 @@ async function revealRecoveryKey(): Promise<void> {
     revealError.value = t('settings.recoveryKeyLocked')
     return
   }
-  if (!revealPassword.value) {
-    revealError.value = t('settings.recoveryKeyPasswordRequired')
-    return
-  }
-
   try {
-    const result = await vaultStore.revealRecoveryKey(revealPassword.value)
+    const result = await vaultStore.loadSavedRecoveryKeyForActiveUser()
     if (result.status === 'loaded') {
       revealedRecoveryKey.value = result.recoveryKey
-      revealPassword.value = ''
       return
     }
 
@@ -1054,8 +1190,8 @@ async function revealRecoveryKey(): Promise<void> {
     revealError.value = revealRecoveryKeyIssue.value === 'unsupported'
       ? t('settings.recoveryKeyUnsupported')
       : t('settings.recoveryKeyMissing')
-  } catch {
-    revealError.value = t('user.wrongPassword')
+  } catch (error) {
+    revealError.value = error instanceof Error ? error.message : String(error)
   }
 }
 
@@ -1068,11 +1204,6 @@ async function saveRecoveryKeyToDevice(recoveryKey: string): Promise<void> {
     revealError.value = t('settings.recoveryKeyLocked')
     return
   }
-  if (!revealPassword.value) {
-    revealRecoveryKeyIssue.value = 'missing'
-    revealError.value = t('settings.recoveryKeyPasswordRequired')
-    return
-  }
   const normalizedRecoveryKey = recoveryKey.trim()
   if (!normalizedRecoveryKey) {
     revealRecoveryKeyIssue.value = 'missing'
@@ -1082,9 +1213,8 @@ async function saveRecoveryKeyToDevice(recoveryKey: string): Promise<void> {
 
   savingRecoveryKeyToDevice.value = true
   try {
-    const storageStatus = await vaultStore.saveRecoveryKeyForActiveUser(revealPassword.value, normalizedRecoveryKey)
+    const storageStatus = await vaultStore.saveVerifiedRecoveryKeyForActiveUser(normalizedRecoveryKey)
     if (storageStatus === 'saved') {
-      revealPassword.value = ''
       revealRecoveryKeyIssue.value = ''
       revealedRecoveryKey.value = normalizedRecoveryKey
       showToast(t('toast.recoveryKeySaved'))
@@ -1144,11 +1274,6 @@ function selectQuickResult(item: VaultItem): void {
   copyValue(item.fields.find((field) => field.kind === 'password')?.value ?? item.title, t('toast.copiedPassword'))
 }
 
-async function openConflicts(): Promise<void> {
-  activeDrawer.value = null
-  await vaultStore.ensureAllVaultObjectsLoaded()
-  activeManagementPage.value = 'conflicts'
-}
 
 function handleInternalShortcut(event: KeyboardEvent): void {
   if (!vaultStore.hydrated || activeManagementPage.value) return
@@ -1241,7 +1366,6 @@ function cancelAutoLock(): void {
 
   <div v-else class="grid h-screen min-h-[680px] grid-rows-[56px_minmax(0,1fr)] bg-[#f7f8fa] text-slate-950">
     <DesktopHeader
-      @open-management="openManagement"
       @quick-search="openQuickSearch"
       @open-generator="openStandalonePasswordGenerator"
       @new-item="openNewItem()"
@@ -1283,12 +1407,8 @@ function cancelAutoLock(): void {
           :active-user-initials="activeUserInitials"
           @create-vault="openNewVault"
           @delete-vault="requestDeleteVault"
-          @open-drawer="activeDrawer = $event"
+          @manage-users="openUserManagement"
           @open-management="openManagement"
-          @sync-now="runSidebarSyncNow"
-          @sync-unavailable="showToast(t('sync.syncNotConnected'))"
-          @switch-user="requestSwitchUser"
-          @add-user="openAddUser"
           @show-recovery-key="openRecoveryKeyModal"
           @lock="lockApp"
         />
@@ -1343,7 +1463,6 @@ function cancelAutoLock(): void {
       @copy-value="copyValue"
       @regenerate="regeneratePassword()"
       @use-password="useGeneratedPassword"
-      @open-conflicts="openConflicts"
       @sync-toast="showToast"
       @operation-start="showOperationProgress"
       @operation-end="hideOperationProgress"
@@ -1385,12 +1504,21 @@ function cancelAutoLock(): void {
       :recovery-key="generatedRecoveryKey"
       :created-user-name="recoveryUserName"
       :initial-mode="userSetupInitialMode"
+      :server-first="setupServerAccountFlow"
+      :server-connected="setupServerConnected"
+      :server-account-label="setupServerAccountLabel"
+      :server-mode="setupServerMode"
+      :server-url="setupServerUrl"
+      :server-busy="setupServerBusy"
       @close="closeUserSetup"
       @generate-recovery-key="prepareUserRecoveryKey"
       @back-to-new-user="backToUserDraftFromRecoveryKey"
       @restore-existing="showUnavailableRecoveryFlow"
       @scan-recovery-qr="showUnavailableRecoveryFlow"
       @submit="createUser"
+      @update-server-mode="updateSetupServerMode"
+      @update-server-url="updateSetupServerUrl"
+      @open-server-login="openInitialServerLogin"
     />
 
     <QuickSearchModal
@@ -1402,17 +1530,21 @@ function cancelAutoLock(): void {
       @select-and-copy="selectQuickResult"
     />
 
+    <UserManagementModal
+      v-if="activeModal === 'userManagement'"
+      @close="activeModal = null"
+      @switch-user="requestSwitchUser"
+      @add-user="openAddUserFromManagement"
+    />
+
     <RecoveryKeyModal
       v-if="activeModal === 'recoveryKey'"
-      :reveal-password="revealPassword"
       :revealed-recovery-key="revealedRecoveryKey"
       :reveal-error="revealError"
       :reveal-issue="revealRecoveryKeyIssue"
       :saving-to-device="savingRecoveryKeyToDevice"
       @close="closeRecoveryKeyModal"
       @copy-value="copyValue"
-      @update-reveal-password="revealPassword = $event"
-      @reveal-recovery-key="revealRecoveryKey"
       @save-recovery-key-to-device="saveRecoveryKeyToDevice"
     />
 

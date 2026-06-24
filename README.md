@@ -1,8 +1,8 @@
 # LockPass Next
 
-LockPass Next 是 LockPass 的全新重写版本。当前阶段优先实现桌面端密码管理器，并同步建设开源同步服务器和服务器后台基础能力，使用 Tauri 2、Vue、Tailwind CSS、TypeScript、Rust 和 PostgreSQL 构建本地优先、端到端加密、可同步、可自部署的个人密码管理工具。
+LockPass Next 是 LockPass 的全新重写版本。当前阶段优先实现桌面端密码管理器、普通用户 Web 保险库、开源同步服务器和管理员后台基础能力，使用 Tauri 2、Vue、Tailwind CSS、TypeScript、Rust 和 PostgreSQL 构建端到端加密、可保存到服务器、可自部署的个人密码管理工具。
 
-当前开发重点是桌面端、本地数据模型、安全边界、同步协议、开源服务器端和服务器后台。移动端、浏览器插件、多人共享保险库和完整托管商业化能力仍属于后续阶段。
+当前开发重点是桌面端、用户 Web 端、本地缓存模型、安全边界、同步协议、开源服务器端和管理员后台。移动端、浏览器插件、多人共享保险库和完整托管商业化能力仍属于后续阶段。
 
 ## 目标
 
@@ -17,9 +17,11 @@ LockPass Next 是 LockPass 的全新重写版本。当前阶段优先实现桌�
 
 | 模块 | 技术栈 | 说明 |
 | --- | --- | --- |
-| Desktop | Tauri 2 + Vue + Tailwind CSS + TypeScript | 当前阶段主应用，负责窗口、托盘、全局快捷键、本地文件和系统集成 |
+| Desktop | Tauri 2 + Vue + Tailwind CSS + TypeScript | 桌面应用，负责窗口、托盘、全局快捷键、本地文件和系统集成 |
+| Web | Vue + Tailwind CSS + TypeScript | 普通用户 Web 保险库，复用保险库体验，服务器数据为准，浏览器本地只保存密文缓存 |
 | Core | TypeScript packages | 领域模型、加密封装、迁移、同步协议和业务命令 |
 | Server | 开源 API 服务 + PostgreSQL | 保存账户、设备、同步元数据和密文数据，不保存明文和可解密密钥 |
+| Admin Web | Vue + Tailwind CSS + TypeScript | 管理员后台，只允许管理员查看和管理实例元数据 |
 | Database | SQLite / PostgreSQL | 桌面端使用本地 SQLite，服务器端使用 PostgreSQL |
 
 后端框架先不与产品协议强绑定。实现时优先选择能稳定交付、方便自部署、便于共享 TypeScript 类型的方案。
@@ -29,8 +31,9 @@ LockPass Next 是 LockPass 的全新重写版本。当前阶段优先实现桌�
 ```text
 apps/
   desktop/   Tauri 2 桌面端
+  web/       普通用户 Web 保险库
   server/    Rust + Axum 开源同步服务器
-  server_web/ Vue + TypeScript 同步服务器后台
+  admin_web/ Vue + TypeScript 管理员后台
 packages/
   core/      领域模型、业务命令、迁移接口
   crypto/    KDF、密文 envelope、加解密 provider 接口
@@ -75,10 +78,10 @@ npm install
 npm run dev:desktop
 ```
 
-桌面端官方服务器地址是编译期配置，默认指向本地服务器后台前端：
+桌面端官方服务器地址是编译期配置，默认指向本地用户 Web 端：
 
 ```bash
-VITE_LOCKPASS_OFFICIAL_SERVER_URL=http://127.0.0.1:1432
+VITE_LOCKPASS_OFFICIAL_SERVER_URL=http://127.0.0.1:1431
 VITE_LOCKPASS_OFFICIAL_API_URL=http://127.0.0.1:1480
 ```
 
@@ -93,10 +96,18 @@ npm run dev:server
 
 服务端必须配置 `server/.env` 中的 `DATABASE_URL`。
 
-### 服务器管理后台
+### 用户 Web 端
 
 ```bash
-npm run dev:server_web
+npm run dev:web
+```
+
+用户 Web 端使用服务器数据作为权威来源，浏览器本地只作为密文缓存和待保存队列。
+
+### 管理员后台
+
+```bash
+npm run dev:admin_web
 ```
 
 ### Landing page
@@ -105,3 +116,13 @@ npm run dev:server_web
 npm run dev:landing
 npm run build:landing
 ```
+
+### Server email configuration
+
+Email verification codes use `MAILER_MODE=log` in local development, which prints
+the code to the server log. Production should use `MAILER_MODE=smtp` with
+`SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAILER_FROM`, and a
+long random `LOCKPASS_EMAIL_CODE_SECRET`.
+
+Aliyun DirectMail, Tencent Cloud SES, Resend, AWS SES, SendGrid, and most
+business mailboxes can be connected through the same SMTP settings.

@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { Command, Lock, Plus, Search, Settings, WandSparkles } from '@lucide/vue'
+import { Command, Lock, Plus, Search, WandSparkles } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
 import { useVaultStore } from '@/stores/vault'
 
 const emit = defineEmits<{
-  openManagement: []
   quickSearch: []
   openGenerator: []
   newItem: []
@@ -28,9 +27,6 @@ const vaultStore = useVaultStore()
     </label>
 
     <div class="flex items-center justify-end gap-1">
-      <button class="icon-button" type="button" :title="t('management.title')" :aria-label="t('management.title')" @click="emit('openManagement')">
-        <Settings class="size-4" />
-      </button>
       <button class="icon-button" :title="t('app.quickSearch')" @click="emit('quickSearch')">
         <Command class="size-4" />
       </button>

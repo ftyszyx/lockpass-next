@@ -4,12 +4,12 @@
 -- PostgreSQL 扩展：用于 gen_random_uuid() 等数据库侧随机能力。
 create extension if not exists pgcrypto;
 
--- 同步空间：账号下的同步分区。一个服务器账号下可以有多个同步空间，对应桌面端不同本地账号。
+-- 技术同步空间：账号下的数据分区。第一版每个服务器账号只使用 default 空间；普通用户界面不展示“同步空间”概念。
 create table if not exists sync_spaces (
-  id uuid primary key, -- 同步空间 id。
-  account_id uuid not null references accounts(id) on delete cascade, -- 同步空间属于哪个服务器账号。
-  display_name text not null default 'default', -- 同步空间明文名称；用于在后台区分桌面端本地账号，例如 test1、test2。
-  encrypted_metadata jsonb not null default '{}'::jsonb, -- 同步空间密文元数据；保险库名称、描述等用户数据仍然放这里。
+  id uuid primary key, -- 技术空间 id。
+  account_id uuid not null references accounts(id) on delete cascade, -- 技术空间属于哪个服务器账号。
+  display_name text not null default 'default', -- 第一版固定为 default；不要写入桌面端本地用户名或保险库名称。
+  encrypted_metadata jsonb not null default '{}'::jsonb, -- 技术空间密文元数据；保险库名称、描述等用户数据仍然放这里。
   created_at timestamptz not null, -- 同步空间创建时间。
   updated_at timestamptz not null, -- 同步空间最后更新时间。
   unique (account_id, id) -- 支持其他表用 (account_id, sync_space_id) 做同账号外键校验。

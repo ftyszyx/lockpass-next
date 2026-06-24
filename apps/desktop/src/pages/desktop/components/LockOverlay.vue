@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ArrowLeft, Cloud, RotateCcw, Unlock, UserPlus } from '@lucide/vue'
-import { computed, ref, watch } from 'vue'
+import { ArrowLeft, RotateCcw, Unlock, UserPlus } from '@lucide/vue'
+import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useVaultStore } from '@/stores/vault'
 
@@ -25,13 +25,23 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const vaultStore = useVaultStore()
-const unlockStep = ref<'password' | 'choice' | 'recovery'>('password')
-const canUsePasswordlessUnlock = computed(() => Boolean(vaultStore.passwordlessUnlockSupported && vaultStore.activeUser?.crypto?.fastUnlock))
+const unlockStep = ref<'account' | 'password' | 'recovery'>(vaultStore.users.length > 0 ? 'password' : 'account')
+const selectedUserId = ref(vaultStore.activeUserId ?? vaultStore.users[0]?.id ?? '')
+
+watch(
+  () => [vaultStore.activeUserId, vaultStore.users.length] as const,
+  () => {
+    selectedUserId.value = vaultStore.activeUserId ?? vaultStore.users[0]?.id ?? ''
+  },
+  { immediate: true }
+)
 
 watch(
   () => props.activeUserName,
   () => {
-    unlockStep.value = 'password'
+    if (unlockStep.value !== 'account') {
+      unlockStep.value = 'password'
+    }
     emit('update:recoveryKey', '')
   }
 )
@@ -41,9 +51,12 @@ function clearErrorAndRecoveryKey(): void {
   emit('update:recoveryKey', '')
 }
 
-function showRecoveryChoice(): void {
+function continueToUnlock(): void {
   clearErrorAndRecoveryKey()
-  unlockStep.value = 'choice'
+  if (selectedUserId.value && selectedUserId.value !== vaultStore.activeUserId) {
+    emit('switchUser', selectedUserId.value)
+  }
+  unlockStep.value = 'password'
 }
 
 function showRecoveryInput(): void {
@@ -51,19 +64,22 @@ function showRecoveryInput(): void {
   unlockStep.value = 'recovery'
 }
 
-function backToPassword(): void {
+function backToAccountPicker(): void {
   clearErrorAndRecoveryKey()
-  unlockStep.value = 'password'
-}
-
-function backToChoice(): void {
-  clearErrorAndRecoveryKey()
-  unlockStep.value = 'choice'
+  unlockStep.value = 'account'
 }
 
 function createNewUser(): void {
   clearErrorAndRecoveryKey()
   emit('createNewUser')
+}
+
+function userLoginLabel(user: { displayName: string; username: string; sync?: { mode: string; accountLabel: string | null; serverUrl: string } | null }): string {
+  const account = user.sync?.accountLabel || user.displayName || user.username
+  const server = user.sync?.mode === 'official'
+    ? t('sync.officialHosted')
+    : user.sync?.serverUrl.replace(/^https?:\/\//i, '').replace(/\/$/, '')
+  return server ? `${account} · ${server}` : account
 }
 
 function submitUnlock(): void {
@@ -72,7 +88,10 @@ function submitUnlock(): void {
     return
   }
 
-  if (unlockStep.value === 'choice') return
+  if (unlockStep.value === 'account') {
+    continueToUnlock()
+    return
+  }
 
   emit('useSavedRecoveryKey')
 }
@@ -81,24 +100,33 @@ function submitUnlock(): void {
 <template>
   <div class="fixed inset-0 z-50 grid place-items-center bg-teal-50/90 backdrop-blur">
     <form class="grid w-[400px] max-w-[94vw] gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-2xl" @submit.prevent="submitUnlock">
-      <div v-if="unlockStep === 'choice'" class="grid gap-3">
-        <button class="plain-button justify-self-start" type="button" @click="backToPassword">
-          <ArrowLeft class="size-4" />
-          {{ t('lock.backToUnlock') }}
+      <div v-if="unlockStep === 'account'" class="grid gap-3">
+        <div class="grid gap-1">
+          <h2 class="text-2xl font-black">{{ t('lock.accountPickerTitle') }}</h2>
+          <p class="text-sm text-slate-500">{{ t('lock.accountPickerBody') }}</p>
+        </div>
+        <label class="form-label">
+          {{ t('lock.accountSelectLabel') }}
+          <select
+            v-model="selectedUserId"
+            class="form-input"
+          >
+            <option v-for="user in vaultStore.users" :key="user.id" :value="user.id">{{ userLoginLabel(user) }}</option>
+          </select>
+        </label>
+        <button class="primary-button justify-center" type="submit" :disabled="!selectedUserId">
+          <Unlock class="size-4" />
+          {{ t('app.unlock') }}
         </button>
-        <button class="grid min-h-20 gap-1 rounded-lg border border-teal-200 bg-teal-50 p-4 text-left hover:border-teal-400" type="button" @click="createNewUser">
-          <span class="flex items-center gap-2 font-bold text-teal-950"><UserPlus class="size-4" />{{ t('lock.newUserTitle') }}</span>
-          <span class="text-sm text-teal-800">{{ t('lock.newUserBody') }}</span>
-        </button>
-        <button class="grid min-h-20 gap-1 rounded-lg border border-slate-200 bg-white p-4 text-left hover:border-slate-400" type="button" @click="showRecoveryInput">
-          <span class="flex items-center gap-2 font-bold"><Cloud class="size-4" />{{ t('lock.existingUserTitle') }}</span>
-          <span class="text-sm text-slate-500">{{ t('lock.existingUserBody') }}</span>
+        <button class="plain-button justify-center" type="button" @click="createNewUser">
+          <UserPlus class="size-4" />
+          {{ t('lock.createNewAccount') }}
         </button>
       </div>
       <div v-else-if="unlockStep === 'recovery'" class="grid gap-3">
-        <button class="plain-button justify-self-start" type="button" @click="backToChoice">
+        <button class="plain-button justify-self-start" type="button" @click="unlockStep = 'password'">
           <ArrowLeft class="size-4" />
-          {{ t('lock.backToChoice') }}
+          {{ t('lock.backToUnlock') }}
         </button>
         <input
           :value="password"
@@ -123,22 +151,17 @@ function submitUnlock(): void {
         </button>
       </div>
       <template v-else>
+        <button class="plain-button justify-self-start" type="button" @click="backToAccountPicker">
+          <ArrowLeft class="size-4" />
+          {{ t('lock.backToAccounts') }}
+        </button>
         <div class="flex items-center gap-3 font-bold">
           <span class="grid size-9 place-items-center rounded-lg bg-[#10201e] text-white">{{ activeUserInitials }}</span>
           <span>{{ activeUserName }}<small class="block text-xs text-slate-500">{{ t('app.locked') }}</small></span>
         </div>
         <h2 class="text-2xl font-black">{{ t('lock.title') }}</h2>
-        <p class="text-sm text-slate-500">{{ canUsePasswordlessUnlock ? t('lock.fastUnlockBody') : t('lock.body') }}</p>
-        <select
-          v-if="vaultStore.users.length > 1"
-          class="form-input"
-          :value="vaultStore.activeUserId ?? ''"
-          @change="emit('switchUser', ($event.target as HTMLSelectElement).value)"
-        >
-          <option v-for="user in vaultStore.users" :key="user.id" :value="user.id">{{ user.displayName }}</option>
-        </select>
+        <p class="text-sm text-slate-500">{{ t('lock.body') }}</p>
         <input
-          v-if="!canUsePasswordlessUnlock"
           :value="password"
           class="form-input"
           autocomplete="current-password"
@@ -146,16 +169,17 @@ function submitUnlock(): void {
           :placeholder="t('lock.passwordPlaceholder')"
           @input="emit('update:password', ($event.target as HTMLInputElement).value)"
         />
-        <button class="plain-button justify-self-start" type="button" @click="showRecoveryChoice">
+        <button class="plain-button justify-self-start" type="button" @click="showRecoveryInput">
           <RotateCcw class="size-4" />
           {{ t('lock.useRecoveryKey') }}
         </button>
         <p v-if="authError" class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{{ authError }}</p>
         <button class="primary-button" type="submit" :disabled="unlocking">
           <Unlock class="size-4" />
-          {{ unlocking ? t('lock.unlocking') : canUsePasswordlessUnlock ? t('lock.fastUnlock') : t('app.unlock') }}
+          {{ unlocking ? t('lock.unlocking') : t('app.unlock') }}
         </button>
       </template>
     </form>
   </div>
 </template>
+

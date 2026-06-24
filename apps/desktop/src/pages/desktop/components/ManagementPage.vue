@@ -15,15 +15,14 @@ import {
   RotateCcw,
   Settings,
   Shield,
-  TriangleAlert,
   UserMinus,
   X
 } from '@lucide/vue'
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { VaultAttachment, VaultItem } from '@lockpass/core'
 import { localeLabels, supportedLocales, type SupportedLocale } from '@/i18n'
 import { readDesktopLog } from '@/services/logger'
+import { isUserWebRuntime } from '@/services/runtime'
 import {
   DEFAULT_SHORTCUT_SETTINGS,
   findShortcutConflict,
@@ -88,49 +87,21 @@ const shortcutChecking = ref<Record<string, boolean>>({})
 const startOnLoginSupported = ref(true)
 const startOnLoginBusy = ref(false)
 const autoLockDelayOptions = [0, 30, 60, 300, 900, 1800, 3600]
-const pages = computed<Array<{ name: ManagementPageName; label: string; icon: typeof TriangleAlert }>>(() => [
-  { name: 'conflicts', label: t('nav.conflicts'), icon: TriangleAlert },
+const webRuntime = isUserWebRuntime()
+const pages = computed<Array<{ name: ManagementPageName; label: string; icon: Component }>>(() => [
   { name: 'backup', label: t('nav.backup'), icon: ArchiveRestore },
   { name: 'settings', label: t('nav.settings'), icon: Settings },
-  { name: 'shortcuts', label: t('shortcuts.title'), icon: Keyboard },
-  { name: 'logs', label: t('logs.title'), icon: Logs },
-  { name: 'system', label: t('system.title'), icon: Info }
+  ...(!webRuntime
+    ? [
+        { name: 'shortcuts' as const, label: t('shortcuts.title'), icon: Keyboard },
+        { name: 'logs' as const, label: t('logs.title'), icon: Logs },
+        { name: 'system' as const, label: t('system.title'), icon: Info }
+      ]
+    : [])
 ])
 const pageTitle = computed(() => pages.value.find((page) => page.name === props.activePage)?.label ?? t('management.title'))
 const visibleShortcutActions = computed(() => shortcutScope.value === 'global' ? GLOBAL_SHORTCUT_ACTIONS : INTERNAL_SHORTCUT_ACTIONS)
 const shortcutsAreDefault = computed(() => shortcutSettingsEqual(vaultStore.settings.shortcuts, DEFAULT_SHORTCUT_SETTINGS))
-const conflictObjects = computed(() => {
-  const vaults = vaultStore.vaults
-    .filter((vault) => vault.sync.state === 'conflicted')
-    .map((vault) => ({
-      id: vault.id,
-      title: vault.name,
-      detail: vault.description || vault.id,
-      type: t('vault.folder'),
-      updatedAt: vault.updatedAt
-    }))
-  const items = vaultStore.items
-    .filter((item) => item.sync.state === 'conflicted')
-    .map((item) => ({
-      id: item.id,
-      title: item.title || item.id,
-      detail: conflictItemDetail(item),
-      type: t(`type.${itemTypeTranslationKey(item.type)}`),
-      updatedAt: item.updatedAt
-    }))
-  const attachments = vaultStore.attachments
-    .filter((attachment) => attachment.sync.state === 'conflicted')
-    .map((attachment) => ({
-      id: attachment.id,
-      title: attachment.fileName || attachment.id,
-      detail: conflictAttachmentDetail(attachment),
-      type: t('type.attachment'),
-      updatedAt: attachment.updatedAt
-    }))
-
-  return [...vaults, ...items, ...attachments]
-})
-
 watch(
   () => props.activePage,
   (page) => {
@@ -162,24 +133,6 @@ function requestSwitchUser(event: Event): void {
   const userId = select.value
   select.value = vaultStore.activeUserId ?? ''
   emit('switchUser', userId)
-}
-
-function itemTypeTranslationKey(type: VaultItem['type']): string {
-  if (type === 'payment-card') return 'card'
-  if (type === 'secure-note') return 'note'
-  if (type === 'recovery-code') return 'recoveryCode'
-  return type
-}
-
-function conflictItemDetail(item: VaultItem): string {
-  const vault = vaultStore.vaults.find((candidate) => candidate.id === item.vaultId)
-  return [vault?.name, item.subtitle].filter(Boolean).join(' / ') || item.id
-}
-
-function conflictAttachmentDetail(attachment: VaultAttachment): string {
-  const item = vaultStore.items.find((candidate) => candidate.id === attachment.itemId)
-  const vault = vaultStore.vaults.find((candidate) => candidate.id === attachment.vaultId)
-  return [vault?.name, item?.title].filter(Boolean).join(' / ') || attachment.id
 }
 
 async function loadSystemInfo(): Promise<void> {
@@ -269,7 +222,6 @@ function autoLockDelayLabel(seconds: number): string {
   if (seconds < 60) return t('settings.seconds', { count: seconds })
   return t('settings.minutes', { count: seconds / 60 })
 }
-
 function openFilePicker(input: HTMLInputElement | null): void {
   if (props.backupBusy) return
   input?.click()
@@ -485,36 +437,7 @@ function clearShortcutError(scope: ShortcutScope, action: ShortcutAction): void 
       </header>
 
       <main class="min-h-0 overflow-auto p-6">
-        <div v-if="activePage === 'conflicts'" class="grid max-w-3xl gap-4">
-          <div v-if="conflictObjects.length === 0" class="grid gap-2 rounded-lg border border-slate-200 bg-white p-5">
-            <strong>{{ t('drawer.conflictsEmptyTitle') }}</strong>
-            <span class="text-sm text-slate-500">{{ t('drawer.conflictsEmptyBody') }}</span>
-          </div>
-          <div v-else class="grid gap-3">
-            <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
-              {{ t('sync.conflictedBody', { count: conflictObjects.length }) }}
-            </div>
-            <div class="overflow-hidden rounded-lg border border-slate-200 bg-white">
-              <div
-                v-for="object in conflictObjects"
-                :key="object.id"
-                class="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0"
-              >
-                <div class="min-w-0">
-                  <div class="flex min-w-0 items-center gap-2">
-                    <strong class="truncate text-sm text-slate-950">{{ object.title }}</strong>
-                    <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">{{ object.type }}</span>
-                  </div>
-                  <p class="mt-1 truncate text-xs text-slate-500">{{ object.detail }}</p>
-                  <code class="mt-1 block truncate font-mono text-[11px] text-slate-400">{{ object.id }}</code>
-                </div>
-                <span class="text-right text-xs text-slate-500">{{ new Date(object.updatedAt).toLocaleString(vaultStore.settings.locale) }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div v-else-if="activePage === 'backup'" class="grid max-w-3xl gap-4">
+        <div v-if="activePage === 'backup'" class="grid max-w-3xl gap-4">
           <p class="text-sm text-slate-500">{{ t('drawer.backupBody') }}</p>
           <div class="grid grid-cols-2 gap-3">
             <button class="action-card" type="button" :disabled="backupBusy" @click="emit('createBackup')">
@@ -600,7 +523,7 @@ function clearShortcutError(scope: ShortcutScope, action: ShortcutAction): void 
               </select>
               <small class="text-xs leading-5 text-slate-500">{{ t('settings.loggingHint') }}</small>
             </label>
-            <button class="plain-button justify-self-start" type="button" @click="emit('openLogDir')">
+            <button v-if="!webRuntime" class="plain-button justify-self-start" type="button" @click="emit('openLogDir')">
               <FolderOpen class="size-4" />
               {{ t('settings.openLogDir') }}
             </button>
@@ -611,7 +534,7 @@ function clearShortcutError(scope: ShortcutScope, action: ShortcutAction): void 
               <Shield class="size-4" />
               {{ t('settings.security') }}
             </div>
-            <label class="setting-row">
+            <label v-if="!webRuntime" class="setting-row">
               <span>
                 <strong>{{ t('settings.startOnLogin') }}</strong>
                 <small>{{ startOnLoginSupported ? t('settings.startOnLoginHint') : t('settings.startOnLoginUnsupported') }}</small>

@@ -11,7 +11,7 @@ import type {
 import { desktopMessages, supportedLocales, type SupportedLocale } from '@/i18n'
 import { detectBrowserLocale, loadSystemLocale } from '@/services/locale'
 import { createPerfTrace } from '@/services/perfTrace'
-import { DEFAULT_SELF_HOST_SYNC_SERVER_URL, configuredOfficialApiUrl, configuredOfficialServerUrl } from '@/services/appConfig'
+import { configuredOfficialApiUrl, configuredOfficialServerUrl } from '@/services/appConfig'
 import { configureLogger, logDebug, logError, logInfo } from '@/services/logger'
 import { DEFAULT_SHORTCUT_SETTINGS, normalizeShortcut, normalizeShortcutSettings } from '@/services/shortcuts'
 import {
@@ -109,6 +109,7 @@ export interface CreateUserPayload {
   username: string
   password: string
   recoveryKey?: string
+  sync?: Pick<SyncConnectPayload, 'mode' | 'serverUrl'>
 }
 
 export interface CreateUserResult {
@@ -125,6 +126,8 @@ export interface SyncConnectPayload {
 export interface OfficialSyncAuthorization {
   loginUrl: string
 }
+
+export type PendingSyncDeviceBindExchange = SyncDeviceBindCallbackPayload
 
 export interface SyncRunResult {
   pushed: number
@@ -176,9 +179,10 @@ const DEFAULT_SECURITY_SETTINGS: DesktopSecuritySettings = {
   autoLockOnLimit: true,
   autoLockDelaySeconds: 300
 }
+const LEGACY_DEFAULT_SELF_HOST_SYNC_SERVER_URL = 'http://127.0.0.1:1480'
 const DEFAULT_SYNC_SETTINGS: DesktopSyncSettings = {
-  mode: 'selfhost',
-  serverUrl: DEFAULT_SELF_HOST_SYNC_SERVER_URL,
+  mode: 'official',
+  serverUrl: '',
   syncSpaceId: null,
   accountId: null,
   accountLabel: null,
@@ -223,6 +227,11 @@ export const useVaultStore = defineStore('vault', {
       inProgress: false,
       exchangeCode: null as string | null,
       lastError: ''
+    },
+    autoSync: {
+      running: false,
+      lastError: '',
+      lastAttemptAt: null as string | null
     },
     legacyPayloads: {} as Record<string, DesktopVaultPayload>
   }),
@@ -276,7 +285,7 @@ export const useVaultStore = defineStore('vault', {
       const serverUrl = state.settings.sync.mode === 'official'
         ? configuredOfficialServerUrl()
         : state.settings.sync.serverUrl
-      return serverUrl.replace(/^https?:\/\//i, '').replace(/\/$/, '') || DEFAULT_SELF_HOST_SYNC_SERVER_URL.replace(/^https?:\/\//i, '')
+      return serverUrl.replace(/^https?:\/\//i, '').replace(/\/$/, '')
     },
     vaultCount: (state) => {
       return (vaultId: string | 'all') => {
@@ -428,7 +437,7 @@ export const useVaultStore = defineStore('vault', {
     async saveSyncSettings(input: Pick<SyncConnectPayload, 'mode' | 'serverUrl'>) {
       const serverUrl = input.mode === 'official'
         ? configuredOfficialApiUrl()
-        : normalizeSyncServerUrl(input.serverUrl)
+        : requireSelfHostServerUrl(input.serverUrl)
       const changedConnectionTarget = this.settings.sync.mode !== input.mode || this.settings.sync.serverUrl !== serverUrl
       const sync = changedConnectionTarget
         ? { ...DEFAULT_SYNC_SETTINGS, mode: input.mode, serverUrl }
@@ -457,12 +466,32 @@ export const useVaultStore = defineStore('vault', {
       loginUrl.searchParams.set('clientDeviceId', this.settings.deviceId)
       return { loginUrl: loginUrl.toString() }
     },
+    startServerAccountAuthorization(input: SyncConnectPayload): OfficialSyncAuthorization {
+      const mode = input.mode
+      const apiUrl = mode === 'official'
+        ? configuredOfficialApiUrl()
+        : requireSelfHostServerUrl(input.serverUrl)
+      const loginBaseUrl = mode === 'official' ? configuredOfficialServerUrl() : webUrlForApiUrl(apiUrl)
+      const loginUrl = new URL('/login', loginBaseUrl)
+      loginUrl.searchParams.set('desktopBind', '1')
+      loginUrl.searchParams.set('mode', mode)
+      loginUrl.searchParams.set('serverUrl', apiUrl)
+      loginUrl.searchParams.set('deviceName', deviceDisplayName())
+      loginUrl.searchParams.set('clientDeviceId', this.settings.deviceId)
+      return { loginUrl: loginUrl.toString() }
+    },
+    parseServerAccountAuthorizationCallback(callbackUrl: string): PendingSyncDeviceBindExchange {
+      return parseSyncDeviceBindCallback(callbackUrl)
+    },
     async completeOfficialSyncAuthorization(callbackOrCode: string): Promise<void> {
       const user = this.activeUser
       if (!user?.crypto) throw new Error('syncLocked')
       this.requireVaultKey()
 
       const exchange = parseSyncDeviceBindCallback(callbackOrCode)
+      await this.applySyncExchange(exchange.mode, exchange.serverUrl, exchange)
+    },
+    async applyPendingServerAccountExchange(exchange: PendingSyncDeviceBindExchange): Promise<void> {
       await this.applySyncExchange(exchange.mode, exchange.serverUrl, exchange)
     },
     async applySyncExchange(mode: SyncMode, serverUrl: string, exchange: SyncDeviceBindResponse): Promise<void> {
@@ -522,6 +551,39 @@ export const useVaultStore = defineStore('vault', {
           throw new Error('syncConnectionInvalid')
         }
         throw error
+      }
+    },
+    async tryAutoSync(reason: string): Promise<SyncRunResult | null> {
+      if (!this.unlocked || !this.syncConnected || this.autoSync.running || this.syncConflictCount > 0) {
+        return null
+      }
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        this.autoSync.lastError = 'syncNetworkBlocked'
+        return null
+      }
+
+      this.autoSync.running = true
+      this.autoSync.lastAttemptAt = new Date().toISOString()
+      try {
+        const result = await this.runSync()
+        this.autoSync.lastError = ''
+        await logDebug('auto sync completed', {
+          reason,
+          pushed: result.pushed,
+          pulled: result.pulled,
+          conflicts: result.conflicts,
+          rejected: result.rejected
+        })
+        return result
+      } catch (error) {
+        this.autoSync.lastError = syncErrorMessage(error)
+        await logInfo('auto sync deferred', {
+          reason,
+          ...syncErrorLogMetadata(error)
+        })
+        return null
+      } finally {
+        this.autoSync.running = false
       }
     },
     async runSyncWithCurrentConnection(): Promise<SyncRunResult> {
@@ -702,7 +764,7 @@ export const useVaultStore = defineStore('vault', {
             username,
             displayName,
             updatedAt: now,
-            sync: setupUser.sync ? normalizeSyncSettings(setupUser.sync) : normalizeSyncSettings(this.settings.sync),
+            sync: normalizeSyncSettings(input.sync ?? setupUser.sync ?? this.settings.sync),
             crypto: created.crypto
           }
         : {
@@ -711,7 +773,7 @@ export const useVaultStore = defineStore('vault', {
             displayName,
             createdAt: now,
             updatedAt: now,
-            sync: { ...DEFAULT_SYNC_SETTINGS },
+            sync: normalizeSyncSettings(input.sync ?? DEFAULT_SYNC_SETTINGS),
             crypto: created.crypto
           }
 
@@ -732,7 +794,6 @@ export const useVaultStore = defineStore('vault', {
         if (recoveryKeyStorage === 'failed') {
           this.storageError = 'recovery-key-save-verification-failed'
         }
-        await this.setupTrustedDeviceFastUnlock(user.id, created.vaultKey)
       } catch (error) {
         this.storageError = error instanceof Error ? error.message : String(error)
       }
@@ -801,7 +862,6 @@ export const useVaultStore = defineStore('vault', {
           this.loadInitialUnlockedUserData(user.id, unlocked.vaultKey, keyId)
         )
         await this.rememberSessionUnlock(user.id, keyId, password, unlocked.vaultKey)
-        await this.setupTrustedDeviceFastUnlock(user.id, unlocked.vaultKey)
         perf.mark('store.sessionStateLoaded')
         await this.persist()
         perf.done({
@@ -1193,6 +1253,7 @@ export const useVaultStore = defineStore('vault', {
       }
       this.selectedVaultId = vault.id
       await this.persist()
+      void this.tryAutoSync('create-vault')
       return vault
     },
     async deleteVault(vaultId: string): Promise<{ vaultName: string; itemCount: number }> {
@@ -1237,6 +1298,7 @@ export const useVaultStore = defineStore('vault', {
       this.vaultItemCounts = countItemsByVault(this.items)
 
       await this.persist()
+      void this.tryAutoSync('delete-vault')
       return { vaultName: vault.name, itemCount }
     },
     async saveItem(input: SaveItemPayload): Promise<VaultItem> {
@@ -1310,6 +1372,7 @@ export const useVaultStore = defineStore('vault', {
       }
       this.selectedItemId = item.id
       await this.persist()
+      void this.tryAutoSync(existing ? 'update-item' : 'create-item')
       return item
     },
     async exportBackupPackage(): Promise<LockPassBackupPackageV1> {
@@ -1425,6 +1488,7 @@ export const useVaultStore = defineStore('vault', {
       this.selectedVaultId = vault.id
       this.selectedItemId = importedItems[0]?.id ?? this.selectedItemId
       await this.persist()
+      void this.tryAutoSync('import-items')
       await logInfo('external items imported', {
         imported: importedItems.length,
         skipped: items.length - importedItems.length
@@ -1463,6 +1527,7 @@ export const useVaultStore = defineStore('vault', {
       this.selectedVaultId = importedVaults[0]?.id ?? this.selectedVaultId
       this.selectedItemId = importedItems[0]?.id ?? this.selectedItemId
       await this.persist()
+      void this.tryAutoSync('import-vaults')
       await logInfo('external vaults imported', {
         imported: importedItems.length,
         skipped,
@@ -1485,8 +1550,8 @@ async function saveAndVerifyRecoveryKey(userId: string, recoveryKey: string): Pr
   return loadedRecoveryKey.status === 'loaded' && loadedRecoveryKey.recoveryKey === recoveryKey ? 'saved' : 'failed'
 }
 
-async function ensureSyncSpace(client: SyncApiClient, deviceToken: string, displayName: string): Promise<{ id: string }> {
-  const normalizedDisplayName = displayName.trim() || 'default'
+async function ensureSyncSpace(client: SyncApiClient, deviceToken: string, _displayName: string): Promise<{ id: string }> {
+  const normalizedDisplayName = 'default'
   const spaces = await client.syncSpaces(deviceToken)
   return spaces.syncSpaces.find((space) => space.displayName === normalizedDisplayName)
     ?? (await client.createSyncSpace(deviceToken, normalizedDisplayName)).syncSpace
@@ -1495,17 +1560,17 @@ async function ensureSyncSpace(client: SyncApiClient, deviceToken: string, displ
 function syncServerUrlForSettings(sync: DesktopSyncSettings): string {
   return sync.mode === 'official'
     ? configuredOfficialApiUrl()
-    : normalizeSyncServerUrl(sync.serverUrl)
+    : requireSelfHostServerUrl(sync.serverUrl)
 }
 
 function webUrlForApiUrl(apiUrl: string): string {
-  const normalized = normalizeSyncServerUrl(apiUrl)
+  const normalized = requireSelfHostServerUrl(apiUrl)
   try {
     const url = new URL(normalized)
     if (url.hostname === '127.0.0.1' || url.hostname === 'localhost') {
       const port = Number(url.port)
       if (port === 1480) {
-        url.port = '1432'
+        url.port = '1431'
       }
     }
     return url.toString()
@@ -1597,6 +1662,10 @@ function syncErrorLogMetadata(error: unknown): Record<string, unknown> {
   }
 
   return { message: String(error) }
+}
+
+function syncErrorMessage(error: unknown): string {
+  return typeof error === 'string' ? error : error instanceof Error ? error.message : String(error)
 }
 
 interface SyncBuildInput {
@@ -2464,11 +2533,16 @@ function isDesktopLogLevel(level: unknown): level is DesktopLogLevel {
 
 function normalizeSyncSettings(sync: Partial<DesktopSyncSettings> | null | undefined): DesktopSyncSettings {
   const mode = sync?.mode === 'official' || sync?.mode === 'selfhost' ? sync.mode : DEFAULT_SYNC_SETTINGS.mode
+  const normalizedSelfHostUrl = normalizeSyncServerUrl(sync?.serverUrl ?? '')
+  const selfHostServerUrl =
+    normalizedSelfHostUrl === LEGACY_DEFAULT_SELF_HOST_SYNC_SERVER_URL && !sync?.accountId && !sync?.deviceId
+      ? ''
+      : normalizedSelfHostUrl
   return {
     mode,
     serverUrl: mode === 'official'
       ? configuredOfficialApiUrl()
-      : normalizeSyncServerUrl(sync?.serverUrl ?? DEFAULT_SYNC_SETTINGS.serverUrl),
+      : selfHostServerUrl,
     syncSpaceId: typeof sync?.syncSpaceId === 'string' && sync.syncSpaceId ? sync.syncSpaceId : null,
     accountId: typeof sync?.accountId === 'string' && sync.accountId ? sync.accountId : null,
     accountLabel: typeof sync?.accountLabel === 'string' && sync.accountLabel ? sync.accountLabel : null,
@@ -2477,6 +2551,12 @@ function normalizeSyncSettings(sync: Partial<DesktopSyncSettings> | null | undef
     connectedAt: typeof sync?.connectedAt === 'string' && sync.connectedAt ? sync.connectedAt : null,
     lastSyncAt: typeof sync?.lastSyncAt === 'string' && sync.lastSyncAt ? sync.lastSyncAt : null
   }
+}
+
+function requireSelfHostServerUrl(value: string): string {
+  const normalized = normalizeSyncServerUrl(value)
+  if (!normalized) throw new Error('syncServerRequired')
+  return normalized
 }
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number): number {

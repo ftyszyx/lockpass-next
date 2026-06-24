@@ -2,19 +2,19 @@
 
 ## 目标
 
-桌面端本地存储使用 SQLite。SQLite 只负责可靠存储、事务、查询和迁移；安全边界仍然是客户端加密 envelope。主密码、恢复密钥、`vaultKey`、`deviceUnlockKey` 和同步 `deviceToken` 不能明文写入 SQLite。
+桌面端本地存储使用 SQLite。SQLite 只负责可靠存储、事务、查询和迁移；安全边界仍然是客户端加密 envelope。主密码、安全密钥、`vaultKey`、`deviceUnlockKey` 和同步 `deviceToken` 不能明文写入 SQLite。
 
-本方案同时要求多用户数据隔离。一个本地用户的数据损坏、删除或迁移失败，不应影响其他用户。
+本方案同时要求服务器账号数据隔离。一个服务器账号在本机的缓存损坏、删除或迁移失败，不应影响其他账号。
 
 ## 目录结构
 
-采用“全局元数据库 + 每个用户独立数据库”的文件级隔离：
+采用“全局元数据库 + 每个服务器账号独立数据库”的文件级隔离：
 
 ```text
 AppData/com.lockpass.next/
   app-meta.sqlite
-  users/
-    {userId}/
+  accounts/
+    {accountId}/
       vault.sqlite
       attachments/
         {attachmentId}.lpblob
@@ -22,25 +22,25 @@ AppData/com.lockpass.next/
 
 `app-meta.sqlite` 只保存全局元信息：
 
-1. 本机用户列表。
-2. 当前选中的用户 `activeUserId`。
+1. 本机已登录服务器账号列表。
+2. 当前选中的账号 `activeAccountId`。
 3. 语言、窗口布局等全局设置。
 
-每个用户的 `vault.sqlite` 保存该用户自己的加密保险库对象、同步设置和对象索引。附件密文文件放在同一用户目录下的 `attachments/`，不与其他用户共享目录。
+每个账号的 `vault.sqlite` 保存该服务器账号在本机的加密保险库对象、服务器保存设置和对象索引。附件密文文件放在同一账号目录下的 `attachments/`，不与其他账号共享目录。
 
-## 用户隔离原则
+## 账号隔离原则
 
-1. 一个用户一个 `vault.sqlite`，不把多个用户混在同一组业务表里再依赖 `user_id` 过滤。
-2. 切换用户时必须释放当前用户的会话状态，清空内存里的 `vaultKey`、搜索索引、附件缓存和敏感 UI 状态，再打开目标用户数据。
-3. “从此设备移除当前用户”只删除该用户目录、该用户在 `app-meta.sqlite` 中的记录，以及系统安全存储里的该用户密钥材料。
-4. 同步 token、恢复密钥、快速解锁密钥仍然放系统安全存储，条目 key 必须包含 `userId`。
+1. 一个服务器账号一个 `vault.sqlite`，不把多个账号混在同一组业务表里再依赖 `account_id` 过滤。
+2. 切换账号时必须释放当前账号的会话状态，清空内存里的 `vaultKey`、搜索索引、附件缓存和敏感 UI 状态，再打开目标账号数据。
+3. “从此设备移除当前账号”只删除该账号目录、该账号在 `app-meta.sqlite` 中的记录，以及系统安全存储里的该账号密钥材料。
+4. 设备 token、安全密钥、快速解锁密钥仍然放系统安全存储，条目 key 必须包含 `accountId`。
 
 系统安全存储 key：
 
 ```text
-lockpass-next:recovery-key:{userId}
-lockpass-next-fast-unlock:{accountId}:{userId}:{deviceId}:{deviceKeyId}
-lockpass-next-sync-device-token:{userId}
+lockpass-next:recovery-key:{accountId}
+lockpass-next-fast-unlock:{accountId}:{deviceId}:{deviceKeyId}
+lockpass-next-sync-device-token:{accountId}
 ```
 
 ## 加密边界
@@ -71,17 +71,17 @@ apps/desktop/src-tauri/migrations/
 
 1. Rust 代码只负责打开连接、设置 SQLite pragma、调用对应 migration runner 和执行业务读写。
 2. 建表、加列、建索引、数据回填等 schema 变更都必须新增 SQL migration 文件，不再在 Rust 里内联 `create table` / `alter table`。
-3. `app_meta` 迁移只作用于 `app-meta.sqlite`，管理 `app_settings`、`users` 等全局元数据表。
-4. `user_vault` 迁移只作用于每个用户的 `users/{userId}/vault.sqlite`，管理 `user_crypto`、`local_settings`、`sync_settings`、`encrypted_objects` 等用户级表。
+3. `app_meta` 迁移只作用于 `app-meta.sqlite`，管理 `app_settings`、`accounts` 等全局元数据表。
+4. `user_vault` 迁移只作用于每个账号的 `accounts/{accountId}/vault.sqlite`，管理 `account_crypto`（或开发期旧名 `user_crypto`）、`local_settings`、`sync_settings`、`encrypted_objects` 等账号级表。
 5. `refinery` 使用自己的 `refinery_schema_history` 记录每个 SQLite 文件已经应用的 migration。不要再维护旧的手写 `schema_migrations` 表。
 6. 应用启动加载全局状态前，必须先打开并迁移 `app-meta.sqlite`。
-7. 创建新用户或打开某个用户时，必须先打开并迁移该用户的 `vault.sqlite`，再执行业务读写。
+7. 首次登录服务器账号或打开某个账号时，必须先打开并迁移该账号的 `vault.sqlite`，再执行业务读写。
 8. 迁移只向前，不做自动降级。已经发布的 migration 文件不得改写；需要修正时新增下一条 migration。
 
 开发期重置策略：
 
 1. 当前仍处于开发期，不为旧开发期 SQLite 表写兼容清理 migration。
-2. 如果 schema 有破坏性调整，可以直接删除旧的 `app-meta.sqlite` 或用户目录下的 `vault.sqlite`，再由 `refinery` 按当前 migration 重新初始化。
+2. 如果 schema 有破坏性调整，可以直接删除旧的 `app-meta.sqlite` 或账号目录下的 `vault.sqlite`，再由 `refinery` 按当前 migration 重新初始化。
 3. `refinery_schema_history` 是唯一的 migration 状态来源；不要迁移或读取旧手写 `schema_migrations` 表。
 
 ## `app-meta.sqlite` schema
@@ -93,10 +93,9 @@ create table if not exists app_settings (
   updated_at text not null
 );
 
-create table if not exists users (
+create table if not exists accounts (
   id text primary key,
-  username text not null,
-  display_name text not null,
+  account_label text not null,
   created_at text not null,
   updated_at text not null,
   vault_db_path text not null
@@ -107,17 +106,17 @@ create table if not exists users (
 
 | key | 内容 |
 | --- | --- |
-| `activeUserId` | 当前选中的用户 id |
+| `activeAccountId` | 当前选中的服务器账号 id |
 | `locale` | 当前语言 |
 | `layout` | 桌面端布局设置 |
 | `deviceId` | 本机设备 id |
 
 ## `vault.sqlite` schema
 
-每个用户独立一份：
+每个服务器账号独立一份：
 
 ```sql
-create table if not exists user_crypto (
+create table if not exists account_crypto (
   id text primary key,
   crypto_json text not null,
   updated_at text not null
@@ -163,7 +162,7 @@ create index if not exists encrypted_objects_type_idx on encrypted_objects(objec
 
 `encrypted_objects.envelope_json` 保存密文 envelope。`object_type`、`vault_id`、`revision` 和同步状态是为了同步和查询保留的明文元数据；这些字段的泄露边界要和 `docs/security-model.md` 中的元数据白名单保持一致。
 
-附件文件本身写入 `users/{userId}/attachments/`。附件名称、MIME、大小、校验和和 blob 引用等业务元数据作为 `vault_attachment` 对象密文保存在 `encrypted_objects` 中，不单独建立明文附件索引表。
+附件文件本身写入 `accounts/{accountId}/attachments/`。附件名称、MIME、大小、校验和和 blob 引用等业务元数据作为 `vault_attachment` 对象密文保存在 `encrypted_objects` 中，不单独建立明文附件索引表。
 
 ## 数据访问接口
 
@@ -180,9 +179,9 @@ save_encrypted_objects
 
 但语义已经改为：
 
-1. `load_vault_store` / `save_vault_store` 只读写全局设置、用户索引、`user_crypto` 和 `sync_settings`。
+1. `load_vault_store` / `save_vault_store` 只读写全局设置、账号索引、`account_crypto` 和 `sync_settings`。
 2. 保险库、条目和附件元数据分别作为 `vault_metadata`、`vault_item`、`vault_attachment` 对象加密后写入 `encrypted_objects`。
-3. 新附件字节写入 `users/{userId}/attachments/`，并返回 `local://users/{userId}/attachments/{attachmentId}.lpblob`。
+3. 新附件字节写入 `accounts/{accountId}/attachments/`，并返回 `local://accounts/{accountId}/attachments/{attachmentId}.lpblob`。
 4. `crypto.encryptedPayload` / `encrypt-desktop-user-payload-v1` 属于旧整包 profile 方案，当前实现禁止继续写入。
 
 ## 开发期重置策略
@@ -202,10 +201,10 @@ save_encrypted_objects
 
 “从此设备移除当前用户”需要删除：
 
-1. `app-meta.sqlite.users` 中的该用户记录。
-2. `users/{userId}/vault.sqlite`。
-3. `users/{userId}/attachments/`。
-4. 系统安全存储中的恢复密钥。
+1. `app-meta.sqlite.accounts` 中的该账号记录。
+2. `accounts/{accountId}/vault.sqlite`。
+3. `accounts/{accountId}/attachments/`。
+4. 系统安全存储中的安全密钥。
 5. 系统安全存储中的快速解锁 key。
 6. 系统安全存储中的同步 `deviceToken`。
 
@@ -220,20 +219,20 @@ save_encrypted_objects
 ```text
 backup-debug/
   app-meta.sqlite
-  users/{userId}/vault.sqlite
-  users/{userId}/attachments/
+  accounts/{accountId}/vault.sqlite
+  accounts/{accountId}/attachments/
 ```
 
 用户可见的正式备份必须是加密、认证、可校验版本的包。
 
 ## 验收清单
 
-1. 新装应用会创建 `app-meta.sqlite`，新用户会创建独立 `users/{userId}/vault.sqlite`。
+1. 新装应用会创建 `app-meta.sqlite`，首次登录服务器账号会创建独立 `accounts/{accountId}/vault.sqlite`。
 2. 两套数据库都有 `refinery_schema_history`，并记录已应用的 migration。
 3. 创建两个用户后，两个用户的 SQLite 文件和附件目录不同。
-4. 切换用户后不能看到另一个用户的条目、附件或同步状态。
+4. 切换服务器账号后不能看到另一个账号的条目、附件或保存状态。
 5. 删除当前用户只删除该用户目录和该用户系统安全存储项，不影响其他用户。
 6. 开发期从旧 `vault-store.json` 启动时会直接删除旧 JSON 和旧 `attachments/`，并初始化 SQLite。
-7. SQLite 中不能搜索到明文密码、明文恢复密钥、明文 `vaultKey` 或明文附件内容。
+7. SQLite 中不能搜索到明文密码、明文安全密钥、明文 `vaultKey` 或明文附件内容。
 8. 附件文件仍是密文 `.lpblob`。
 9. 同步连接、断开、立即同步和 deep link 登录绑定在 SQLite 存储下仍可用。

@@ -62,6 +62,9 @@ const WINDOWS_CNG_DEVICE_UNLOCK_PREFIX: &str = "win-cng-v1:";
 const UNLOCK_PURPOSE: &str = "lockpass unlock v1";
 const KEY_BYTES: usize = 32;
 const ARGON2_MAXMEM_BYTES: u64 = 256 * 1024 * 1024;
+const ARGON2_MEMORY_KIB: u32 = 32_768;
+const ARGON2_ITERATIONS: u32 = 2;
+const ARGON2_PARALLELISM: u32 = 1;
 const RECOVERY_KEY_BYTES: usize = 32;
 const RECOVERY_KEY_ALPHABET: &str = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const DEEP_LINK_SCHEME: &str = "lockpass://";
@@ -250,7 +253,11 @@ fn open_app_data_dir(app: AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn save_text_file_to_downloads(app: AppHandle, file_name: String, text: String) -> Result<String, String> {
+fn save_text_file_to_downloads(
+    app: AppHandle,
+    file_name: String,
+    text: String,
+) -> Result<String, String> {
     let file_name = safe_output_file_name(&file_name)?;
     let downloads_dir = app
         .path()
@@ -276,7 +283,8 @@ fn open_file_parent_dir(path: String) -> Result<(), String> {
 #[tauri::command]
 fn open_log_dir(app: AppHandle) -> Result<String, String> {
     let path = log_dir(&app)?;
-    fs::create_dir_all(&path).map_err(|error| format!("failed to create log directory: {error}"))?;
+    fs::create_dir_all(&path)
+        .map_err(|error| format!("failed to create log directory: {error}"))?;
     let path_text = path.to_string_lossy().to_string();
     open_system_target(&path_text, "log directory")?;
     Ok(path_text)
@@ -287,15 +295,22 @@ fn write_desktop_log(app: AppHandle, level: String, message: String) -> Result<(
     let level = normalize_log_level(&level)?;
     let message = normalize_log_message(&message)?;
     let path = log_dir(&app)?;
-    fs::create_dir_all(&path).map_err(|error| format!("failed to create log directory: {error}"))?;
+    fs::create_dir_all(&path)
+        .map_err(|error| format!("failed to create log directory: {error}"))?;
     let log_path = path.join("lockpass.log");
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
         .open(&log_path)
         .map_err(|error| format!("failed to open desktop log file: {error}"))?;
-    writeln!(file, "{} [{}] {}", current_timestamp_string(), level, message)
-        .map_err(|error| format!("failed to write desktop log file: {error}"))?;
+    writeln!(
+        file,
+        "{} [{}] {}",
+        current_timestamp_string(),
+        level,
+        message
+    )
+    .map_err(|error| format!("failed to write desktop log file: {error}"))?;
     Ok(())
 }
 
@@ -336,7 +351,8 @@ fn check_global_shortcut(shortcut: String) -> Result<&'static str, String> {
     {
         let (modifiers, key_code) = parse_windows_hotkey(&shortcut)?;
         let hotkey_id = 0x4c50;
-        let registered = unsafe { RegisterHotKey(std::ptr::null_mut(), hotkey_id, modifiers, key_code) };
+        let registered =
+            unsafe { RegisterHotKey(std::ptr::null_mut(), hotkey_id, modifiers, key_code) };
         if registered == 0 {
             return Ok("unavailable");
         }
@@ -411,7 +427,11 @@ fn parse_windows_hotkey(shortcut: &str) -> Result<(u32, u32), String> {
     let mut modifiers = MOD_NOREPEAT;
     let mut key_code = None;
 
-    for token in shortcut.split('+').map(str::trim).filter(|token| !token.is_empty()) {
+    for token in shortcut
+        .split('+')
+        .map(str::trim)
+        .filter(|token| !token.is_empty())
+    {
         match token.to_ascii_lowercase().as_str() {
             "ctrl" | "control" => modifiers |= MOD_CONTROL,
             "alt" => modifiers |= MOD_ALT,
@@ -435,7 +455,10 @@ fn windows_hotkey_code(key: &str) -> Result<u32, String> {
             return Ok(byte as u32);
         }
     }
-    if let Some(number) = key.strip_prefix('F').and_then(|value| value.parse::<u32>().ok()) {
+    if let Some(number) = key
+        .strip_prefix('F')
+        .and_then(|value| value.parse::<u32>().ok())
+    {
         if (1..=24).contains(&number) {
             return Ok(0x70 + number - 1);
         }
@@ -494,7 +517,9 @@ fn windows_start_on_login_enabled() -> Result<bool, String> {
         return Ok(false);
     }
     if status != windows_sys::Win32::Foundation::ERROR_SUCCESS {
-        return Err(format!("failed to read start-on-login registry value: {status}"));
+        return Err(format!(
+            "failed to read start-on-login registry value: {status}"
+        ));
     }
     Ok(value_type == REG_SZ && byte_len > 0)
 }
@@ -508,9 +533,21 @@ fn windows_set_start_on_login(enabled: bool) -> Result<(), String> {
             .map_err(|error| format!("failed to resolve current executable: {error}"))?;
         let value = wide_null(&format!("\"{}\"", current_exe.to_string_lossy()));
         let bytes = unsafe {
-            std::slice::from_raw_parts(value.as_ptr() as *const u8, value.len() * std::mem::size_of::<u16>())
+            std::slice::from_raw_parts(
+                value.as_ptr() as *const u8,
+                value.len() * std::mem::size_of::<u16>(),
+            )
         };
-        unsafe { RegSetValueExW(key, value_name.as_ptr(), 0, REG_SZ, bytes.as_ptr(), bytes.len() as u32) }
+        unsafe {
+            RegSetValueExW(
+                key,
+                value_name.as_ptr(),
+                0,
+                REG_SZ,
+                bytes.as_ptr(),
+                bytes.len() as u32,
+            )
+        }
     } else {
         unsafe { RegDeleteValueW(key, value_name.as_ptr()) }
     };
@@ -522,7 +559,9 @@ fn windows_set_start_on_login(enabled: bool) -> Result<(), String> {
         return Ok(());
     }
     if status != windows_sys::Win32::Foundation::ERROR_SUCCESS {
-        return Err(format!("failed to update start-on-login registry value: {status}"));
+        return Err(format!(
+            "failed to update start-on-login registry value: {status}"
+        ));
     }
     Ok(())
 }
@@ -531,17 +570,11 @@ fn windows_set_start_on_login(enabled: bool) -> Result<(), String> {
 fn windows_open_run_key(access: u32) -> Result<windows_sys::Win32::System::Registry::HKEY, String> {
     let subkey = wide_null("Software\\Microsoft\\Windows\\CurrentVersion\\Run");
     let mut key = std::ptr::null_mut();
-    let status = unsafe {
-        RegOpenKeyExW(
-            HKEY_CURRENT_USER,
-            subkey.as_ptr(),
-            0,
-            access,
-            &mut key,
-        )
-    };
+    let status = unsafe { RegOpenKeyExW(HKEY_CURRENT_USER, subkey.as_ptr(), 0, access, &mut key) };
     if status != windows_sys::Win32::Foundation::ERROR_SUCCESS {
-        return Err(format!("failed to open start-on-login registry key: {status}"));
+        return Err(format!(
+            "failed to open start-on-login registry key: {status}"
+        ));
     }
     Ok(key)
 }
@@ -1753,7 +1786,9 @@ fn save_app_settings(conn: &Connection, data: &serde_json::Value) -> Result<(), 
         ),
         (
             "shortcuts",
-            settings.get("shortcuts").unwrap_or(&serde_json::Value::Null),
+            settings
+                .get("shortcuts")
+                .unwrap_or(&serde_json::Value::Null),
         ),
         (
             "security",
@@ -1939,7 +1974,7 @@ fn save_user_sync_settings(
     let mode = sync
         .get("mode")
         .and_then(serde_json::Value::as_str)
-        .unwrap_or("selfhost");
+        .unwrap_or("official");
     if !matches!(mode, "official" | "selfhost") {
         return Err("invalid sync settings mode".to_string());
     }
@@ -2770,9 +2805,9 @@ fn sync_device_token_entry(user_id: &str) -> Result<Entry, String> {
 fn assert_supported_kdf(params: &KdfParams) -> Result<(), String> {
     if params.version != 1
         || params.name != "argon2id"
-        || params.memory_kib < 65_536
-        || params.iterations < 3
-        || params.parallelism < 1
+        || params.memory_kib != ARGON2_MEMORY_KIB
+        || params.iterations != ARGON2_ITERATIONS
+        || params.parallelism != ARGON2_PARALLELISM
         || params.key_length_bytes != KEY_BYTES as u32
         || params.input_encoding != "domain-tagged-length-prefixed-utf8"
         || params.password_normalization != "NFKC"
@@ -3324,8 +3359,8 @@ mod tests {
         let params = KdfParams {
             version: 1,
             name: "argon2id".to_string(),
-            memory_kib: 65_536,
-            iterations: 3,
+            memory_kib: 32_768,
+            iterations: 2,
             parallelism: 1,
             salt: "AQIDBAUGBwgJCgsMDQ4PEA".to_string(),
             key_length_bytes: 32,
@@ -3341,7 +3376,7 @@ mod tests {
         )
         .expect("unlock key should derive");
 
-        assert_eq!(derived, "Aj32HCnL3306nnKc_LIww1dio3lv5PAkNbcIK9plgzk");
+        assert_eq!(derived, "gMxV5ElgDK2gIkGmdue7IP0xmPJag2wc57pOIjFh6LA");
     }
 
     #[test]

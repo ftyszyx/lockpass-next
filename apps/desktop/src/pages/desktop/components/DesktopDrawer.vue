@@ -27,7 +27,6 @@ const emit = defineEmits<{
   copyValue: [value: string]
   regenerate: []
   usePassword: []
-  openConflicts: []
   syncToast: [message: string]
   operationStart: [payload: { title: string; body: string }]
   operationEnd: []
@@ -246,19 +245,13 @@ function syncErrorMessageKey(error: unknown): string {
       </div>
 
       <div v-else-if="activeDrawer === 'sync'" class="grid min-h-0 flex-1 content-start gap-4 overflow-auto p-4">
-        <button
-          class="grid gap-1 rounded-lg border px-3 py-2 text-left transition"
-          :class="[syncStatusCardClass, syncState === 'conflicted' ? 'cursor-pointer hover:ring-2 hover:ring-rose-200' : 'cursor-default']"
-          type="button"
-          :disabled="syncState !== 'conflicted'"
-          @click="emit('openConflicts')"
-        >
+        <div class="grid gap-1 rounded-lg border px-3 py-2 text-left" :class="syncStatusCardClass">
           <div class="flex items-center gap-2 font-bold">
             <Cloud class="size-4" />
             {{ syncStatusTitle }}
           </div>
           <p class="text-xs leading-5 text-slate-500">{{ syncStatusBody }}</p>
-        </button>
+        </div>
 
         <label class="form-label">
           {{ t('sync.mode') }}
