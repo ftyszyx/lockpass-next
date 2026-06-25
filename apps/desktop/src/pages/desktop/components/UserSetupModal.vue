@@ -31,7 +31,7 @@ const emit = defineEmits<{
   scanRecoveryQr: []
   updateServerMode: [mode: SyncMode]
   updateServerUrl: [serverUrl: string]
-  openServerLogin: []
+  openServerLogin: [mode: 'login' | 'register']
 }>()
 
 const { t } = useI18n()
@@ -83,12 +83,7 @@ function showChoice(): void {
 
 function handleSubmit(): void {
   if (showServerStep.value) {
-    if (props.serverMode === 'selfhost' && !props.serverUrl.trim()) {
-      selfhostUrlDraft.value = ''
-      showSelfhostDialog.value = true
-      return
-    }
-    emit('openServerLogin')
+    openServerLogin('login')
     return
   }
 
@@ -110,6 +105,15 @@ function handleSubmit(): void {
   if (!showSetupChoice.value || setupMode.value === 'new') {
     emit('generateRecoveryKey')
   }
+}
+
+function openServerLogin(mode: 'login' | 'register'): void {
+  if (props.serverMode === 'selfhost' && !props.serverUrl.trim()) {
+    selfhostUrlDraft.value = ''
+    showSelfhostDialog.value = true
+    return
+  }
+  emit('openServerLogin', mode)
 }
 
 function requestSavedOfflineConfirmation(): void {
@@ -176,7 +180,7 @@ function saveSelfhostUrl(): void {
         <div class="grid gap-1">
           <h2 class="text-2xl font-black">{{ t('user.serverAccountTitle') }}</h2>
         </div>
-        <div class="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2 max-sm:grid-cols-1">
+        <div class="grid gap-3">
           <label class="form-label">
             {{ t('sync.mode') }}
             <select class="form-input" :value="serverMode" :disabled="serverBusy" @change="updateServerMode">
@@ -184,10 +188,16 @@ function saveSelfhostUrl(): void {
               <option value="selfhost">{{ t('sync.selfHosted') }}</option>
             </select>
           </label>
-          <button class="primary-button justify-center" type="submit" :disabled="serverBusy">
-            <LogIn class="size-4" />
-            {{ serverBusy ? t('sync.officialLoginPending') : t('user.serverLoginAction') }}
-          </button>
+          <div class="grid gap-2">
+            <button class="primary-button justify-center" type="submit" :disabled="serverBusy">
+              <LogIn class="size-4" />
+              {{ serverBusy ? t('sync.officialLoginPending') : t('user.serverLoginAction') }}
+            </button>
+            <button class="plain-button justify-center" type="button" :disabled="serverBusy" @click="openServerLogin('register')">
+              <UserPlus class="size-4" />
+              {{ t('user.createServerAccountAction') }}
+            </button>
+          </div>
         </div>
         <p v-if="authError" class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{{ authError }}</p>
       </div>

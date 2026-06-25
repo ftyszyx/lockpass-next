@@ -35,6 +35,7 @@ export interface DesktopVaultPayload {
 export type WrappedVaultKey = CryptoEnvelope<{
   purpose: 'wrap-vault-key-v1'
   userId: string
+  vaultId: string
   keyId: string
   kdfVersion: number
   schemaVersion: number
@@ -144,6 +145,17 @@ export function generateDeviceUnlockKey(): string {
   return bytesToBase64url(randomBytes(KEY_BYTES))
 }
 
+export function serverUuidFromLocalId(id: string): string | null {
+  const match = id.match(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
+  return match ? match[0].toLowerCase() : null
+}
+
+export function requireServerUuidFromLocalId(id: string): string {
+  const uuid = serverUuidFromLocalId(id)
+  if (!uuid) throw new Error('syncUnsupportedId')
+  return uuid
+}
+
 export async function deriveUnlockKey(password: string, recoveryKey: string, params: KdfParams, perf?: PerfTrace): Promise<Uint8Array> {
   assertSupportedKdf(params)
 
@@ -169,19 +181,21 @@ export async function deriveUnlockKey(password: string, recoveryKey: string, par
 export async function createUserCrypto(
   userId: string,
   password: string,
-  _payload?: DesktopVaultPayload,
+  payload?: DesktopVaultPayload,
   recoveryKey = generateRecoveryKey()
 ): Promise<{ crypto: DesktopUserCrypto; recoveryKey: string; vaultKey: Uint8Array }> {
   const keyId = `key-${crypto.randomUUID()}`
   const kdfParams = createKdfParams()
   const unlockKey = await deriveUnlockKey(password, recoveryKey, kdfParams)
   const vaultKey = generateVaultKey()
+  const localVaultId = payload?.vaults.find((vault) => !vault.sync.deletedAt)?.id
+  const vaultId = localVaultId ? serverUuidFromLocalId(localVaultId) ?? crypto.randomUUID() : crypto.randomUUID()
 
   return {
     crypto: {
       keyId,
       kdfParams,
-      wrappedVaultKey: await wrapVaultKey(unlockKey, vaultKey, userId, keyId, kdfParams)
+      wrappedVaultKey: await wrapVaultKey(unlockKey, vaultKey, userId, vaultId, keyId, kdfParams)
     },
     recoveryKey,
     vaultKey
@@ -196,8 +210,9 @@ export async function unlockUserCrypto(
   perf?: PerfTrace
 ): Promise<{ vaultKey: Uint8Array; payload: DesktopVaultPayload }> {
   const unlockKey = await deriveUnlockKey(password, recoveryKey, cryptoConfig.kdfParams, perf)
+  const vaultId = cryptoConfig.wrappedVaultKey.aad.vaultId || userId
   const vaultKey = await perfMeasure(perf, 'crypto.unwrapVaultKey', () =>
-    unwrapVaultKey(unlockKey, cryptoConfig.wrappedVaultKey, userId, cryptoConfig.keyId, cryptoConfig.kdfParams)
+    unwrapVaultKey(unlockKey, cryptoConfig.wrappedVaultKey, userId, vaultId, cryptoConfig.keyId, cryptoConfig.kdfParams)
   )
   return { vaultKey, payload: emptyDesktopVaultPayload() }
 }
@@ -362,6 +377,7 @@ async function wrapVaultKey(
   unlockKey: Uint8Array,
   vaultKey: Uint8Array,
   userId: string,
+  vaultId: string,
   keyId: string,
   kdfParams: KdfParams
 ): Promise<WrappedVaultKey> {
@@ -371,6 +387,7 @@ async function wrapVaultKey(
     {
       purpose: 'wrap-vault-key-v1',
       userId,
+      vaultId,
       keyId,
       kdfVersion: kdfParams.version,
       schemaVersion: WRAP_SCHEMA_VERSION
@@ -383,12 +400,14 @@ async function unwrapVaultKey(
   unlockKey: Uint8Array,
   envelope: WrappedVaultKey,
   userId: string,
+  vaultId: string,
   keyId: string,
   kdfParams: KdfParams
 ): Promise<Uint8Array> {
   return decryptEnvelope(unlockKey, envelope, {
     purpose: 'wrap-vault-key-v1',
     userId,
+    vaultId,
     keyId,
     kdfVersion: kdfParams.version,
     schemaVersion: WRAP_SCHEMA_VERSION

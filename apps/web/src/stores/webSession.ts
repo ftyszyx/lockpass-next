@@ -68,6 +68,9 @@ export const useWebSessionStore = defineStore('web-session', {
         return this.setDeviceBinding(input.mode, input.serverUrl, exchange)
       })
     },
+    rememberDeviceBinding(mode: SyncMode, serverUrl: string, exchange: SyncDeviceBindResponse): SyncDeviceBindCallbackPayload {
+      return this.setDeviceBinding(mode, serverUrl, exchange)
+    },
     async bindWebDevice(input: { mode: SyncMode; serverUrl: string; deviceName: string; clientDeviceId?: string }): Promise<SyncDeviceBindCallbackPayload> {
       if (!this.token) throw new Error('syncNotConnected')
       const exchange = await webApi.bindDevice(this.token, input.deviceName, input.clientDeviceId)

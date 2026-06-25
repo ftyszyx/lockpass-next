@@ -1,4 +1,4 @@
-import type { EncryptedSyncObjectPayload } from '@/services/masterPassword'
+import type { EncryptedSyncObjectPayload, KdfParams, WrappedVaultKey } from '@/services/masterPassword'
 import { normalizeServerUrl } from '@/services/appConfig'
 
 export type SyncMode = 'official' | 'selfhost'
@@ -115,6 +115,16 @@ export interface SyncSnapshotResponse {
   nextPageToken?: string | null
 }
 
+export interface WrappedVaultKeyCreateRequest {
+  syncSpaceId: string
+  vaultId: string
+  keyId: string
+  wrapType: 'user_wrapped'
+  replacesWrappedVaultKeyId?: string | null
+  kdfParams: KdfParams
+  wrappedVaultKey: WrappedVaultKey
+}
+
 export class SyncApiError extends Error {
   constructor(
     message: string,
@@ -158,6 +168,13 @@ export class SyncApiClient {
           ciphertext: 'encrypted-sync-space-metadata-placeholder'
         }
       }
+    })
+  }
+
+  async createWrappedVaultKey(token: string, body: WrappedVaultKeyCreateRequest): Promise<unknown> {
+    return this.request('/sync/wrapped-vault-keys', {
+      token,
+      body
     })
   }
 

@@ -16,12 +16,15 @@ import { configureLogger, logDebug, logError, logInfo } from '@/services/logger'
 import { DEFAULT_SHORTCUT_SETTINGS, normalizeShortcut, normalizeShortcutSettings } from '@/services/shortcuts'
 import {
   createDeviceFastUnlock,
-  createUserCrypto,
   decryptSyncObjectPayload,
   encryptSyncObjectPayload,
-  unlockUserCryptoWithDeviceUnlockKey,
+  createUserCrypto,
+  requireServerUuidFromLocalId,
+  serverUuidFromLocalId,
   unlockUserCrypto,
+  unlockUserCryptoWithDeviceUnlockKey,
   type DesktopVaultPayload,
+  type DesktopUserCrypto,
   type EncryptedSyncObjectPayload,
   type SyncVaultObjectType
 } from '@/services/masterPassword'
@@ -36,6 +39,7 @@ import {
   type SyncObjectView,
   type SyncPushObject
 } from '@/services/syncClient'
+import type { InitialServerVaultResult } from '@/services/accountBootstrap'
 import {
   clearAttachmentBlobCache,
   countEncryptedObjectsByVault,
@@ -110,6 +114,19 @@ export interface CreateUserPayload {
   password: string
   recoveryKey?: string
   sync?: Pick<SyncConnectPayload, 'mode' | 'serverUrl'>
+}
+
+export interface RestoreServerAccountPayload {
+  exchange: PendingSyncDeviceBindExchange
+  password: string
+  recoveryKey: string
+}
+
+export interface CreateServerBackedUserPayload {
+  exchange: PendingSyncDeviceBindExchange
+  password: string
+  recoveryKey: string
+  initialVault: InitialServerVaultResult
 }
 
 export interface CreateUserResult {
@@ -466,7 +483,7 @@ export const useVaultStore = defineStore('vault', {
       loginUrl.searchParams.set('clientDeviceId', this.settings.deviceId)
       return { loginUrl: loginUrl.toString() }
     },
-    startServerAccountAuthorization(input: SyncConnectPayload): OfficialSyncAuthorization {
+    startServerAccountAuthorization(input: SyncConnectPayload & { authMode?: 'login' | 'register' }): OfficialSyncAuthorization {
       const mode = input.mode
       const apiUrl = mode === 'official'
         ? configuredOfficialApiUrl()
@@ -478,6 +495,7 @@ export const useVaultStore = defineStore('vault', {
       loginUrl.searchParams.set('serverUrl', apiUrl)
       loginUrl.searchParams.set('deviceName', deviceDisplayName())
       loginUrl.searchParams.set('clientDeviceId', this.settings.deviceId)
+      loginUrl.searchParams.set('authMode', input.authMode ?? 'login')
       return { loginUrl: loginUrl.toString() }
     },
     parseServerAccountAuthorizationCallback(callbackUrl: string): PendingSyncDeviceBindExchange {
@@ -494,6 +512,155 @@ export const useVaultStore = defineStore('vault', {
     async applyPendingServerAccountExchange(exchange: PendingSyncDeviceBindExchange): Promise<void> {
       await this.applySyncExchange(exchange.mode, exchange.serverUrl, exchange)
     },
+    async createServerBackedUser(input: CreateServerBackedUserPayload): Promise<CreateUserResult> {
+      const existing = this.users.find((user) => user.sync?.accountId === input.exchange.account.id || user.id === input.exchange.account.id)
+      if (existing?.crypto) {
+        throw new Error('duplicate-username')
+      }
+      if (!existing && this.unlocked) {
+        await this.persist()
+      }
+
+      const now = new Date().toISOString()
+      const accountLabel = input.exchange.account.email ?? input.exchange.account.displayName ?? input.exchange.account.id
+      const sync = normalizeSyncSettings({
+        mode: input.exchange.mode,
+        serverUrl: input.exchange.serverUrl,
+        syncSpaceId: input.initialVault.syncSpaceId,
+        accountId: input.exchange.account.id,
+        accountLabel,
+        deviceId: input.exchange.device.id,
+        cursor: input.initialVault.cursor,
+        connectedAt: now,
+        lastSyncAt: now
+      })
+      const user: DesktopUserProfile = {
+        id: input.exchange.account.id,
+        username: normalizeUsername(accountLabel),
+        displayName: accountLabel,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+        sync,
+        crypto: input.initialVault.crypto
+      }
+
+      await saveSyncDeviceToken(user.id, input.exchange.deviceToken)
+      this.users = existing
+        ? this.users.map((candidate) => (candidate.id === existing.id ? user : candidate))
+        : [...this.users, user]
+      this.activeUserId = user.id
+      this.settings.sync = sync
+      this.unlocked = true
+      this.vaultKey = input.initialVault.vaultKey
+      this.activeKeyId = input.initialVault.crypto.keyId
+      this.loadActiveUserData(input.initialVault.payload)
+      await upsertEncryptedObjects(
+        user.id,
+        await buildLocalEncryptedObjectRecords({
+          vaultKey: input.initialVault.vaultKey,
+          keyId: input.initialVault.crypto.keyId,
+          vaults: input.initialVault.payload.vaults,
+          items: input.initialVault.payload.items,
+          attachments: input.initialVault.payload.attachments
+        })
+      )
+      await this.rememberSessionUnlock(user.id, input.initialVault.crypto.keyId, input.password, input.initialVault.vaultKey)
+      const recoveryKeyStorage = await saveAndVerifyRecoveryKey(user.id, input.recoveryKey)
+      if (recoveryKeyStorage === 'failed') {
+        this.storageError = 'recovery-key-save-verification-failed'
+      }
+      this.clearOfficialLoginState()
+      await this.persist()
+      return {
+        user,
+        recoveryKey: input.recoveryKey,
+        recoveryKeyStorage
+      }
+    },
+    async restoreServerAccount(input: RestoreServerAccountPayload): Promise<void> {
+      const existing = this.users.find((user) => user.sync?.accountId === input.exchange.account.id)
+      if (existing?.crypto) {
+        throw new Error('duplicate-username')
+      }
+
+      const client = new SyncApiClient(input.exchange.serverUrl)
+      const syncSpace = await ensureSyncSpace(
+        client,
+        input.exchange.deviceToken,
+        input.exchange.account.email ?? input.exchange.account.displayName
+      )
+      const snapshot = await client.snapshot(input.exchange.deviceToken, syncSpace.id)
+      const wrappedVaultKey = snapshot.wrappedVaultKeys?.[0] as
+        | {
+          vaultId: string
+          keyId: string
+          kdfParams: DesktopUserCrypto['kdfParams']
+          wrappedVaultKey: DesktopUserCrypto['wrappedVaultKey']
+        }
+        | undefined
+      if (!wrappedVaultKey) {
+        throw new Error('serverVaultKeyMissing')
+      }
+
+      const userId = input.exchange.account.id
+      const userCrypto: DesktopUserCrypto = {
+        keyId: wrappedVaultKey.keyId,
+        kdfParams: wrappedVaultKey.kdfParams,
+        wrappedVaultKey: wrappedVaultKey.wrappedVaultKey
+      }
+      const unlocked = await unlockUserCrypto(userId, input.password, input.recoveryKey, userCrypto)
+      const remotePayload: DesktopVaultPayload = { vaults: [], items: [], attachments: [] }
+      for (const object of snapshot.objects) {
+        await applyRemoteSyncObject(remotePayload, object, unlocked.vaultKey)
+      }
+      const payload = ensurePayloadHasVault(remotePayload, input.exchange.device.id, this.settings.locale)
+      const now = new Date().toISOString()
+      const sync = normalizeSyncSettings({
+        mode: input.exchange.mode,
+        serverUrl: input.exchange.serverUrl,
+        syncSpaceId: syncSpace.id,
+        accountId: input.exchange.account.id,
+        accountLabel: input.exchange.account.email ?? input.exchange.account.displayName,
+        deviceId: input.exchange.device.id,
+        cursor: snapshot.snapshotCursor,
+        connectedAt: now,
+        lastSyncAt: now
+      })
+      const user: DesktopUserProfile = {
+        id: userId,
+        username: normalizeUsername(input.exchange.account.email ?? input.exchange.account.displayName ?? userId),
+        displayName: input.exchange.account.email ?? input.exchange.account.displayName ?? userId,
+        createdAt: now,
+        updatedAt: now,
+        sync,
+        crypto: userCrypto
+      }
+
+      await saveSyncDeviceToken(user.id, input.exchange.deviceToken)
+      this.users = existing
+        ? this.users.map((candidate) => (candidate.id === existing.id ? user : candidate))
+        : [...this.users, user]
+      this.activeUserId = user.id
+      this.settings.sync = sync
+      this.unlocked = true
+      this.vaultKey = unlocked.vaultKey
+      this.activeKeyId = userCrypto.keyId
+      this.loadActiveUserData(payload)
+      await upsertEncryptedObjects(
+        user.id,
+        await buildLocalEncryptedObjectRecords({
+          vaultKey: unlocked.vaultKey,
+          keyId: userCrypto.keyId,
+          vaults: payload.vaults,
+          items: payload.items,
+          attachments: payload.attachments
+        })
+      )
+      await this.rememberSessionUnlock(user.id, userCrypto.keyId, input.password, unlocked.vaultKey)
+      await saveAndVerifyRecoveryKey(user.id, input.recoveryKey)
+      this.clearOfficialLoginState()
+      await this.persist()
+    },
     async applySyncExchange(mode: SyncMode, serverUrl: string, exchange: SyncDeviceBindResponse): Promise<void> {
       const user = this.activeUser
       if (!user?.crypto) throw new Error('syncLocked')
@@ -503,6 +670,17 @@ export const useVaultStore = defineStore('vault', {
       const syncSpace = await ensureSyncSpace(client, exchange.deviceToken, user.displayName || user.username)
       await this.ensureAllVaultObjectsLoaded()
       resetLoadedObjectsForNewSyncTarget(this.vaults, this.items, this.attachments, this.settings.deviceId)
+      const wrappedVaultId = user.crypto.wrappedVaultKey.aad.vaultId || this.vaults.find((vault) => !vault.sync.deletedAt)?.id
+      if (wrappedVaultId) {
+        await client.createWrappedVaultKey(exchange.deviceToken, {
+          syncSpaceId: syncSpace.id,
+          vaultId: toServerUuid(wrappedVaultId),
+          keyId: user.crypto.keyId,
+          wrapType: 'user_wrapped',
+          kdfParams: user.crypto.kdfParams,
+          wrappedVaultKey: user.crypto.wrappedVaultKey
+        })
+      }
       const now = new Date().toISOString()
       this.settings.sync = {
         mode,
@@ -1869,6 +2047,8 @@ interface SyncStateContainer {
   attachments: VaultAttachment[]
 }
 
+type SyncObjectContainer = Pick<SyncStateContainer, 'vaults' | 'items' | 'attachments'>
+
 function applyAcceptedSyncObjects(store: SyncStateContainer, accepted: Array<{ objectId: string; revision: number }>): void {
   for (const result of accepted) {
     markLocalObjectSyncState(store, result.objectId, (sync) => ({
@@ -1955,7 +2135,7 @@ function resetSyncForNewTarget(sync: SyncMetadata, deviceId: string): SyncMetada
 }
 
 async function applyRemoteSyncObject(
-  store: SyncStateContainer,
+  store: SyncObjectContainer,
   object: SyncObjectView,
   vaultKey: Uint8Array
 ): Promise<void> {
@@ -1994,7 +2174,7 @@ async function applyRemoteSyncObject(
   store.attachments = upsertById(store.attachments, attachment)
 }
 
-function removeRemoteObject(store: SyncStateContainer, object: SyncObjectView): void {
+function removeRemoteObject(store: SyncObjectContainer, object: SyncObjectView): void {
   if (object.objectType === 'vault_metadata') {
     store.vaults = store.vaults.filter((vault) => safeToServerUuid(vault.id) !== object.objectId)
     return
@@ -2097,14 +2277,11 @@ function shouldPushSync(sync: SyncMetadata): boolean {
 }
 
 function toServerUuid(id: string): string {
-  const uuid = safeToServerUuid(id)
-  if (!uuid) throw new Error('syncUnsupportedId')
-  return uuid
+  return requireServerUuidFromLocalId(id)
 }
 
 function safeToServerUuid(id: string): string | null {
-  const match = id.match(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
-  return match ? match[0].toLowerCase() : null
+  return serverUuidFromLocalId(id)
 }
 
 function serverIdsHasLocalId(serverIds: Set<string>, localId: string): boolean {
