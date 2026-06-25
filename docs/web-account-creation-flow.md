@@ -301,7 +301,7 @@ code = 6 位随机数字
 codeHash = HMAC(serverSecret, challengeId || email || code)
 ```
 
-数据库只存 `codeHash`。校验时用常量时间比较。验证码发送日志不得记录明文 code；开发环境使用 `MAILER_MODE=log` 可以把 code 输出到服务端日志，但日志级别和文案必须清楚标记为开发模式。生产环境第一版使用标准 SMTP 发送，阿里云邮件推送、腾讯云 SES、Resend、AWS SES、SendGrid 和企业邮箱都通过同一组 SMTP 配置接入。
+数据库只存 `codeHash`。校验时用常量时间比较。验证码发送日志不得记录明文 code；开发环境的实例邮件配置默认使用日志模式，可以把 code 输出到服务端日志，但日志级别和文案必须清楚标记为开发模式。生产环境第一版使用标准 SMTP 发送，并在管理后台配置发件人、SMTP 主机、端口、用户名、密码和邮箱验证码签名密钥。阿里云邮件推送、腾讯云 SES、Resend、AWS SES、SendGrid 和企业邮箱都通过同一组 SMTP 配置接入。
 
 ## 安全边界
 
@@ -349,6 +349,6 @@ PC 客户端首次启动时，如果本机没有账号，只展示“登录”�
 
 ## 已决策
 
-1. 邮件发送第一版使用可插拔发送层：开发环境 `MAILER_MODE=log`，生产环境 `MAILER_MODE=smtp`。
+1. 邮件发送第一版使用可插拔发送层：实例配置中选择开发日志模式或 SMTP 模式，配置入口在管理后台。
 2. SMTP 是第一版真实邮件服务接入方式，不直接绑定单一厂商；阿里云邮件推送、腾讯云 SES、Resend、AWS SES、SendGrid 和多数企业邮箱都可通过 SMTP 配置接入。
 

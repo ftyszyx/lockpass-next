@@ -52,6 +52,12 @@ impl AppState {
         let store = AppStore::new(pool.clone());
         info!("initializing application storage");
         store.initialize().await?;
+        if store.account_count().await? == 0 {
+            if let Some(admin) = config.bootstrap_admin.as_ref() {
+                store.create_bootstrap_admin(&admin.username, &admin.password)?;
+                info!("bootstrap admin account created");
+            }
+        }
         info!("application storage initialized");
 
         Ok(Self {

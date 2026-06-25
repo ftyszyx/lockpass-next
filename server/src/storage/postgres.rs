@@ -7,7 +7,7 @@ use chrono::{DateTime, Duration, Utc};
 use hmac::{Hmac, Mac};
 use lockpass_server_auth::{
     AuthServices, EmailAuthStore, EmailLoginInput, EmailRegisterInput, NewEmailAccount,
-    StoredEmailAccount, DEVICE_TOKEN_PREFIX,
+    PasswordHasher, StoredEmailAccount, DEVICE_TOKEN_PREFIX, SESSION_TOKEN_PREFIX,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -64,6 +64,91 @@ impl PostgresStore {
         seed_rbac(&mut connection).await?;
         info!("ensuring instance config");
         save_instance_config_if_missing(&mut connection, InstanceConfig::default()).await
+    }
+
+    pub async fn account_count(&self) -> AppResult<i64> {
+        sqlx::query_scalar("select count(*) from accounts")
+            .fetch_one(&self.pool)
+            .await
+            .map_err(AppError::from)
+    }
+
+    pub fn create_bootstrap_admin(&self, username: &str, password: &str) -> AppResult<AccountView> {
+        let username = normalize_admin_username(username)?;
+        let password_hash = self.auth.passwords().hash(password)?;
+        let pool = self.pool.clone();
+
+        run_blocking(async move {
+            let now = Utc::now();
+            let mut tx = pool.begin().await?;
+            let account_count: i64 = sqlx::query_scalar("select count(*) from accounts")
+                .fetch_one(&mut *tx)
+                .await?;
+            if account_count > 0 {
+                return Err(AppError::Conflict(
+                    "bootstrap admin can only be created when no account exists".to_string(),
+                ));
+            }
+
+            let account_id = Uuid::new_v4();
+            let role_id = ensure_role_tx(&mut tx, rbac::ROLE_ADMIN).await?;
+            let email = if username.contains('@') {
+                Some(username.clone())
+            } else {
+                None
+            };
+
+            sqlx::query(
+                "insert into accounts (id, display_name, email, password_hash, created_at, updated_at, disabled_at) \
+                 values ($1, $2, $3, $4, $5, $6, $7)",
+            )
+            .bind(account_id)
+            .bind(&username)
+            .bind(&email)
+            .bind(&password_hash)
+            .bind(now)
+            .bind(now)
+            .bind(Option::<DateTime<Utc>>::None)
+            .execute(&mut *tx)
+            .await?;
+
+            sqlx::query(
+                "insert into account_identities (id, account_id, provider, provider_subject, display_label, created_at) \
+                 values ($1, $2, 'password', $3, $4, $5)",
+            )
+            .bind(Uuid::new_v4())
+            .bind(account_id)
+            .bind(&username)
+            .bind(&username)
+            .bind(now)
+            .execute(&mut *tx)
+            .await?;
+
+            sqlx::query(
+                "insert into account_roles (account_id, role_id, granted_by, created_at) values ($1, $2, $3::uuid, $4)",
+            )
+            .bind(account_id)
+            .bind(role_id)
+            .bind(Option::<Uuid>::None)
+            .bind(now)
+            .execute(&mut *tx)
+            .await?;
+
+            let roles = fetch_account_roles_in_tx(&mut tx, account_id).await?;
+            tx.commit().await?;
+
+            Ok(AccountRecord {
+                id: account_id,
+                display_name: username,
+                email,
+                password_hash: Some(password_hash),
+                disabled_at: None,
+                created_at: now,
+                updated_at: now,
+                roles,
+            }
+            .to_view())
+        })
     }
 
     pub fn start_email_challenge(
@@ -125,8 +210,13 @@ impl PostgresStore {
 
             let challenge_id = Uuid::new_v4();
             let code = generate_email_code(&auth);
-            let code_hash =
-                hash_email_code(&config.email.code_secret, challenge_id, &email, purpose, &code);
+            let code_hash = hash_email_code(
+                &config.email.code_secret,
+                challenge_id,
+                &email,
+                purpose,
+                &code,
+            );
             let expires_at = now + Duration::minutes(EMAIL_CODE_TTL_MINUTES);
             let resend_after = now + Duration::seconds(EMAIL_CODE_RESEND_SECONDS);
 
@@ -212,8 +302,13 @@ impl PostgresStore {
                 });
             }
 
-            let expected =
-                hash_email_code(&config.email.code_secret, challenge_id, &email, purpose, &code);
+            let expected = hash_email_code(
+                &config.email.code_secret,
+                challenge_id,
+                &email,
+                purpose,
+                &code,
+            );
             if !constant_time_eq(expected.as_bytes(), code_hash.as_bytes()) {
                 sqlx::query("update email_challenges set attempts = attempts + 1 where id = $1")
                     .bind(challenge_id)
@@ -254,6 +349,77 @@ impl PostgresStore {
                 display_name,
                 purpose,
                 expires_at: token_expires_at,
+            })
+        })
+    }
+
+    pub fn complete_email_login(&self, setup_token: &str) -> AppResult<AuthResponse> {
+        let pool = self.pool.clone();
+        let auth = self.auth.clone();
+        let token_hash = self.auth.secrets().hash(setup_token);
+
+        run_blocking(async move {
+            let now = Utc::now();
+            let mut tx = pool.begin().await?;
+            let Some(row) = sqlx::query(
+                "select token_hash, challenge_id, email, purpose, expires_at, consumed_at \
+                 from account_setup_tokens where token_hash = $1 for update",
+            )
+            .bind(&token_hash)
+            .fetch_optional(&mut *tx)
+            .await?
+            else {
+                return Err(AppError::Unauthorized);
+            };
+
+            let challenge_id: Uuid = row.try_get("challenge_id")?;
+            let email: String = row.try_get("email")?;
+            let purpose = parse_email_challenge_purpose(row.try_get::<String, _>("purpose")?)?;
+            let expires_at: DateTime<Utc> = row.try_get("expires_at")?;
+            let consumed_at: Option<DateTime<Utc>> = row.try_get("consumed_at")?;
+
+            if purpose != EmailChallengePurpose::Login {
+                return Err(AppError::Forbidden);
+            }
+            if consumed_at.is_some() || expires_at <= now {
+                return Err(AppError::Unauthorized);
+            }
+
+            let account = fetch_account_by_identity_in_tx(&mut tx, "email", &email)
+                .await?
+                .ok_or(AppError::Unauthorized)?;
+            if account.disabled_at.is_some() {
+                return Err(AppError::Forbidden);
+            }
+
+            sqlx::query("update account_setup_tokens set consumed_at = $1 where token_hash = $2")
+                .bind(now)
+                .bind(&token_hash)
+                .execute(&mut *tx)
+                .await?;
+            sqlx::query("update email_challenges set consumed_at = $1 where id = $2")
+                .bind(now)
+                .bind(challenge_id)
+                .execute(&mut *tx)
+                .await?;
+
+            let session = auth.secrets().issue(SESSION_TOKEN_PREFIX);
+            sqlx::query(
+                "insert into auth_sessions (token_hash, account_id, expires_at, created_at) values ($1, $2, $3, $4)",
+            )
+            .bind(session.hash())
+            .bind(account.id)
+            .bind(now + Duration::days(30))
+            .bind(now)
+            .execute(&mut *tx)
+            .await?;
+
+            tx.commit().await?;
+
+            Ok(AuthResponse {
+                account: account.to_view(),
+                token: session.into_value(),
+                token_type: "Bearer".to_string(),
             })
         })
     }
@@ -397,6 +563,45 @@ impl PostgresStore {
             account: session.account.to_view(),
             token: session.token,
             token_type: session.token_type,
+        })
+    }
+
+    pub fn login_admin_password(&self, username: &str, password: &str) -> AppResult<AuthResponse> {
+        let username = normalize_admin_username(username)?;
+        let pool = self.pool.clone();
+        let auth = self.auth.clone();
+        let password = password.to_string();
+
+        run_blocking(async move {
+            let account = fetch_account_by_identity(&pool, "password", &username)
+                .await?
+                .ok_or(AppError::Unauthorized)?;
+            if account.disabled_at.is_some() || !account.roles.contains(rbac::ROLE_ADMIN) {
+                return Err(AppError::Forbidden);
+            }
+            let password_hash = account
+                .password_hash
+                .as_deref()
+                .ok_or(AppError::Unauthorized)?;
+            auth.passwords().verify(password_hash, &password)?;
+
+            let session = auth.secrets().issue(SESSION_TOKEN_PREFIX);
+            let now = Utc::now();
+            sqlx::query(
+                "insert into auth_sessions (token_hash, account_id, expires_at, created_at) values ($1, $2, $3, $4)",
+            )
+            .bind(session.hash())
+            .bind(account.id)
+            .bind(now + Duration::days(30))
+            .bind(now)
+            .execute(&pool)
+            .await?;
+
+            Ok(AuthResponse {
+                account: account.to_view(),
+                token: session.into_value(),
+                token_type: "Bearer".to_string(),
+            })
         })
     }
 
@@ -1555,16 +1760,17 @@ impl PostgresStore {
             }
 
             save_instance_config(&pool, &config).await?;
+            let admin_view = config.to_admin_view();
             append_audit(
                 &pool,
                 Some(actor_account_id),
                 "config.patch",
                 "instance_config",
                 None,
-                json!(config),
+                json!(admin_view),
             )
             .await?;
-            Ok(config.to_admin_view())
+            Ok(admin_view)
         })
     }
 
@@ -2520,7 +2726,11 @@ fn normalize_device_remark(remark: Option<String>) -> Option<String> {
 
 fn normalize_optional_config_string(value: String) -> Option<String> {
     let value = value.trim().to_string();
-    if value.is_empty() { None } else { Some(value) }
+    if value.is_empty() {
+        None
+    } else {
+        Some(value)
+    }
 }
 
 fn validate_email_service_config(config: &EmailServiceConfig) -> AppResult<()> {
@@ -2549,7 +2759,9 @@ fn validate_email_service_config(config: &EmailServiceConfig) -> AppResult<()> {
             .filter(|value| !value.is_empty())
             .is_none()
         {
-            return Err(AppError::BadRequest("SMTP username is required".to_string()));
+            return Err(AppError::BadRequest(
+                "SMTP username is required".to_string(),
+            ));
         }
         if config
             .smtp_password
@@ -2557,7 +2769,9 @@ fn validate_email_service_config(config: &EmailServiceConfig) -> AppResult<()> {
             .filter(|value| !value.is_empty())
             .is_none()
         {
-            return Err(AppError::BadRequest("SMTP password is required".to_string()));
+            return Err(AppError::BadRequest(
+                "SMTP password is required".to_string(),
+            ));
         }
     }
     Ok(())
@@ -2660,8 +2874,9 @@ async fn load_instance_config(pool: &PgPool) -> AppResult<InstanceConfig> {
 
 async fn save_instance_config_if_missing(
     connection: &mut PgConnection,
-    config: InstanceConfig,
+    mut config: InstanceConfig,
 ) -> AppResult<()> {
+    normalize_instance_config_for_storage(&mut config);
     let value = serde_json::to_value(config)
         .map_err(|error| AppError::Internal(format!("invalid instance config: {error}")))?;
     sqlx::query(
@@ -2692,6 +2907,8 @@ fn normalize_public_base_url(value: &str) -> AppResult<String> {
 }
 
 async fn save_instance_config(pool: &PgPool, config: &InstanceConfig) -> AppResult<()> {
+    let mut config = config.clone();
+    normalize_instance_config_for_storage(&mut config);
     let value = serde_json::to_value(config)
         .map_err(|error| AppError::Internal(format!("invalid instance config: {error}")))?;
     sqlx::query(
@@ -2704,6 +2921,10 @@ async fn save_instance_config(pool: &PgPool, config: &InstanceConfig) -> AppResu
     .execute(pool)
     .await?;
     Ok(())
+}
+
+fn normalize_instance_config_for_storage(config: &mut InstanceConfig) {
+    config.email.smtp_password_set = config.email.smtp_password.is_some();
 }
 
 async fn fetch_account_required(pool: &PgPool, account_id: Uuid) -> AppResult<AccountRecord> {
@@ -3083,6 +3304,17 @@ fn normalize_display_name(display_name: Option<String>) -> Option<String> {
     display_name
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
+}
+
+fn normalize_admin_username(username: &str) -> AppResult<String> {
+    let username = username.trim();
+    if username.is_empty() {
+        return Err(AppError::BadRequest("username is required".to_string()));
+    }
+    if username.len() > 128 {
+        return Err(AppError::BadRequest("username is too long".to_string()));
+    }
+    Ok(username.to_string())
 }
 
 fn normalize_email_code(code: &str) -> AppResult<String> {

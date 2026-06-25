@@ -21,7 +21,7 @@ const zhCN = {
     type: '类型',
     device: '设备',
     deviceName: '设备名称',
-    deviceRemark: '备注名',
+    deviceRemark: '备注',
     clientDeviceId: '本机设备 ID',
     createdAt: '创建时间',
     updatedAt: '更新时间',
@@ -57,6 +57,10 @@ const zhCN = {
     syncData: '密文数据',
     syncEvents: '保存记录',
     system: '实例配置',
+    systemGeneral: '基础设置',
+    systemEmail: '邮件验证码',
+    systemAuth: '登录方式',
+    systemQuota: '配额限制',
     audit: '审计日志',
     accountMenu: '账号菜单',
     logout: '退出',
@@ -71,6 +75,10 @@ const zhCN = {
     adminSyncData: '管理后台密文数据',
     adminSyncEvents: '管理后台保存记录',
     adminSystem: '管理后台实例配置',
+    adminSystemGeneral: '管理后台基础设置',
+    adminSystemEmail: '管理后台邮件验证码配置',
+    adminSystemAuth: '管理后台登录方式配置',
+    adminSystemQuota: '管理后台配额限制配置',
     adminAudit: '管理后台审计日志'
   },
   roleCodes: {
@@ -92,19 +100,23 @@ const zhCN = {
     accountsCount: '{count} 个账号'
   },
   auth: {
-    subtitle: '服务器账号与设备绑定',
+    subtitle: '管理员登录',
     heroTitle: '管理员后台',
     endToEndTitle: '端到端加密',
     endToEndBody: '服务器只保存密文与保存元数据',
-    accountTitle: '支持多种登录方式',
-    accountBody: '可使用邮箱、手机短信、Google、微信等方式登录',
+    accountTitle: '管理员账号',
+    accountBody: '使用服务器配置的管理员账号名和密码登录',
     selfHostedTitle: '可自部署',
-    selfHostedBody: '官方托管和自建服务共用协议',
+    selfHostedBody: '官方托管和自建服务器共用协议',
     login: '登录',
     register: '注册',
     displayName: '显示名称',
+    username: '账号名',
     email: '邮箱',
     password: '密码',
+    emailCode: '邮箱验证码',
+    sendEmailCode: '发送邮箱验证码',
+    changeEmail: '更换邮箱',
     createAccount: '创建账号',
     smsLogin: '手机短信登录',
     googleLogin: 'Google 登录',
@@ -173,6 +185,25 @@ const zhCN = {
   },
   adminSystem: {
     title: '实例配置',
+    saved: '配置已保存',
+    sections: {
+      general: {
+        title: '基础设置',
+        summary: '配置实例公开地址和普通用户账号创建开关。'
+      },
+      email: {
+        title: '邮件验证码',
+        summary: '配置用户网站邮箱验证码的开发日志或 SMTP 发送方式。'
+      },
+      auth: {
+        title: '登录方式',
+        summary: '查看预留登录方式状态；管理员后台只允许账号名和密码登录。'
+      },
+      quota: {
+        title: '配额限制',
+        summary: '限制单个账号可绑定设备数和服务器端密文存储规模。'
+      }
+    },
     configItem: '配置项',
     value: '值',
     registrationEnabled: '开放注册',
@@ -180,6 +211,17 @@ const zhCN = {
     smsEnabled: '手机短信登录',
     googleEnabled: 'Google 登录',
     wechatEnabled: '微信登录',
+    emailMode: '邮箱发送方式',
+    emailModeLog: '开发日志',
+    emailModeSmtp: 'SMTP',
+    emailFrom: '发件人',
+    smtpHost: 'SMTP 主机',
+    smtpPort: 'SMTP 端口',
+    smtpUsername: 'SMTP 用户名',
+    smtpPassword: 'SMTP 密码',
+    emailCodeSecret: '邮箱验证码签名密钥',
+    secretSet: '已设置',
+    secretNotSet: '未设置',
     reservedDisabled: '暂不可用',
     reservedLoginUnavailable: '当前版本暂不支持启用此登录方式。',
     maxDevices: '最大设备数',

@@ -1,14 +1,19 @@
 <script setup lang="ts">
 import {
   ChevronDown,
+  Gauge,
+  KeyRound,
   LogOut,
+  Mail,
   ScrollText,
   ServerCog,
   Settings,
+  SlidersHorizontal,
   TableProperties,
+  UserCircle,
   Users
 } from '@lucide/vue'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ToastHost from '@/components/ToastHost.vue'
 import { t, useI18n, type AdminWebLocale } from '@/i18n'
@@ -22,6 +27,14 @@ const toast = ref<string | null>(null)
 const accountMenuOpen = ref(false)
 const accountMenuRef = ref<HTMLElement | null>(null)
 
+interface NavItem {
+  to: string
+  label: string
+  ariaLabel: string
+  icon: Component
+  children?: NavItem[]
+}
+
 const navGroups = computed(() => [
   {
     label: t('layout.adminConsole'),
@@ -30,7 +43,18 @@ const navGroups = computed(() => [
       { to: '/admin/roles', label: t('layout.roles'), ariaLabel: t('layout.adminRoles'), icon: Settings },
       { to: '/admin/data', label: t('layout.syncData'), ariaLabel: t('layout.adminSyncData'), icon: TableProperties },
       { to: '/admin/save-history', label: t('layout.syncEvents'), ariaLabel: t('layout.adminSyncEvents'), icon: ScrollText },
-      { to: '/admin/system', label: t('layout.system'), ariaLabel: t('layout.adminSystem'), icon: Settings },
+      {
+        to: '/admin/system/general',
+        label: t('layout.system'),
+        ariaLabel: t('layout.adminSystem'),
+        icon: Settings,
+        children: [
+          { to: '/admin/system/general', label: t('layout.systemGeneral'), ariaLabel: t('layout.adminSystemGeneral'), icon: SlidersHorizontal },
+          { to: '/admin/system/email', label: t('layout.systemEmail'), ariaLabel: t('layout.adminSystemEmail'), icon: Mail },
+          { to: '/admin/system/auth', label: t('layout.systemAuth'), ariaLabel: t('layout.adminSystemAuth'), icon: KeyRound },
+          { to: '/admin/system/quota', label: t('layout.systemQuota'), ariaLabel: t('layout.adminSystemQuota'), icon: Gauge }
+        ]
+      },
       { to: '/admin/audit', label: t('layout.audit'), ariaLabel: t('layout.adminAudit'), icon: ScrollText }
     ]
   }
@@ -38,7 +62,7 @@ const navGroups = computed(() => [
 
 const pageTitle = computed(() => {
   if (route.meta.titleKey) return t(route.meta.titleKey)
-  const item = navGroups.value.flatMap((group) => group.items).find((entry) => route.path === entry.to)
+  const item = navGroups.value.flatMap((group) => flattenNavItems(group.items)).find((entry) => route.path === entry.to)
   return item?.label ?? t('common.productName')
 })
 
@@ -72,6 +96,15 @@ function showToast(message: string) {
     toast.value = null
   }, 1800)
 }
+
+function flattenNavItems(items: NavItem[]): NavItem[] {
+  return items.flatMap((item) => [item, ...flattenNavItems(item.children ?? [])])
+}
+
+function isNavItemActive(item: NavItem): boolean {
+  if (route.path === item.to) return true
+  return Boolean(item.children?.some((child) => isNavItemActive(child)))
+}
 </script>
 
 <template>
@@ -90,17 +123,30 @@ function showToast(message: string) {
       <nav class="grid gap-4 p-3 sm:grid-cols-2 lg:grid-cols-1">
         <div v-for="group in navGroups" :key="group.label" class="grid gap-1">
           <div class="px-2 py-1 text-xs font-black text-slate-500">{{ group.label }}</div>
-          <RouterLink
-            v-for="item in group.items"
-            :key="item.to"
-            :to="item.to"
-            :aria-label="item.ariaLabel"
-            class="grid h-10 grid-cols-[20px_minmax(0,1fr)] items-center gap-2 rounded-lg px-2 text-sm font-semibold text-slate-700 hover:bg-white hover:text-slate-950"
-            active-class="bg-white text-teal-700 shadow-sm shadow-slate-900/5"
-          >
-            <component :is="item.icon" class="size-4" />
-            <span>{{ item.label }}</span>
-          </RouterLink>
+          <div v-for="item in group.items" :key="item.to" class="grid gap-1">
+            <RouterLink
+              :to="item.to"
+              :aria-label="item.ariaLabel"
+              class="grid h-10 grid-cols-[20px_minmax(0,1fr)] items-center gap-2 rounded-lg px-2 text-sm font-semibold text-slate-700 hover:bg-white hover:text-slate-950"
+              :class="isNavItemActive(item) ? 'bg-white text-teal-700 shadow-sm shadow-slate-900/5' : ''"
+            >
+              <component :is="item.icon" class="size-4" />
+              <span>{{ item.label }}</span>
+            </RouterLink>
+            <div v-if="item.children?.length" class="grid gap-1 pl-6">
+              <RouterLink
+                v-for="child in item.children"
+                :key="child.to"
+                :to="child.to"
+                :aria-label="child.ariaLabel"
+                class="grid h-8 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-md px-2 text-xs font-bold text-slate-600 hover:bg-white hover:text-slate-950"
+                :class="route.path === child.to ? 'bg-white text-teal-700 shadow-sm shadow-slate-900/5' : ''"
+              >
+                <component :is="child.icon" class="size-3.5" />
+                <span>{{ child.label }}</span>
+              </RouterLink>
+            </div>
+          </div>
         </div>
       </nav>
     </aside>

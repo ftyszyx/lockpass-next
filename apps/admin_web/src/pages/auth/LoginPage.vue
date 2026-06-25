@@ -1,22 +1,19 @@
 <script setup lang="ts">
-import { Mail, ServerCog, ShieldCheck } from '@lucide/vue'
+import { KeyRound, ServerCog, ShieldCheck } from '@lucide/vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import { useI18n, type AdminWebLocale } from '@/i18n'
 import { userFacingErrorMessage } from '@/services/errorMessage'
 import { useSessionStore } from '@/stores/session'
-import type { AuthResponse } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
 const { locale, setLocale, supportedLocales, t } = useI18n()
 
-const mode = ref<'login' | 'register'>('login')
-const email = ref('')
+const username = ref('')
 const password = ref('')
-const displayName = ref('')
 const submitting = ref(false)
 const desktopBindError = ref('')
 const desktopBind = computed(() => route.query.desktopBind === '1')
@@ -36,12 +33,7 @@ async function submit() {
   submitting.value = true
   desktopBindError.value = ''
   try {
-    let auth: AuthResponse
-    if (mode.value === 'login') {
-      auth = await session.login(email.value, password.value)
-    } else {
-      auth = await session.register(email.value, password.value, displayName.value)
-    }
+    const auth = await session.adminLogin(username.value, password.value)
     if (desktopBind.value) {
       await completeDesktopBind(auth.token)
       return
@@ -50,6 +42,18 @@ async function submit() {
   } finally {
     submitting.value = false
   }
+}
+
+async function redirectDesktopBinding(exchange: Awaited<ReturnType<typeof api.bindDevice>>): Promise<void> {
+  const payload = base64UrlEncode(JSON.stringify({
+    mode: desktopMode.value,
+    serverUrl: desktopServerUrl.value,
+    account: exchange.account,
+    device: exchange.device,
+    deviceToken: exchange.deviceToken,
+    tokenType: exchange.tokenType
+  }))
+  window.location.href = `lockpass://auth/callback?payload=${encodeURIComponent(payload)}`
 }
 
 async function bindCurrentSessionToDesktop(): Promise<void> {
@@ -72,15 +76,7 @@ async function completeDesktopBind(token: string): Promise<void> {
 
 async function bindDesktopDevice(token: string): Promise<void> {
   const exchange = await api.bindDevice(token, desktopDeviceName.value, desktopClientDeviceId.value || undefined)
-  const payload = base64UrlEncode(JSON.stringify({
-    mode: desktopMode.value,
-    serverUrl: desktopServerUrl.value,
-    account: exchange.account,
-    device: exchange.device,
-    deviceToken: exchange.deviceToken,
-    tokenType: exchange.tokenType
-  }))
-  window.location.href = `lockpass://auth/callback?payload=${encodeURIComponent(payload)}`
+  await redirectDesktopBinding(exchange)
 }
 
 function base64UrlEncode(value: string): string {
@@ -130,7 +126,7 @@ function base64UrlEncode(value: string): string {
     <aside class="grid content-center border-t border-slate-200 bg-white p-6 sm:p-8 lg:border-l lg:border-t-0">
       <div class="grid gap-4">
         <div class="flex items-center justify-between">
-          <h2 class="m-0 text-xl font-black">{{ mode === 'login' ? t('auth.login') : t('auth.register') }}</h2>
+          <h2 class="m-0 text-xl font-black">{{ t('auth.login') }}</h2>
           <select
             class="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm font-semibold text-slate-700"
             :aria-label="t('common.language')"
@@ -143,37 +139,14 @@ function base64UrlEncode(value: string): string {
           </select>
         </div>
 
-        <div class="grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1">
-          <button
-            type="button"
-            class="h-9 rounded-md text-sm font-bold"
-            :class="mode === 'login' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500'"
-            @click="mode = 'login'"
-          >
-            {{ t('auth.login') }}
-          </button>
-          <button
-            type="button"
-            class="h-9 rounded-md text-sm font-bold"
-            :class="mode === 'register' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500'"
-            @click="mode = 'register'"
-          >
-            {{ t('auth.register') }}
-          </button>
-        </div>
-
         <form class="grid gap-3" @submit.prevent="submit">
-          <label v-if="mode === 'register'" class="lp-label">
-            {{ t('auth.displayName') }}
-            <input v-model="displayName" class="lp-input" autocomplete="name" required />
-          </label>
           <label class="lp-label">
-            {{ t('auth.email') }}
-            <input v-model="email" class="lp-input" autocomplete="email" required type="email" />
+            {{ t('auth.username') }}
+            <input v-model="username" class="lp-input" autocomplete="username" required />
           </label>
           <label class="lp-label">
             {{ t('auth.password') }}
-            <input v-model="password" class="lp-input" autocomplete="current-password" required type="password" minlength="8" />
+            <input v-model="password" class="lp-input" autocomplete="current-password" required type="password" />
           </label>
 
           <p v-if="session.error || desktopBindError" class="m-0 rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">
@@ -181,15 +154,10 @@ function base64UrlEncode(value: string): string {
           </p>
 
           <button class="lp-button-primary" type="submit" :disabled="submitting">
-            {{ submitting ? t('common.processing') : mode === 'login' ? t('auth.login') : t('auth.createAccount') }}
+            <KeyRound class="size-4" />
+            {{ submitting ? t('common.processing') : t('auth.login') }}
           </button>
         </form>
-
-        <div class="grid gap-2 border-t border-slate-200 pt-4">
-          <button class="lp-button" type="button" disabled>{{ t('auth.smsLogin') }}</button>
-          <button class="lp-button" type="button" disabled>{{ t('auth.googleLogin') }}</button>
-          <button class="lp-button" type="button" disabled>{{ t('auth.wechatLogin') }}</button>
-        </div>
       </div>
     </aside>
   </div>

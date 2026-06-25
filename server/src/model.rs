@@ -482,6 +482,13 @@ pub struct EmailLoginRequest {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct AdminLoginRequest {
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EmailStartRequest {
     pub email: String,
     pub display_name: Option<String>,

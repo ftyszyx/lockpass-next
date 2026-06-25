@@ -59,6 +59,10 @@ const enUS: ServerWebMessages = {
     syncData: 'Encrypted data',
     syncEvents: 'Save history',
     system: 'Instance config',
+    systemGeneral: 'General',
+    systemEmail: 'Email codes',
+    systemAuth: 'Sign-in methods',
+    systemQuota: 'Quotas',
     audit: 'Audit logs',
     accountMenu: 'Account menu',
     logout: 'Log out',
@@ -73,6 +77,10 @@ const enUS: ServerWebMessages = {
     adminSyncData: 'Management encrypted data',
     adminSyncEvents: 'Management save history',
     adminSystem: 'Management instance config',
+    adminSystemGeneral: 'Management general settings',
+    adminSystemEmail: 'Management email code settings',
+    adminSystemAuth: 'Management sign-in method settings',
+    adminSystemQuota: 'Management quota settings',
     adminAudit: 'Management audit logs'
   },
   roleCodes: {
@@ -94,19 +102,23 @@ const enUS: ServerWebMessages = {
     accountsCount: '{count} accounts'
   },
   auth: {
-    subtitle: 'Server account and device binding',
+    subtitle: 'Administrator sign-in',
     heroTitle: 'Admin console',
     endToEndTitle: 'End-to-end encryption',
     endToEndBody: 'The server stores only ciphertext and save metadata',
-    accountTitle: 'Multiple sign-in methods',
-    accountBody: 'Sign in with email, SMS, Google, WeChat, and other supported methods',
+    accountTitle: 'Admin account',
+    accountBody: 'Use the administrator username and password configured on the server',
     selfHostedTitle: 'Self-hostable',
     selfHostedBody: 'Official hosting and self-hosted servers share the same protocol',
     login: 'Log in',
     register: 'Register',
     displayName: 'Display name',
+    username: 'Username',
     email: 'Email',
     password: 'Password',
+    emailCode: 'Email code',
+    sendEmailCode: 'Send email code',
+    changeEmail: 'Change email',
     createAccount: 'Create account',
     smsLogin: 'SMS login',
     googleLogin: 'Google login',
@@ -175,6 +187,25 @@ const enUS: ServerWebMessages = {
   },
   adminSystem: {
     title: 'Instance config',
+    saved: 'Configuration saved',
+    sections: {
+      general: {
+        title: 'General settings',
+        summary: 'Configure the public instance URL and standard user account creation.'
+      },
+      email: {
+        title: 'Email codes',
+        summary: 'Configure development log or SMTP delivery for user web email verification codes.'
+      },
+      auth: {
+        title: 'Sign-in methods',
+        summary: 'Review reserved sign-in providers. The admin console only accepts username and password sign-in.'
+      },
+      quota: {
+        title: 'Quotas',
+        summary: 'Limit per-account device count and server-side encrypted storage size.'
+      }
+    },
     configItem: 'Config item',
     value: 'Value',
     registrationEnabled: 'Registration',
@@ -182,6 +213,17 @@ const enUS: ServerWebMessages = {
     smsEnabled: 'SMS login',
     googleEnabled: 'Google login',
     wechatEnabled: 'WeChat login',
+    emailMode: 'Email delivery',
+    emailModeLog: 'Development log',
+    emailModeSmtp: 'SMTP',
+    emailFrom: 'Email sender',
+    smtpHost: 'SMTP host',
+    smtpPort: 'SMTP port',
+    smtpUsername: 'SMTP username',
+    smtpPassword: 'SMTP password',
+    emailCodeSecret: 'Email code signing secret',
+    secretSet: 'Set',
+    secretNotSet: 'Not set',
     reservedDisabled: 'Not available',
     reservedLoginUnavailable: 'This sign-in method cannot be enabled in this version.',
     maxDevices: 'Max devices',

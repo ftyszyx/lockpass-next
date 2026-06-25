@@ -44,6 +44,23 @@ export interface AuthResponse {
   tokenType: string
 }
 
+export type EmailChallengePurpose = 'register' | 'login'
+
+export interface EmailStartResponse {
+  challengeId: string
+  email: string
+  expiresAt: string
+  resendAfterSeconds: number
+}
+
+export interface EmailVerifyResponse {
+  accountSetupToken: string
+  email: string
+  displayName?: string | null
+  purpose: EmailChallengePurpose
+  expiresAt: string
+}
+
 export interface DeviceBindResponse {
   account: AccountView
   device: DeviceView

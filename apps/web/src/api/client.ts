@@ -14,6 +14,23 @@ export interface WebAuthResponse {
   tokenType: string
 }
 
+export type EmailChallengePurpose = 'register' | 'login'
+
+export interface WebEmailStartResponse {
+  challengeId: string
+  email: string
+  expiresAt: string
+  resendAfterSeconds: number
+}
+
+export interface WebEmailVerifyResponse {
+  accountSetupToken: string
+  email: string
+  displayName?: string | null
+  purpose: EmailChallengePurpose
+  expiresAt: string
+}
+
 export interface WebMeResponse {
   account: WebAccountView
   roles: string[]
@@ -32,15 +49,29 @@ export class WebApiError extends Error {
 export class WebApiClient {
   constructor(private readonly baseUrl = configuredOfficialApiUrl()) {}
 
-  async login(email: string, password: string): Promise<WebAuthResponse> {
-    return this.request('/auth/email/login', {
-      body: { email, password }
+  async startEmail(email: string, purpose: EmailChallengePurpose, displayName?: string): Promise<WebEmailStartResponse> {
+    return this.request('/auth/email/start', {
+      body: { email, purpose, displayName }
     })
   }
 
-  async register(email: string, password: string, displayName: string): Promise<WebAuthResponse> {
-    return this.request('/auth/email/register', {
-      body: { email, password, displayName }
+  async verifyEmail(challengeId: string, code: string): Promise<WebEmailVerifyResponse> {
+    return this.request('/auth/email/verify', {
+      body: { challengeId, code }
+    })
+  }
+
+  async completeEmailLogin(setupToken: string): Promise<WebAuthResponse> {
+    return this.request('/auth/email/complete-login', {
+      method: 'POST',
+      token: setupToken
+    })
+  }
+
+  async completeAccount(setupToken: string, deviceName: string, clientDeviceId?: string): Promise<SyncDeviceBindResponse> {
+    return this.request('/auth/account/complete', {
+      token: setupToken,
+      body: { deviceName, clientDeviceId }
     })
   }
 
@@ -49,7 +80,7 @@ export class WebApiClient {
   }
 
   async logout(token: string): Promise<{ ok: boolean }> {
-    return this.request('/auth/logout', { token })
+    return this.request('/auth/logout', { method: 'POST', token })
   }
 
   async bindDevice(token: string, deviceName: string, clientDeviceId?: string): Promise<SyncDeviceBindResponse> {
@@ -62,6 +93,7 @@ export class WebApiClient {
   private async request<T>(
     path: string,
     options: {
+      method?: 'GET' | 'POST'
       token?: string | null
       body?: unknown
       query?: Record<string, string | number | boolean | undefined | null>
@@ -75,7 +107,7 @@ export class WebApiClient {
     }
 
     const response = await fetch(url, {
-      method: options.body === undefined ? 'GET' : 'POST',
+      method: options.method ?? (options.body === undefined ? 'GET' : 'POST'),
       headers: {
         Accept: 'application/json',
         ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }),

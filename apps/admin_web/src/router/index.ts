@@ -74,9 +74,7 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'admin/config',
-        name: 'admin-config',
-        meta: { titleKey: 'layout.system', requiresAdmin: true },
-        component: () => import('@/pages/admin/AdminSystemPage.vue')
+        redirect: '/admin/system/general'
       },
       {
         path: 'admin/audit',
@@ -86,8 +84,30 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'admin/system',
-        name: 'admin-system',
-        meta: { titleKey: 'layout.system', requiresAdmin: true },
+        redirect: '/admin/system/general'
+      },
+      {
+        path: 'admin/system/general',
+        name: 'admin-system-general',
+        meta: { titleKey: 'layout.systemGeneral', requiresAdmin: true, configSection: 'general' },
+        component: () => import('@/pages/admin/AdminSystemPage.vue')
+      },
+      {
+        path: 'admin/system/email',
+        name: 'admin-system-email',
+        meta: { titleKey: 'layout.systemEmail', requiresAdmin: true, configSection: 'email' },
+        component: () => import('@/pages/admin/AdminSystemPage.vue')
+      },
+      {
+        path: 'admin/system/auth',
+        name: 'admin-system-auth',
+        meta: { titleKey: 'layout.systemAuth', requiresAdmin: true, configSection: 'auth' },
+        component: () => import('@/pages/admin/AdminSystemPage.vue')
+      },
+      {
+        path: 'admin/system/quota',
+        name: 'admin-system-quota',
+        meta: { titleKey: 'layout.systemQuota', requiresAdmin: true, configSection: 'quota' },
         component: () => import('@/pages/admin/AdminSystemPage.vue')
       },
       {

@@ -54,15 +54,9 @@ export class ApiClient {
     return this.request<HealthResponse>('/health')
   }
 
-  async register(email: string, password: string, displayName: string) {
-    return this.request<AuthResponse>('/auth/email/register', {
-      body: { email, password, displayName }
-    })
-  }
-
-  async login(email: string, password: string) {
-    return this.request<AuthResponse>('/auth/email/login', {
-      body: { email, password }
+  async adminLogin(username: string, password: string) {
+    return this.request<AuthResponse>('/auth/admin/login', {
+      body: { username, password }
     })
   }
 
@@ -71,7 +65,7 @@ export class ApiClient {
   }
 
   async logout(token: string) {
-    return this.request<{ ok: boolean }>('/auth/logout', { token })
+    return this.request<{ ok: boolean }>('/auth/logout', { method: 'POST', token })
   }
 
   async profile(token: string) {

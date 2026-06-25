@@ -1,5 +1,13 @@
 import { defineStore } from 'pinia'
-import { webApi, type WebAccountView, type WebAuthResponse } from '../api/client'
+import {
+  webApi,
+  type EmailChallengePurpose,
+  type WebAccountView,
+  type WebAuthResponse,
+  type WebEmailStartResponse,
+  type WebEmailVerifyResponse
+} from '../api/client'
+import type { SyncDeviceBindResponse } from '@/services/syncClient'
 import type { SyncDeviceBindCallbackPayload, SyncMode } from '@/services/syncClient'
 
 const TOKEN_STORAGE_KEY = 'lockpass.web.session.token'
@@ -31,35 +39,39 @@ export const useWebSessionStore = defineStore('web-session', {
         this.clear()
       }
     },
-    async login(email: string, password: string): Promise<WebAuthResponse> {
+    async startEmail(email: string, purpose: EmailChallengePurpose, displayName?: string): Promise<WebEmailStartResponse> {
       return this.withLoading(async () => {
-        const result = await webApi.login(email, password)
+        return await webApi.startEmail(email, purpose, displayName)
+      })
+    },
+    async verifyEmail(challengeId: string, code: string): Promise<WebEmailVerifyResponse> {
+      return this.withLoading(async () => {
+        return await webApi.verifyEmail(challengeId, code)
+      })
+    },
+    async completeEmailLogin(setupToken: string): Promise<WebAuthResponse> {
+      return this.withLoading(async () => {
+        const result = await webApi.completeEmailLogin(setupToken)
         this.setAuth(result)
         return result
       })
     },
-    async register(email: string, password: string, displayName: string): Promise<WebAuthResponse> {
+    async completeAccount(input: {
+      setupToken: string
+      mode: SyncMode
+      serverUrl: string
+      deviceName: string
+      clientDeviceId?: string
+    }): Promise<SyncDeviceBindCallbackPayload> {
       return this.withLoading(async () => {
-        const result = await webApi.register(email, password, displayName)
-        this.setAuth(result)
-        return result
+        const exchange = await webApi.completeAccount(input.setupToken, input.deviceName, input.clientDeviceId)
+        return this.setDeviceBinding(input.mode, input.serverUrl, exchange)
       })
     },
     async bindWebDevice(input: { mode: SyncMode; serverUrl: string; deviceName: string; clientDeviceId?: string }): Promise<SyncDeviceBindCallbackPayload> {
       if (!this.token) throw new Error('syncNotConnected')
       const exchange = await webApi.bindDevice(this.token, input.deviceName, input.clientDeviceId)
-      const binding: SyncDeviceBindCallbackPayload = {
-        mode: input.mode,
-        serverUrl: input.serverUrl,
-        account: exchange.account,
-        device: exchange.device,
-        deviceToken: exchange.deviceToken,
-        tokenType: exchange.tokenType
-      }
-      this.deviceBinding = binding
-      localStorage.setItem(DEVICE_TOKEN_STORAGE_KEY, exchange.deviceToken)
-      localStorage.setItem(DEVICE_BINDING_STORAGE_KEY, JSON.stringify(binding))
-      return binding
+      return this.setDeviceBinding(input.mode, input.serverUrl, exchange)
     },
     async logout(): Promise<void> {
       if (this.token) {
@@ -72,10 +84,30 @@ export const useWebSessionStore = defineStore('web-session', {
       this.account = result.account
       localStorage.setItem(TOKEN_STORAGE_KEY, result.token)
     },
+    setDeviceBinding(mode: SyncMode, serverUrl: string, exchange: SyncDeviceBindResponse): SyncDeviceBindCallbackPayload {
+      const binding: SyncDeviceBindCallbackPayload = {
+        mode,
+        serverUrl,
+        account: exchange.account,
+        device: exchange.device,
+        deviceToken: exchange.deviceToken,
+        tokenType: exchange.tokenType
+      }
+      this.token = exchange.deviceToken
+      this.account = exchange.account as WebAccountView
+      this.deviceBinding = binding
+      localStorage.setItem(TOKEN_STORAGE_KEY, exchange.deviceToken)
+      localStorage.setItem(DEVICE_TOKEN_STORAGE_KEY, exchange.deviceToken)
+      localStorage.setItem(DEVICE_BINDING_STORAGE_KEY, JSON.stringify(binding))
+      return binding
+    },
     clear(): void {
       this.token = null
       this.account = null
+      this.deviceBinding = null
       localStorage.removeItem(TOKEN_STORAGE_KEY)
+      localStorage.removeItem(DEVICE_TOKEN_STORAGE_KEY)
+      localStorage.removeItem(DEVICE_BINDING_STORAGE_KEY)
     },
     async withLoading<T>(task: () => Promise<T>): Promise<T> {
       this.loading = true

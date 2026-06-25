@@ -30,19 +30,10 @@ export const useSessionStore = defineStore('session', () => {
     }
   }
 
-  async function login(email: string, password: string): Promise<AuthResponse> {
+  async function adminLogin(username: string, password: string): Promise<AuthResponse> {
     let result!: AuthResponse
     await withLoading(async () => {
-      result = await api.login(email, password)
-      setAuth(result.token, result.account)
-    })
-    return result
-  }
-
-  async function register(email: string, password: string, displayName: string): Promise<AuthResponse> {
-    let result!: AuthResponse
-    await withLoading(async () => {
-      result = await api.register(email, password, displayName)
+      result = await api.adminLogin(username, password)
       setAuth(result.token, result.account)
     })
     return result
@@ -94,8 +85,7 @@ export const useSessionStore = defineStore('session', () => {
     isAdmin,
     refreshHealth,
     restore,
-    login,
-    register,
+    adminLogin,
     logout
   }
 })

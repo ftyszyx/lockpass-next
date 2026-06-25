@@ -16,9 +16,11 @@ const session = useWebSessionStore()
 const { locale, t } = useI18n()
 
 const mode = ref<'login' | 'register'>('login')
+const step = ref<'email' | 'code'>('email')
 const email = ref('')
-const password = ref('')
+const code = ref('')
 const displayName = ref('')
+const challengeId = ref('')
 const error = ref('')
 
 const desktopBind = computed(() => route.query.desktopBind === '1')
@@ -37,12 +39,32 @@ onMounted(async () => {
 async function submit(): Promise<void> {
   error.value = ''
   try {
-    if (mode.value === 'login') {
-      await session.login(email.value, password.value)
-    } else {
-      await session.register(email.value, password.value, displayName.value)
+    if (step.value === 'email') {
+      const challenge = await session.startEmail(email.value, mode.value, mode.value === 'register' ? displayName.value : undefined)
+      challengeId.value = challenge.challengeId
+      code.value = ''
+      step.value = 'code'
+      return
     }
 
+    const verified = await session.verifyEmail(challengeId.value, code.value)
+    if (mode.value === 'register') {
+      const binding = await session.completeAccount({
+        setupToken: verified.accountSetupToken,
+        mode: desktopBind.value ? bindMode.value : 'official',
+        serverUrl: desktopBind.value ? bindServerUrl.value : configuredOfficialApiUrl(),
+        deviceName: desktopBind.value ? desktopDeviceName.value : t('webAuth.defaultWebDeviceName'),
+        clientDeviceId: desktopBind.value ? desktopClientDeviceId.value || undefined : webClientDeviceId()
+      })
+      if (desktopBind.value) {
+        redirectDesktopBinding(binding)
+        return
+      }
+      await router.push(String(route.query.redirect || '/vault'))
+      return
+    }
+
+    await session.completeEmailLogin(verified.accountSetupToken)
     if (desktopBind.value) {
       await completeDesktopBind()
       return
@@ -52,6 +74,17 @@ async function submit(): Promise<void> {
   } catch (cause) {
     error.value = authErrorMessage(cause)
   }
+}
+
+function resetCodeStep(): void {
+  step.value = 'email'
+  code.value = ''
+  challengeId.value = ''
+}
+
+function switchMode(nextMode: 'login' | 'register'): void {
+  mode.value = nextMode
+  resetCodeStep()
 }
 
 function authErrorMessage(cause: unknown): string {
@@ -87,6 +120,10 @@ async function completeDesktopBind(): Promise<void> {
     deviceName: desktopDeviceName.value,
     clientDeviceId: desktopClientDeviceId.value || undefined
   })
+  redirectDesktopBinding(binding)
+}
+
+function redirectDesktopBinding(binding: SyncDeviceBindCallbackPayload): void {
   window.location.href = `lockpass://auth/callback?payload=${encodeURIComponent(base64UrlEncode(JSON.stringify(binding)))}`
 }
 
@@ -170,7 +207,7 @@ function changeLocale(event: Event): void {
             type="button"
             class="h-9 rounded-md text-sm font-bold"
             :class="mode === 'login' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500'"
-            @click="mode = 'login'"
+            @click="switchMode('login')"
           >
             {{ t('webAuth.login') }}
           </button>
@@ -178,24 +215,24 @@ function changeLocale(event: Event): void {
             type="button"
             class="h-9 rounded-md text-sm font-bold"
             :class="mode === 'register' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500'"
-            @click="mode = 'register'"
+            @click="switchMode('register')"
           >
             {{ t('webAuth.register') }}
           </button>
         </div>
 
         <form class="grid gap-3" @submit.prevent="submit">
-          <label v-if="mode === 'register'" class="form-label">
+          <label v-if="mode === 'register' && step === 'email'" class="form-label">
             {{ t('webAuth.displayName') }}
             <input v-model="displayName" class="form-input" autocomplete="name" required />
           </label>
-          <label class="form-label">
+          <label v-if="step === 'email'" class="form-label">
             {{ t('webAuth.email') }}
             <input v-model="email" class="form-input" autocomplete="email" required type="email" />
           </label>
-          <label class="form-label">
-            {{ t('webAuth.password') }}
-            <input v-model="password" class="form-input" :autocomplete="mode === 'login' ? 'current-password' : 'new-password'" required type="password" minlength="8" />
+          <label v-else class="form-label">
+            {{ t('webAuth.emailCode') }}
+            <input v-model="code" class="form-input" autocomplete="one-time-code" inputmode="numeric" maxlength="6" minlength="6" required />
           </label>
 
           <p v-if="error || session.error" class="m-0 rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">
@@ -204,7 +241,18 @@ function changeLocale(event: Event): void {
 
           <button class="primary-button justify-center" type="submit" :disabled="session.loading">
             <LogIn class="size-4" />
-            {{ session.loading ? t('app.loading') : mode === 'login' ? t('webAuth.login') : t('webAuth.createAccount') }}
+            {{
+              session.loading
+                ? t('app.loading')
+                : step === 'email'
+                  ? t('webAuth.sendEmailCode')
+                  : mode === 'login'
+                    ? t('webAuth.login')
+                    : t('webAuth.createAccount')
+            }}
+          </button>
+          <button v-if="step === 'code'" class="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700" type="button" :disabled="session.loading" @click="resetCodeStep">
+            {{ t('webAuth.changeEmail') }}
           </button>
         </form>
       </div>

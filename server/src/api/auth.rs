@@ -10,7 +10,10 @@ use std::net::SocketAddr;
 use crate::{
     api::{auth_principal, auth_principal_with_client_ip, client_ip, ok},
     error::{AppError, AppResult},
-    model::{AccountCompleteRequest, DeviceBindRequest, EmailStartRequest, EmailVerifyRequest},
+    model::{
+        AccountCompleteRequest, AdminLoginRequest, DeviceBindRequest, EmailStartRequest,
+        EmailVerifyRequest,
+    },
     state::AppState,
 };
 
@@ -20,6 +23,8 @@ pub fn router() -> Router<AppState> {
         .route("/logout", post(logout))
         .route("/email/start", post(email_start))
         .route("/email/verify", post(email_verify))
+        .route("/email/complete-login", post(email_complete_login))
+        .route("/admin/login", post(admin_login))
         .route("/account/complete", post(account_complete))
         .route("/sms/send", post(sms_placeholder))
         .route("/sms/verify", post(sms_placeholder))
@@ -42,6 +47,16 @@ async fn logout(State(state): State<AppState>, headers: HeaderMap) -> AppResult<
         state.store.logout_bearer(value)?;
     }
     Ok(ok())
+}
+
+async fn admin_login(
+    State(state): State<AppState>,
+    Json(payload): Json<AdminLoginRequest>,
+) -> AppResult<Json<Value>> {
+    Ok(Json(json!(state.store.login_admin_password(
+        &payload.username,
+        &payload.password
+    )?)))
 }
 
 async fn email_start(
@@ -76,6 +91,16 @@ async fn email_verify(
         payload.challenge_id,
         &payload.code
     )?)))
+}
+
+async fn email_complete_login(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> AppResult<Json<Value>> {
+    let setup_token = bearer_token(&headers)?;
+    Ok(Json(json!(state
+        .store
+        .complete_email_login(setup_token)?)))
 }
 
 async fn account_complete(

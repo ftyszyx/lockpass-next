@@ -5,6 +5,13 @@ pub struct Config {
     pub listen_addr: SocketAddr,
     pub database_url: Option<String>,
     pub cors_origin: Option<String>,
+    pub bootstrap_admin: Option<BootstrapAdminConfig>,
+}
+
+#[derive(Clone, Debug)]
+pub struct BootstrapAdminConfig {
+    pub username: String,
+    pub password: String,
 }
 
 impl Config {
@@ -27,6 +34,21 @@ impl Config {
             cors_origin: env::var("LOCKPASS_CORS_ORIGIN")
                 .ok()
                 .filter(|value| !value.is_empty()),
+            bootstrap_admin: BootstrapAdminConfig::from_env(),
         }
+    }
+}
+
+impl BootstrapAdminConfig {
+    fn from_env() -> Option<Self> {
+        let username = env::var("LOCKPASS_BOOTSTRAP_ADMIN_USERNAME")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())?;
+        let password = env::var("LOCKPASS_BOOTSTRAP_ADMIN_PASSWORD")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())?;
+        Some(Self { username, password })
     }
 }

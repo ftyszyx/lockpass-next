@@ -96,6 +96,8 @@ npm run dev:server
 
 服务端必须配置 `server/.env` 中的 `DATABASE_URL`。
 
+管理员后台不开放注册。首次启动时，如果数据库里没有任何账号，服务端会读取 `LOCKPASS_BOOTSTRAP_ADMIN_USERNAME` 和 `LOCKPASS_BOOTSTRAP_ADMIN_PASSWORD` 创建默认管理员账号。这个配置只在空库首次启动时生效，已有账号后不会重置密码。
+
 ### 用户 Web 端
 
 ```bash
@@ -119,10 +121,10 @@ npm run build:landing
 
 ### Server email configuration
 
-Email verification codes use `MAILER_MODE=log` in local development, which prints
-the code to the server log. Production should use `MAILER_MODE=smtp` with
-`SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAILER_FROM`, and a
-long random `LOCKPASS_EMAIL_CODE_SECRET`.
+Email verification delivery is configured in the admin console. Local
+development defaults to log mode, which prints the code to the server log.
+Production should switch the instance email delivery setting to SMTP and fill
+the sender, host, port, username, password, and email-code signing secret there.
 
 Aliyun DirectMail, Tencent Cloud SES, Resend, AWS SES, SendGrid, and most
 business mailboxes can be connected through the same SMTP settings.
