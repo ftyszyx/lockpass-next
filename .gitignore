@@ -32,3 +32,4 @@ apps/mobile/ios/
 
 pc_release.env
 *.env
+tools/keys/lockpass.key.pub

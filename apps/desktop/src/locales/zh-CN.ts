@@ -170,7 +170,7 @@ const zhCN = {
   },
   logs: {
     title: "运行日志",
-    body: "用于排查服务器保存、备份、导入导出和自动更新问题。日志不会记录主密码、安全密钥、设备令牌或条目内容。",
+    body: "查看运行日志，用于排查问题。",
     refresh: "刷新",
     copy: "复制日志",
     loading: "正在读取日志...",
@@ -180,7 +180,7 @@ const zhCN = {
   },
   shortcuts: {
     title: "快捷键",
-    body: "点击快捷键输入框后，直接按下新的组合键。全局快捷键会检测是否被系统或其他程序占用。",
+    body: "点击输入框后按下新的组合键。",
     global: "全局快捷键",
     internal: "软件内快捷键",
     action: "操作",
@@ -190,8 +190,7 @@ const zhCN = {
     checkingConflict: "正在检查是否冲突...",
     restoreDefaults: "恢复默认",
     defaultsRestored: "快捷键已恢复默认",
-    globalConflictHint:
-      "全局快捷键需要至少两个修饰键，例如 Ctrl + Shift。检测到系统占用时，请换一个组合键。",
+    globalConflictHint: "全局快捷键至少需要两个修饰键。",
     duplicateConflict: "已和「{action}」重复。",
     systemConflict: "这个全局快捷键可能已被系统或其他程序占用。",
     globalShortcutInvalid: "全局快捷键至少需要两个修饰键。",
@@ -243,17 +242,15 @@ const zhCN = {
     offlineTitle: "请登录服务器账号",
     offlineBody: "选择 LockPass 官方托管，或连接自己的服务器。",
     unsyncedTitle: "服务器账号已登录",
-    unsyncedBody: "保存条目后会立即上传密文；恢复联网时会自动检查并补传。",
+    unsyncedBody: "保存后会自动上传密文。",
     needsSyncTitle: "等待保存到服务器",
     neverSynced: "尚未保存到服务器",
-    neverSyncedBody:
-      "服务器账号已登录。联网时会立即上传和下载密文数据，也可以手动立即检查。",
+    neverSyncedBody: "联网上传和下载密文。",
     localChangesCount: "本机有 {count} 个修改待保存",
-    localChangesBody:
-      "本机有 {count} 个修改尚未保存到服务器。恢复联网后会自动检查并立即补传。",
+    localChangesBody: "{count} 个本地修改待保存。",
     conflictCount: "有 {count} 个服务器版本冲突",
     conflictedTitle: "服务器版本有冲突",
-    conflictedBody: "有 {count} 个对象与服务器版本冲突，请处理后再保存。",
+    conflictedBody: "先处理 {count} 个冲突。",
     lastSyncedAt: "上次保存：{time}",
     connectedTitle: "服务器账号已登录",
     connectedBody: "当前账号：{account}",
@@ -269,8 +266,7 @@ const zhCN = {
     openServerLogin: "网页登录并连接",
     officialLogin: "网页登录并连接",
     officialLoginPending: "登录中",
-    officialLoginPendingBody:
-      "已打开服务器登录页面，网页登录后会自动完成设备绑定。",
+    officialLoginPendingBody: "已打开登录页，完成后会自动绑定。",
     connect: "连接",
     disconnect: "退出服务器账号",
     saveSettings: "保存服务器地址",
@@ -294,8 +290,7 @@ const zhCN = {
     syncNetworkBlocked: "无法连接服务器，请确认网络可用或服务端已启动。",
     popup_blocked: "浏览器拦截了登录页弹窗，请允许弹窗后重试。",
     syncFailed: "保存到服务器失败，请检查服务器地址、Token 或网络状态。",
-    recoveryKeyNotice:
-      "安全密钥不会上传服务器；新设备需要先获取服务器密文，再输入主密码和安全密钥解锁。",
+    recoveryKeyNotice: "安全密钥不会上传服务器。",
   },
   filters: {
     all: "全部",
@@ -424,8 +419,7 @@ const zhCN = {
     readable: "易读",
     regenerate: "重新生成",
     backupTitle: "备份恢复",
-    backupBody:
-      "备份导入导出会接入真实加密备份格式；备份明文不会包含安全密钥。",
+    backupBody: "备份、恢复、导入和导出。",
     createBackup: "创建加密备份",
     restoreBackup: "从备份恢复",
     importLegacy: "导入旧版 LockPass",
@@ -442,8 +436,7 @@ const zhCN = {
     legacyPasswordRequired: "请先输入旧版主密码",
     selectLegacyBackup: "选择旧版备份",
     legacyPickTitle: "先选择旧版备份文件",
-    legacyPickBody:
-      "请先在旧版 LockPass 中创建备份，然后选择导出的 zip 文件。下一步再输入旧版主密码。",
+    legacyPickBody: "选择旧版导出的 zip 文件，下一步输入旧版主密码。",
     legacyPickAgain: "重新选择备份",
     legacyPasswordTitle: "输入旧版主密码",
     startLegacyImport: "开始导入",
@@ -561,8 +554,7 @@ const zhCN = {
     syncDeviceId: "服务器设备 ID",
     syncDeviceIdMissing: "尚未登录服务器账号",
     logging: "日志",
-    loggingHint:
-      "日志只记录服务器保存、备份、导入导出等运行状态，不记录主密码、安全密钥、设备令牌或条目内容。",
+    loggingHint: "不记录主密码、安全密钥或条目内容。",
     logLevel: "日志级别",
     logLevelOff: "关闭",
     logLevelError: "仅错误",
@@ -575,11 +567,11 @@ const zhCN = {
     signOutCurrentUser: "退出当前账号",
     signOutUserTitle: "退出当前账号",
     signOutUserSummary: "将退出「{name}」。",
-    signOutUserBody: "默认保留本地数据。",
+    signOutUserBody: "确认后将退出此账号。",
     deleteLocalDataOnSignOut: "同时删除此设备上的本地数据",
     signOutDetails: "说明",
     deleteLocalDataOnSignOutHint:
-      "会删除本地用户、保险库密文、附件密文、已保存的安全密钥和服务器设备令牌；其他设备和服务器账号不受影响。",
+      "只删除这台设备上的本地数据，不影响服务器账号和其它设备。",
     signOutAction: "退出当前账号",
     signOutAndDeleteAction: "退出并删除本地数据",
     signingOut: "正在退出...",

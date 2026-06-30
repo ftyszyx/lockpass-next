@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { LogOut, Trash2, X } from "@lucide/vue";
+import { CircleHelp, LogOut, Trash2, X } from "@lucide/vue";
 import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
@@ -14,12 +14,14 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const deleteLocalData = ref(false);
+const deleteLocalData = ref(true);
+const helpOpen = ref(false);
 
 watch(
   () => props.userName,
   () => {
-    deleteLocalData.value = false;
+    deleteLocalData.value = true;
+    helpOpen.value = false;
   },
   { immediate: true },
 );
@@ -55,20 +57,35 @@ watch(
             }}</span>
           </div>
         </div>
-        <label
-          class="grid grid-cols-[16px_minmax(0,1fr)] gap-2 text-sm font-bold text-slate-700"
-        >
-          <input v-model="deleteLocalData" class="mt-1" type="checkbox" />
-          <span>{{ t("settings.deleteLocalDataOnSignOut") }}</span>
-        </label>
-        <details
-          class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500"
-        >
-          <summary class="cursor-pointer select-none font-bold text-slate-600">
-            {{ t("settings.signOutDetails") }}
-          </summary>
-          <p class="mt-2">{{ t("settings.deleteLocalDataOnSignOutHint") }}</p>
-        </details>
+        <div class="relative">
+          <div
+            class="grid grid-cols-[16px_minmax(0,1fr)_28px] items-start gap-2 text-sm font-bold text-slate-700"
+          >
+            <input
+              id="sign-out-delete-local-data"
+              v-model="deleteLocalData"
+              class="mt-1"
+              type="checkbox"
+            />
+            <label for="sign-out-delete-local-data">{{
+              t("settings.deleteLocalDataOnSignOut")
+            }}</label>
+            <button
+              class="grid size-7 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              type="button"
+              :aria-label="t('settings.signOutDetails')"
+              @click="helpOpen = !helpOpen"
+            >
+              <CircleHelp class="size-4" />
+            </button>
+          </div>
+          <div
+            v-if="helpOpen"
+            class="absolute right-0 top-8 z-10 w-[320px] max-w-[calc(94vw-32px)] rounded-lg border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600 shadow-xl"
+          >
+            {{ t("settings.deleteLocalDataOnSignOutHint") }}
+          </div>
+        </div>
       </div>
       <div class="flex justify-end gap-2 border-t border-slate-200 p-4">
         <button

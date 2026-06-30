@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,8 +25,9 @@ TAURI_CONFIG = TAURI_DIR / "tauri.conf.json5"
 NSIS_DIR = TAURI_DIR / "target" / "release" / "bundle" / "nsis"
 DEFAULT_DIST_DIR = ROOT / "tools" / "dist" / "pc_release"
 DEFAULT_KEY_PATH = Path.home() / ".tauri" / "lockpass.key"
-DEFAULT_PLATFORM = "windows-x86_64"
 DEFAULT_PUBLIC_BASE_URL = "https://updates.lockpass.example.com"
+DEFAULT_LATEST_NAME = "latest.json"
+DEFAULT_OSS_APPS_DIR = "apps"
 IMMUTABLE_ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable"
 LATEST_JSON_CACHE_CONTROL = "no-cache"
 
@@ -39,48 +41,47 @@ class ReleaseArtifact:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Build LockPass Windows NSIS release and optionally upload to OSS.")
-    parser.add_argument("--env", default=str(ROOT / "tools" / "pc_release.env"), help="Optional env file path.")
-    parser.add_argument("--skip-build", action="store_true", help="Reuse the existing NSIS bundle output.")
-    parser.add_argument("--upload", action="store_true", help="Upload installer, signature and latest.json to OSS.")
-    parser.add_argument("--dry-run", action="store_true", help="Print upload actions without writing to OSS.")
-    parser.add_argument("--overwrite", action="store_true", help="Allow overwriting existing OSS installer/signature objects.")
-    parser.add_argument("--notes", default=None, help="Release notes written to latest.json.")
-    parser.add_argument("--dist-dir", default=str(DEFAULT_DIST_DIR), help="Directory for copied artifacts and latest.json.")
-    parser.add_argument("--signing-key", default=None, help="Updater private key path. Defaults to env or ~/.tauri/lockpass.key.")
-    parser.add_argument("--public-base-url", default=None, help="Public base URL for update files.")
-    parser.add_argument("--oss-prefix", default=None, help="OSS object prefix, for example desktop.")
-    parser.add_argument("--oss-endpoint", default=None, help="OSS endpoint, overrides env.")
-    parser.add_argument("--oss-bucket", default=None, help="OSS bucket, overrides env.")
-    parser.add_argument("--latest-name", default="latest.json", help="Update manifest file name.")
-    parser.add_argument("--platform", default=DEFAULT_PLATFORM, help="Tauri updater platform key.")
+    parser = build_arg_parser()
     args = parser.parse_args()
 
-    env_file = Path(args.env)
+    env_file = Path(os.environ.get("LOCKPASS_RELEASE_ENV", ROOT / "tools" / "pc_release.env"))
     file_env = load_env_file(env_file) if env_file.exists() else {}
     env = {**os.environ, **file_env}
 
-    signing_key = resolve_signing_key(args.signing_key, env)
-    if not args.skip_build:
-        build_release(signing_key, env)
+    config = read_tauri_config()
+    version = config_string(config, "version")
+    app_id = config_string(config, "identifier")
+    platform = args.platform
+    channel = normalize_channel(args.channel)
+    latest_name = DEFAULT_LATEST_NAME
 
-    dist_dir = Path(args.dist_dir).resolve()
-    version = read_json5_string(TAURI_CONFIG, "version")
-    artifact = collect_artifact(version, dist_dir, args.notes, args.platform, args.public_base_url, args.oss_prefix, env, args.latest_name)
+    signing_key = resolve_signing_key(None, env)
+    build_release(signing_key, env, release_tauri_config(config, app_id, channel, platform, latest_name, env))
+
+    dist_dir = resolve_dist_dir()
+    artifact = collect_artifact(version, app_id, channel, dist_dir, args.notes, platform, env, latest_name)
 
     print(f"Release version: {artifact.version}")
+    print(f"App ID: {app_id}")
+    print(f"Channel: {channel}")
+    print(f"Platform: {platform}")
     print(f"Installer: {artifact.installer_path}")
     print(f"Signature: {artifact.signature_path}")
     print(f"Latest JSON: {artifact.latest_json_path}")
 
     if args.upload:
-        if args.oss_endpoint:
-            env["OSS_ENDPOINT"] = args.oss_endpoint
-        if args.oss_bucket:
-            env["OSS_BUCKET"] = args.oss_bucket
-        upload_to_oss(artifact, args.oss_prefix, args.latest_name, env, args.dry_run, args.overwrite)
+        upload_to_oss(artifact, app_id, channel, platform, latest_name, env)
 
     return 0
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Build LockPass Windows NSIS release and optionally upload to OSS.")
+    parser.add_argument("--channel", required=True, help="Release channel, for example web.")
+    parser.add_argument("--platform", required=True, help="Tauri updater platform key, for example windows-x86_64.")
+    parser.add_argument("--upload", action="store_true", help="Upload installer, signature and latest.json to OSS.")
+    parser.add_argument("--notes", default=None, help="Release notes written to latest.json.")
+    return parser
 
 
 def load_env_file(path: Path) -> dict[str, str]:
@@ -94,6 +95,21 @@ def load_env_file(path: Path) -> dict[str, str]:
             continue
         values[key.strip()] = strip_env_quotes(value.strip())
     return values
+
+
+def resolve_dist_dir() -> Path:
+    return DEFAULT_DIST_DIR.resolve()
+
+
+def normalize_channel(value: str) -> str:
+    normalized = value.strip().lower()
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", normalized):
+        raise SystemExit(f"Invalid release channel {value!r}. Use lowercase letters, numbers and hyphens.")
+    return normalized
+
+
+def resolve_latest_name() -> str:
+    return DEFAULT_LATEST_NAME
 
 
 def strip_env_quotes(value: str) -> str:
@@ -117,7 +133,7 @@ def resolve_signing_key(argument: str | None, env: dict[str, str]) -> Path | Non
     return key_path
 
 
-def build_release(signing_key: Path | None, base_env: dict[str, str]) -> None:
+def build_release(signing_key: Path | None, base_env: dict[str, str], config: dict[str, object]) -> None:
     if NSIS_DIR.exists():
         shutil.rmtree(NSIS_DIR)
 
@@ -127,7 +143,13 @@ def build_release(signing_key: Path | None, base_env: dict[str, str]) -> None:
         env["TAURI_SIGNING_PRIVATE_KEY"] = signing_key.read_text(encoding="utf-8")
         env.setdefault("TAURI_SIGNING_PRIVATE_KEY_PASSWORD", "")
 
-    run(["npm", "run", "-w", "@lockpass/desktop", "tauri:build"], env=env)
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as config_file:
+        json.dump(config, config_file, ensure_ascii=False, indent=2)
+        config_path = Path(config_file.name)
+    try:
+        run(["npm", "run", "-w", "@lockpass/desktop", "tauri:build", "--", "--config", str(config_path)], env=env)
+    finally:
+        config_path.unlink(missing_ok=True)
 
 
 def run(command: list[str], env: dict[str, str] | None = None) -> None:
@@ -136,21 +158,63 @@ def run(command: list[str], env: dict[str, str] | None = None) -> None:
     subprocess.run([executable or command[0], *command[1:]], cwd=ROOT, env=env, check=True)
 
 
-def read_json5_string(path: Path, key: str) -> str:
-    text = path.read_text(encoding="utf-8")
-    match = re.search(rf"(?m)^\s*{re.escape(key)}\s*:\s*['\"]([^'\"]+)['\"]", text)
-    if not match:
-        raise SystemExit(f"Could not find {key!r} in {path}")
-    return match.group(1)
+def read_tauri_config() -> dict[str, object]:
+    text = TAURI_CONFIG.read_text(encoding="utf-8-sig")
+    try:
+        import json5  # type: ignore
+    except ImportError as error:
+        raise SystemExit(
+            "Missing Python package 'json5'. Install release tool dependencies with: "
+            "python -m pip install -r tools/requirements.txt"
+        ) from error
+    return json5.loads(text)
+
+
+def config_string(config: dict[str, object], key: str) -> str:
+    value = config.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise SystemExit(f"Could not find non-empty {key!r} in {TAURI_CONFIG}")
+    return value.strip()
+
+
+def release_tauri_config(
+    base_config: dict[str, object],
+    app_id: str,
+    channel: str,
+    platform: str,
+    latest_name: str,
+    env: dict[str, str],
+) -> dict[str, object]:
+    return merge_dicts(
+        base_config,
+        {
+            "plugins": {
+                "updater": {
+                    "endpoints": [manifest_url_for(app_id, channel, platform, latest_name, env)],
+                }
+            }
+        },
+    )
+
+
+def merge_dicts(left: dict[str, object], right: dict[str, object]) -> dict[str, object]:
+    merged = dict(left)
+    for key, right_value in right.items():
+        left_value = merged.get(key)
+        if isinstance(left_value, dict) and isinstance(right_value, dict):
+            merged[key] = merge_dicts(left_value, right_value)
+        else:
+            merged[key] = right_value
+    return merged
 
 
 def collect_artifact(
     version: str,
+    app_id: str,
+    channel: str,
     dist_dir: Path,
     notes: str | None,
     platform: str,
-    public_base_url: str | None,
-    oss_prefix: str | None,
     env: dict[str, str],
     latest_name: str,
 ) -> ReleaseArtifact:
@@ -168,8 +232,8 @@ def collect_artifact(
     shutil.copy2(installer, installer_copy)
     shutil.copy2(signature, signature_copy)
 
-    base_url = resolve_public_base_url(public_base_url, env)
-    asset_prefix = normalize_prefix(oss_prefix or env.get("OSS_ASSET_PREFIX") or join_key(env.get("OSS_PREFIX") or env.get("OSS_PATH") or "desktop", "windows"))
+    base_url = resolve_public_base_url(env)
+    asset_prefix = release_prefix_for(app_id, channel, platform, env)
     installer_url = join_url(base_url, asset_prefix, installer_copy.name)
     latest = {
         "version": version,
@@ -195,8 +259,8 @@ def newest_file(files: Iterable[Path]) -> Path:
     return max(candidates, key=lambda path: path.stat().st_mtime)
 
 
-def resolve_public_base_url(argument: str | None, env: dict[str, str]) -> str:
-    value = argument or env.get("OSS_PUBLIC_BASE_URL") or env.get("UPDATE_PUBLIC_BASE_URL")
+def resolve_public_base_url(env: dict[str, str]) -> str:
+    value = env.get("OSS_PUBLIC_BASE_URL") or env.get("UPDATE_PUBLIC_BASE_URL")
     if value:
         return value.rstrip("/")
 
@@ -208,48 +272,49 @@ def resolve_public_base_url(argument: str | None, env: dict[str, str]) -> str:
     return DEFAULT_PUBLIC_BASE_URL
 
 
+def release_prefix_for(app_id: str, channel: str, platform: str, env: dict[str, str]) -> str:
+    apps_dir = normalize_prefix(env.get("OSS_APPS_DIR") or DEFAULT_OSS_APPS_DIR)
+    return normalize_prefix(join_key(apps_dir, app_id, channel, platform))
+
+
+def manifest_url_for(app_id: str, channel: str, platform: str, latest_name: str, env: dict[str, str]) -> str:
+    return join_url(resolve_public_base_url(env), release_prefix_for(app_id, channel, platform, env), latest_name)
+
+
 def upload_to_oss(
     artifact: ReleaseArtifact,
-    oss_prefix_arg: str | None,
+    app_id: str,
+    channel: str,
+    platform: str,
     latest_name: str,
     env: dict[str, str],
-    dry_run: bool,
-    overwrite: bool,
 ) -> None:
     endpoint = required_env(env, "OSS_ENDPOINT")
     bucket_name = required_env(env, "OSS_BUCKET")
-    root_prefix = normalize_prefix(env.get("OSS_PREFIX") or env.get("OSS_PATH") or "desktop")
-    asset_prefix = normalize_prefix(oss_prefix_arg or env.get("OSS_ASSET_PREFIX") or join_key(root_prefix, "windows"))
-    latest_key = normalize_key(env.get("OSS_LATEST_KEY") or join_key(root_prefix, latest_name))
+    release_prefix = release_prefix_for(app_id, channel, platform, env)
+    latest_key = normalize_key(join_key(release_prefix, latest_name))
     public_read = parse_bool(env.get("OSS_PUBLIC_READ", "true"))
 
     uploads = [
         (
             artifact.installer_path,
-            normalize_key(join_key(asset_prefix, artifact.installer_path.name)),
-            False,
+            normalize_key(join_key(release_prefix, artifact.installer_path.name)),
             IMMUTABLE_ASSET_CACHE_CONTROL,
         ),
         (
             artifact.signature_path,
-            normalize_key(join_key(asset_prefix, artifact.signature_path.name)),
-            False,
+            normalize_key(join_key(release_prefix, artifact.signature_path.name)),
             IMMUTABLE_ASSET_CACHE_CONTROL,
         ),
         (
             artifact.latest_json_path,
             latest_key,
-            True,
             LATEST_JSON_CACHE_CONTROL,
         ),
     ]
 
     print(f"OSS bucket: {bucket_name}")
     print(f"OSS endpoint: {endpoint}")
-    if dry_run:
-        for source, key, _allow_overwrite, cache_control in uploads:
-            print(f"Upload {source} -> oss://{bucket_name}/{key} Cache-Control={cache_control}")
-        return
 
     try:
         import oss2  # type: ignore
@@ -260,10 +325,8 @@ def upload_to_oss(
     key_secret = required_env(env, "OSS_ACCESS_KEY_SECRET")
     bucket = oss2.Bucket(oss2.Auth(key_id, key_secret), endpoint, bucket_name)
 
-    for source, key, allow_overwrite, cache_control in uploads:
+    for source, key, cache_control in uploads:
         print(f"Upload {source} -> oss://{bucket_name}/{key}")
-        if bucket.object_exists(key) and not (overwrite or allow_overwrite):
-            raise SystemExit(f"OSS object already exists: {key}. Use --overwrite to replace it.")
         bucket.put_object_from_file(key, str(source), headers={"Cache-Control": cache_control})
         if public_read:
             bucket.put_object_acl(key, oss2.OBJECT_ACL_PUBLIC_READ)

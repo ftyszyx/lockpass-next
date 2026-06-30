@@ -191,7 +191,7 @@ const enUS: LocaleMessages = {
   },
   logs: {
     title: "Runtime logs",
-    body: "Use logs to troubleshoot server saving, backup, import/export, and update issues. Logs do not record the master password, Secret Key, device tokens, or item contents.",
+    body: "View runtime logs for troubleshooting.",
     refresh: "Refresh",
     copy: "Copy logs",
     loading: "Reading logs...",
@@ -202,7 +202,7 @@ const enUS: LocaleMessages = {
   },
   shortcuts: {
     title: "Shortcuts",
-    body: "Click a shortcut field, then press the new key combination. Global shortcuts are checked against the system and other apps.",
+    body: "Click a field, then press a new shortcut.",
     global: "Global shortcuts",
     internal: "In-app shortcuts",
     action: "Action",
@@ -212,8 +212,7 @@ const enUS: LocaleMessages = {
     checkingConflict: "Checking for conflicts...",
     restoreDefaults: "Restore defaults",
     defaultsRestored: "Shortcuts restored to defaults",
-    globalConflictHint:
-      "Global shortcuts need at least two modifiers, such as Ctrl + Shift. Pick another combination if it is already reserved.",
+    globalConflictHint: "Global shortcuts need at least two modifiers.",
     duplicateConflict: "Already used by “{action}”.",
     systemConflict:
       "This global shortcut may already be used by the system or another app.",
@@ -269,19 +268,15 @@ const enUS: LocaleMessages = {
     offlineTitle: "Sign in to a server account",
     offlineBody: "Use LockPass hosted, or connect your own server.",
     unsyncedTitle: "Server account signed in",
-    unsyncedBody:
-      "Encrypted changes are uploaded after saving. When the connection returns, LockPass checks and uploads pending changes automatically.",
+    unsyncedBody: "Encrypted changes upload after saving.",
     needsSyncTitle: "Waiting to save to server",
     neverSynced: "Not saved to server yet",
-    neverSyncedBody:
-      "Server account signed in. LockPass uploads and downloads encrypted data when online, and you can also check now.",
+    neverSyncedBody: "Uploads and downloads encrypted data when online.",
     localChangesCount: "{count} local changes pending",
-    localChangesBody:
-      "{count} local changes have not been saved to the server yet. They upload automatically when the connection returns.",
+    localChangesBody: "{count} local changes pending.",
     conflictCount: "{count} server version conflicts",
     conflictedTitle: "Server version conflicts",
-    conflictedBody:
-      "{count} objects conflict with the server version. Resolve them before saving again.",
+    conflictedBody: "Resolve {count} conflicts first.",
     lastSyncedAt: "Last saved: {time}",
     connectedTitle: "Server account signed in",
     connectedBody: "Current account: {account}",
@@ -298,7 +293,7 @@ const enUS: LocaleMessages = {
     officialLogin: "Sign in on web",
     officialLoginPending: "Signing in",
     officialLoginPendingBody:
-      "Opened the server sign-in page. This app will bind the device automatically after web sign-in.",
+      "Opened the sign-in page. Device binding finishes automatically.",
     connect: "Connect",
     disconnect: "Sign out of server",
     saveSettings: "Save server address",
@@ -328,8 +323,7 @@ const enUS: LocaleMessages = {
       "The browser blocked the sign-in popup. Allow popups and try again.",
     syncFailed:
       "Could not save to the server. Check the server URL, token, or network status.",
-    recoveryKeyNotice:
-      "Secret Keys are not uploaded to the server. New devices fetch encrypted server data, then unlock with the master password and Secret Key.",
+    recoveryKeyNotice: "Secret Keys are not uploaded to the server.",
   },
   filters: {
     all: "All",
@@ -460,8 +454,7 @@ const enUS: LocaleMessages = {
     readable: "Readable",
     regenerate: "Regenerate",
     backupTitle: "Backup restore",
-    backupBody:
-      "Backup import/export will use the real encrypted backup format. Secret Keys are not included in backup plaintext.",
+    backupBody: "Backup, restore, import, and export.",
     createBackup: "Create encrypted backup",
     restoreBackup: "Restore from backup",
     importLegacy: "Import legacy LockPass",
@@ -479,7 +472,7 @@ const enUS: LocaleMessages = {
     selectLegacyBackup: "Select legacy backup",
     legacyPickTitle: "Choose the legacy backup first",
     legacyPickBody:
-      "Create a backup in legacy LockPass, then select the exported zip file. The legacy master password is entered in the next step.",
+      "Choose the legacy exported zip file, then enter the legacy master password.",
     legacyPickAgain: "Choose another backup",
     legacyPasswordTitle: "Enter the legacy master password",
     startLegacyImport: "Start import",
@@ -613,7 +606,7 @@ const enUS: LocaleMessages = {
     syncDeviceIdMissing: "Server account is not signed in yet",
     logging: "Logs",
     loggingHint:
-      "Logs record runtime status for server saving, backups, import, and export. They do not record the master password, Secret Key, device tokens, or item contents.",
+      "Does not record master passwords, Secret Keys, or item contents.",
     logLevel: "Log level",
     logLevelOff: "Off",
     logLevelError: "Errors only",
@@ -627,11 +620,11 @@ const enUS: LocaleMessages = {
     signOutCurrentUser: "Sign out of current account",
     signOutUserTitle: "Sign out of current account",
     signOutUserSummary: "Sign out of “{name}”.",
-    signOutUserBody: "Local data is kept by default.",
+    signOutUserBody: "Confirm to sign out of this account.",
     deleteLocalDataOnSignOut: "Also delete local data on this device",
     signOutDetails: "Details",
     deleteLocalDataOnSignOutHint:
-      "This deletes the local user, encrypted vault data, encrypted attachments, saved Secret Key, and server device token. Other devices and the server account are not affected.",
+      "Only local data on this device is deleted. The server account and other devices are not affected.",
     signOutAction: "Sign out",
     signOutAndDeleteAction: "Sign out and delete local data",
     signingOut: "Signing out...",

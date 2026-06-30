@@ -103,6 +103,7 @@ const showSensitive = ref(false);
 const activeDrawer = ref<DrawerName>(null);
 const activeManagementPage = ref<ManagementPageName | null>(null);
 const activeModal = ref<ModalName>(null);
+const returnToUserManagementAfterSetup = ref(false);
 const editingItemId = ref<string | null>(null);
 const passwordTargetFieldId = ref<string | null>(null);
 const quickQuery = ref("");
@@ -390,14 +391,19 @@ function closeSwitchUserConfirm(): void {
 }
 
 function openUserManagement(): void {
+  returnToUserManagementAfterSetup.value = false;
   activeModal.value = "userManagement";
 }
 
 function openAddUser(
   initialMode: "choice" | "new" | "restore" = "choice",
+  options: { returnToUserManagement?: boolean } = {},
 ): void {
   resetUserDraft();
   userSetupInitialMode.value = initialMode;
+  returnToUserManagementAfterSetup.value = Boolean(
+    options.returnToUserManagement,
+  );
   activeModal.value = "user";
 }
 
@@ -408,8 +414,14 @@ function createNewUserFromLock(): void {
   openAddUser("new");
 }
 
-function closeUserSetup(): void {
-  activeModal.value = null;
+function closeUserSetup(
+  options: { returnToPrevious?: boolean } = { returnToPrevious: true },
+): void {
+  const shouldReturnToUserManagement =
+    options.returnToPrevious !== false &&
+    returnToUserManagementAfterSetup.value;
+  activeModal.value = shouldReturnToUserManagement ? "userManagement" : null;
+  returnToUserManagementAfterSetup.value = false;
   resetUserDraft();
 }
 
@@ -465,7 +477,7 @@ async function restoreExistingServerAccount(payload: {
       recoveryKey: payload.recoveryKey,
     });
     pendingServerExchange.value = null;
-    closeUserSetup();
+    closeUserSetup({ returnToPrevious: false });
     showToast(t("toast.unlocked"));
     scheduleAutoSync("restore-server-account");
   } catch (error) {
@@ -524,7 +536,7 @@ async function createUser(): Promise<void> {
         : result.recoveryKeyStorage === "saved"
           ? t("toast.recoveryKeySaved")
           : t("toast.recoveryKeySaveFailed");
-    closeUserSetup();
+    closeUserSetup({ returnToPrevious: false });
     showToast(toastMessage);
     promptServerSignInIfNeeded();
   } catch (error) {
@@ -567,7 +579,7 @@ async function confirmSwitchUser(): Promise<void> {
 }
 
 function openAddUserFromManagement(): void {
-  openAddUser();
+  openAddUser("choice", { returnToUserManagement: true });
 }
 
 async function signOutCurrentUser(payload: {
@@ -1861,7 +1873,7 @@ function cancelAutoLock(): void {
       :draft="userDraft"
       :auth-error="authError"
       :creating="creatingUser"
-      :is-adding="activeModal === 'user' && !generatedRecoveryKey"
+      :is-adding="activeModal === 'user'"
       :is-legacy-import="hasLegacyImport"
       :recovery-key="generatedRecoveryKey"
       :created-user-name="recoveryUserName"
