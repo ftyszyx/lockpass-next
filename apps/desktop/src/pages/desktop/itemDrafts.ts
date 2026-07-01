@@ -3,11 +3,12 @@ import type {
   VaultItemFieldKind,
   VaultItemType,
 } from "@lockpass/core";
-import type { AttachmentDraft } from "@/stores/vault";
+import type { AttachmentDraft } from "@/stores/vault/types";
 import { fieldLabel, isSensitiveField } from "./formatters";
 import type { AddMoreMenuItem, AttachmentDraftBlock } from "./types";
 
 type Translate = (key: string) => string;
+type ExtraFieldKind = "password" | "date" | "totp" | "note";
 
 export const CARD_CONTACT_FIELD_LABEL_KEYS = {
   issuer: "editor.cardIssuer",
@@ -90,7 +91,7 @@ export function isCardContactDraftField(field: VaultItemField): boolean {
 export function normalizeDraftFieldsForSave(
   fields: VaultItemField[],
 ): VaultItemField[] {
-  return fields.map((field) => ({ ...field }));
+  return fields.map((field) => normalizeDraftFieldForSave(field));
 }
 
 export function makeAttachmentDraftBlock(
@@ -110,34 +111,114 @@ export function flattenAttachmentDraftBlocks(
 
 export function getAddMoreMenuItems(
   t: Translate,
-  type: VaultItemType,
+  _type: VaultItemType,
 ): AddMoreMenuItem[] {
-  const sharedItems: AddMoreMenuItem[] = [
+  return [
+    { kind: "group", label: t("editor.addGroup") },
+    { kind: "password", label: t("editor.addPassword") },
+    { kind: "date", label: t("editor.addDate") },
+    { kind: "totp", label: t("editor.addTotp") },
     { kind: "attachment", label: t("detail.attachments") },
     { kind: "note", label: t("editor.notes") },
   ];
-
-  if (type === "login") {
-    return [
-      { kind: "totp", label: t("editor.addTotp") },
-      ...sharedItems,
-    ];
-  }
-
-  return sharedItems;
 }
 
 export function appendExtraDraftField(
   t: Translate,
   fields: VaultItemField[],
-  kind: "totp" | "note",
+  kind: ExtraFieldKind | "group",
 ): VaultItemField[] {
+  if (kind === "group") {
+    return [...fields, makeDraftGroupField(t)];
+  }
+
+  const field = makeDraftField(
+    t,
+    kind,
+    kind === "date" ? todayDateValue() : "",
+    isSensitiveField(kind),
+  );
   return [
     ...fields,
-    makeDraftField(t, kind, "", kind === "totp"),
+    { ...field, id: `optional-field-${kind}-${crypto.randomUUID()}` },
   ];
 }
 
 export function isTotpField(field: VaultItemField): boolean {
   return field.kind === "totp";
+}
+
+export function isOptionalDraftField(field: VaultItemField): boolean {
+  return field.id.startsWith("optional-field-");
+}
+
+export function isUserEditableDraftField(field: VaultItemField): boolean {
+  return isOptionalDraftField(field) || isCardContactDraftField(field);
+}
+
+export function makeDraftGroupField(t: Translate): VaultItemField {
+  return {
+    id: `optional-field-group-${crypto.randomUUID()}`,
+    kind: "group",
+    label: t("fields.group"),
+    value: "",
+    sensitive: false,
+    collapsed: false,
+    children: [
+      {
+        ...makeDraftField(t, "text", "", false),
+        id: `optional-field-group-child-${crypto.randomUUID()}`,
+      },
+    ],
+  };
+}
+
+export function toggleDraftGroupCollapsed(
+  fields: VaultItemField[],
+  groupId: string,
+): VaultItemField[] {
+  return fields.map((field) =>
+    field.id === groupId && field.kind === "group"
+      ? { ...field, collapsed: !field.collapsed }
+      : field,
+  );
+}
+
+export function reorderDraftFieldsByDrop(
+  fields: VaultItemField[],
+  draggedFieldId: string,
+  targetFieldId: string,
+  placement: "before" | "after" = "before",
+): VaultItemField[] {
+  if (draggedFieldId === targetFieldId) return fields;
+
+  const draggedIndex = fields.findIndex((field) => field.id === draggedFieldId);
+  const targetIndex = fields.findIndex((field) => field.id === targetFieldId);
+  if (draggedIndex < 0 || targetIndex < 0) return fields;
+
+  const nextFields = [...fields];
+  const [draggedField] = nextFields.splice(draggedIndex, 1);
+  const adjustedTargetIndex = nextFields.findIndex(
+    (field) => field.id === targetFieldId,
+  );
+  const insertIndex =
+    placement === "after" ? adjustedTargetIndex + 1 : adjustedTargetIndex;
+  nextFields.splice(insertIndex, 0, draggedField);
+  return nextFields;
+}
+
+function todayDateValue(): string {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function normalizeDraftFieldForSave(field: VaultItemField): VaultItemField {
+  const { collapsed: _collapsed, children, ...savedField } = field;
+  const normalizedChildren = children?.map(normalizeDraftFieldForSave) ?? [];
+  return normalizedChildren.length
+    ? { ...savedField, children: normalizedChildren }
+    : savedField;
 }

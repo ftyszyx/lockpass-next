@@ -10,6 +10,7 @@ import type {
 export type VaultItemFieldInput = Partial<VaultItemField> & {
   kind: VaultItemFieldKind;
   value?: string | null;
+  children?: readonly VaultItemFieldInput[];
 };
 
 export type VaultItemInput = Omit<
@@ -33,6 +34,8 @@ const DEFAULT_FIELD_LABELS: Record<VaultItemFieldKind, string> = {
   email: "Email",
   phone: "Phone",
   text: "Text",
+  group: "Group",
+  date: "Date",
   secret: "Secret",
   note: "Note",
   cardholder: "Cardholder",
@@ -79,7 +82,7 @@ export function normalizeItemFields(fields: readonly VaultItemFieldInput[]): Vau
 
   return fields
     .map((field, index) => normalizeItemField(field, index, seenIds))
-    .filter((field) => field.value.length > 0);
+    .filter((field) => field.value.length > 0 || hasChildFields(field));
 }
 
 export function normalizeItemField(
@@ -93,14 +96,18 @@ export function normalizeItemField(
   );
   const label = normalizeSingleLineText(field.label) || DEFAULT_FIELD_LABELS[field.kind];
   const rawValue = normalizeFieldValue(field.kind, field.value);
+  const children =
+    field.kind === "group" ? normalizeItemFields(field.children ?? []) : [];
 
-  return {
+  const normalized: VaultItemField = {
     id,
     kind: field.kind,
     label,
-    value: rawValue,
+    value: field.kind === "group" ? "" : rawValue,
     sensitive: field.sensitive ?? SENSITIVE_FIELD_KINDS.has(field.kind)
   };
+  if (children.length > 0) normalized.children = children;
+  return normalized;
 }
 
 export function normalizeTags(tags: readonly (string | null | undefined)[]): string[] {
@@ -191,4 +198,8 @@ function ensureUniqueId(candidate: LockPassId, seenIds: Set<LockPassId>): LockPa
 
   seenIds.add(id);
   return id;
+}
+
+function hasChildFields(field: VaultItemField): boolean {
+  return (field.children?.length ?? 0) > 0;
 }

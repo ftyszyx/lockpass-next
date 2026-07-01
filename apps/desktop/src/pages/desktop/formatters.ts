@@ -52,6 +52,8 @@ export function fieldLabel(
     email: t("fields.email"),
     phone: t("fields.phone"),
     text: t("fields.text"),
+    group: t("fields.group"),
+    date: t("fields.date"),
     secret: t("fields.secret"),
     note: t("fields.note"),
     cardholder: t("fields.cardholder"),
@@ -60,7 +62,14 @@ export function fieldLabel(
     cvv: t("fields.cvv"),
     "recovery-code": t("fields.recoveryCode"),
   };
-  return labels[kind] || fallback;
+  return fallback || labels[kind];
+}
+
+export function fieldDisplayLabel(
+  t: Translate,
+  field: VaultItemField,
+): string {
+  return field.label || fieldLabel(t, field.kind);
 }
 
 export function itemIconText(item: VaultItem): string {
@@ -88,7 +97,9 @@ export function detailFields(t: Translate, item: VaultItem): VaultItemField[] {
   }));
   return [
     ...urlFields,
-    ...item.fields.filter((field) => field.kind !== "note"),
+    ...item.fields.filter(
+      (field) => field.kind !== "note" || (field.children?.length ?? 0) > 0,
+    ),
   ];
 }
 

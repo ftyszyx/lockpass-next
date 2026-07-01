@@ -50,6 +50,8 @@ export type VaultItemFieldKind =
   | "email"
   | "phone"
   | "text"
+  | "group"
+  | "date"
   | "secret"
   | "note"
   | "cardholder"
@@ -64,6 +66,8 @@ export interface VaultItemField {
   label: string;
   value: string;
   sensitive: boolean;
+  children?: VaultItemField[];
+  collapsed?: boolean;
 }
 
 export interface VaultItem {

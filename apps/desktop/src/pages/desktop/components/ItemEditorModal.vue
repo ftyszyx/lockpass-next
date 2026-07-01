@@ -2,6 +2,7 @@
 import {
   ArrowLeft,
   ArrowRight,
+  ChevronDown,
   CreditCard,
   GripVertical,
   Image,
@@ -16,21 +17,23 @@ import {
   CircleMinus,
 } from "@lucide/vue";
 import type { VaultItemField, VaultItemFieldKind, VaultItemType } from "@lockpass/core";
-import { computed, onBeforeUnmount, reactive } from "vue";
+import { computed, onBeforeUnmount, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { loadAttachmentFile } from "@/services/vaultRepository";
 import {
   attachmentIcon,
   attachmentKind,
-  fieldLabel,
+  fieldDisplayLabel,
   formatFileSize,
   isImageAttachment,
   typeLabel,
 } from "../formatters";
-import { editorTypes, type ItemDraft } from "../types";
+import { editorTypes, type AddMoreItemKind, type ItemDraft } from "../types";
 import {
   getAddMoreMenuItems,
   isCardContactDraftField,
+  isOptionalDraftField,
+  isUserEditableDraftField,
 } from "../itemDrafts";
 import AddMoreMenu from "./AddMoreMenu.vue";
 import ImagePreviewModal from "./ImagePreviewModal.vue";
@@ -55,18 +58,28 @@ const emit = defineEmits<{
   removeAttachment: [id: string];
   removeAttachmentBlock: [id: string];
   removeField: [id: string];
+  moveField: [
+    draggedId: string,
+    targetId: string,
+    placement: "before" | "after",
+  ];
+  toggleGroup: [id: string];
   generateField: [field: VaultItemField];
   addWebsite: [];
-  addExtra: [kind: "totp" | "note" | "attachment"];
+  addExtra: [kind: AddMoreItemKind];
 }>();
 
 const { t } = useI18n();
-const loginFields = computed(() => props.draft.fields.filter((field) => ["url", "username", "password", "totp"].includes(field.kind)));
-const websiteFields = computed(() => loginFields.value.filter((field) => field.kind === "url"));
-const loginCredentialFields = computed(() => loginFields.value.filter((field) => field.kind !== "url"));
-const cardCoreFields = computed(() => props.draft.fields.filter((field) => ["cardholder", "card-number", "expiry", "cvv", "secret"].includes(field.kind)));
+const FIELD_DRAG_MIME = "application/x-lockpass-field-id";
+const websiteFields = computed(() => props.draft.fields.filter((field) => field.kind === "url"));
 const cardContactFields = computed(() => props.draft.fields.filter(isCardContactDraftField));
-const extraNoteFields = computed(() => props.draft.fields.filter((field) => field.kind === "note"));
+const mainFields = computed(() =>
+  props.draft.fields.filter((field) => {
+    if (props.draft.type === "login" && field.kind === "url") return false;
+    if (props.draft.type === "payment-card" && isCardContactDraftField(field)) return false;
+    return true;
+  }),
+);
 const addMoreItems = computed(() => getAddMoreMenuItems(t, props.draft.type));
 const preview = reactive({
   visible: false,
@@ -75,10 +88,13 @@ const preview = reactive({
   fileName: "",
   url: "",
 });
+const draggingFieldId = ref<string | null>(null);
 
-function isRequiredField(kind: VaultItemFieldKind): boolean {
-  if (props.draft.type === "login") return kind === "password";
-  if (props.draft.type === "payment-card") return kind === "card-number";
+function isRequiredField(field: VaultItemField): boolean {
+  if (props.draft.type === "login") {
+    return field.kind === "password" && !isOptionalDraftField(field);
+  }
+  if (props.draft.type === "payment-card") return field.kind === "card-number";
   return false;
 }
 
@@ -92,8 +108,84 @@ function itemTypeIcon(type: VaultItemType) {
   return KeyRound;
 }
 
-function fieldDisplayLabel(field: VaultItemField): string {
-  return isCardContactDraftField(field) ? field.label : fieldLabel(t, field.kind, field.label);
+function draftFieldLabel(field: VaultItemField): string {
+  return fieldDisplayLabel(t, field);
+}
+
+function canRemoveField(field: VaultItemField): boolean {
+  return field.kind === "group" || isOptionalDraftField(field) || field.kind === "totp";
+}
+
+function canMoveField(field: VaultItemField): boolean {
+  if (field.kind === "group") return true;
+  if (props.draft.type === "login" && field.kind === "url") {
+    return websiteFields.value.length > 1;
+  }
+  return isUserEditableDraftField(field);
+}
+
+function isGroupField(field: VaultItemField): boolean {
+  return field.kind === "group";
+}
+
+function groupChildren(field: VaultItemField): VaultItemField[] {
+  return field.children ?? [];
+}
+
+function fieldLabelEditable(field: VaultItemField): boolean {
+  return isGroupField(field) || isUserEditableDraftField(field);
+}
+
+function fieldDragClasses(field: VaultItemField): Record<string, boolean> {
+  const isDragging = draggingFieldId.value === field.id;
+  const isDropTarget = Boolean(
+    draggingFieldId.value &&
+      draggingFieldId.value !== field.id &&
+      canMoveField(field),
+  );
+  return {
+    "opacity-50": isDragging,
+    "ring-2 ring-sky-200 bg-white": isDropTarget,
+  };
+}
+
+function startFieldDrag(field: VaultItemField, event: DragEvent): void {
+  if (!canMoveField(field)) return;
+  draggingFieldId.value = field.id;
+  event.dataTransfer?.setData(FIELD_DRAG_MIME, field.id);
+  event.dataTransfer?.setData("text/plain", field.id);
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+}
+
+function dragFieldOver(field: VaultItemField, event: DragEvent): void {
+  if (!canMoveField(field) || draggingFieldId.value === field.id) return;
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+}
+
+function dropFieldOn(field: VaultItemField, event: DragEvent): void {
+  if (!canMoveField(field)) return;
+
+  event.preventDefault();
+  const draggedId =
+    draggingFieldId.value ?? event.dataTransfer?.getData(FIELD_DRAG_MIME);
+  const placement = fieldDropPlacement(event);
+  draggingFieldId.value = null;
+
+  if (!draggedId || draggedId === field.id) return;
+  emit("moveField", draggedId, field.id, placement);
+}
+
+function endFieldDrag(): void {
+  draggingFieldId.value = null;
+}
+
+function fieldDropPlacement(event: DragEvent): "before" | "after" {
+  const target = event.currentTarget;
+  if (!(target instanceof HTMLElement)) return "before";
+
+  const rect = target.getBoundingClientRect();
+  return event.clientY > rect.top + rect.height / 2 ? "after" : "before";
 }
 
 async function previewImage(attachment: ItemDraft["attachments"][number]): Promise<void> {
@@ -193,9 +285,22 @@ onBeforeUnmount(revokePreviewUrl);
                 <div
                   v-for="(field, index) in websiteFields"
                   :key="field.id"
-                  class="grid grid-cols-[24px_minmax(0,1fr)_34px] items-center gap-2 rounded-lg bg-slate-100 p-2"
+                  class="grid grid-cols-[24px_minmax(0,1fr)_34px] items-center gap-2 rounded-lg bg-slate-100 p-2 transition"
+                  :class="fieldDragClasses(field)"
+                  @dragover="dragFieldOver(field, $event)"
+                  @drop="dropFieldOn(field, $event)"
                 >
-                  <GripVertical class="size-4 text-slate-500" />
+                  <button
+                    class="grid size-6 cursor-grab place-items-center rounded-md text-slate-500 hover:bg-white active:cursor-grabbing"
+                    type="button"
+                    draggable="true"
+                    :title="t('editor.dragField')"
+                    :aria-label="t('editor.dragField')"
+                    @dragstart="startFieldDrag(field, $event)"
+                    @dragend="endFieldDrag"
+                  >
+                    <GripVertical class="size-4" />
+                  </button>
                   <label class="grid gap-1">
                     <span class="text-xs font-bold text-slate-500">{{ index === 0 ? t("fields.url") : t("editor.website") }}</span>
                     <input v-model="field.value" class="border-0 bg-transparent text-sm outline-none" :placeholder="t('editor.websitePlaceholder')" />
@@ -211,27 +316,114 @@ onBeforeUnmount(revokePreviewUrl);
               </div>
             </template>
 
-            <template v-for="field in draft.type === 'payment-card' ? cardCoreFields : loginCredentialFields" :key="field.id">
-              <label class="form-label">
-                <span class="flex items-center justify-between gap-3">
-                  <span>
-                    {{ fieldDisplayLabel(field) }}
-                    <span v-if="isRequiredField(field.kind)" class="required-mark" :title="t('editor.required')">*</span>
-                  </span>
-                  <button v-if="field.kind === 'totp'" class="text-xs font-semibold text-slate-500 hover:text-rose-600" type="button" @click="emit('removeField', field.id)">
-                    {{ t("editor.removeOptionalField") }}
-                  </button>
-                </span>
-                <div v-if="isGeneratedField(field.kind)" class="grid grid-cols-[1fr_auto] gap-2">
-                  <input v-model="field.value" class="form-input" />
-                  <button class="plain-button" type="button" @click="emit('generateField', field)">
-                    <WandSparkles class="size-4" />
-                    {{ t("editor.generate") }}
-                  </button>
-                </div>
-                <input v-else-if="field.kind === 'totp'" v-model="field.value" class="form-input" autocomplete="off" :placeholder="t('editor.totpPlaceholder')" />
-                <input v-else v-model="field.value" class="form-input" />
-              </label>
+            <template v-for="field in mainFields" :key="field.id">
+              <div
+                class="grid gap-2 rounded-lg transition"
+                :class="fieldDragClasses(field)"
+                @dragover="dragFieldOver(field, $event)"
+                @drop="dropFieldOn(field, $event)"
+              >
+                <template v-if="isGroupField(field)">
+                  <div class="overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+                    <div class="grid min-h-11 grid-cols-[24px_28px_minmax(0,1fr)_34px] items-center gap-2 border-b border-slate-200 p-2">
+                      <button
+                        class="grid size-6 cursor-grab place-items-center rounded-md text-slate-500 hover:bg-white active:cursor-grabbing"
+                        type="button"
+                        draggable="true"
+                        :title="t('editor.dragField')"
+                        :aria-label="t('editor.dragField')"
+                        @dragstart="startFieldDrag(field, $event)"
+                        @dragend="endFieldDrag"
+                      >
+                        <GripVertical class="size-4" />
+                      </button>
+                      <button
+                        class="grid size-7 place-items-center rounded-md text-slate-500 hover:bg-white"
+                        type="button"
+                        :title="field.collapsed ? t('editor.expandGroup') : t('editor.collapseGroup')"
+                        :aria-label="field.collapsed ? t('editor.expandGroup') : t('editor.collapseGroup')"
+                        @click="emit('toggleGroup', field.id)"
+                      >
+                        <ChevronDown class="size-4 transition" :class="{ '-rotate-90': field.collapsed }" />
+                      </button>
+                      <input
+                        v-model="field.label"
+                        class="min-w-0 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-sm font-bold text-slate-700 outline-none hover:border-slate-200 focus:border-sky-300 focus:bg-white"
+                        :placeholder="t('fields.group')"
+                      />
+                      <button class="icon-button text-rose-600" type="button" @click="emit('removeField', field.id)">
+                        <CircleMinus class="size-4" />
+                      </button>
+                    </div>
+                    <div v-if="!field.collapsed" class="grid gap-3 p-3">
+                      <label
+                        v-for="child in groupChildren(field)"
+                        :key="child.id"
+                        class="grid gap-2 text-xs font-bold text-slate-500"
+                      >
+                        <input
+                          v-model="child.label"
+                          class="min-w-0 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-sm font-bold text-slate-700 outline-none hover:border-slate-200 focus:border-sky-300 focus:bg-white"
+                          :placeholder="draftFieldLabel(child)"
+                        />
+                        <div v-if="isGeneratedField(child.kind)" class="grid grid-cols-[1fr_auto] gap-2">
+                          <input v-model="child.value" class="form-input" />
+                          <button class="plain-button" type="button" @click="emit('generateField', child)">
+                            <WandSparkles class="size-4" />
+                            {{ t("editor.generate") }}
+                          </button>
+                        </div>
+                        <input v-else-if="child.kind === 'date'" v-model="child.value" class="form-input" type="date" />
+                        <input v-else-if="child.kind === 'totp'" v-model="child.value" class="form-input" autocomplete="off" :placeholder="t('editor.totpPlaceholder')" />
+                        <textarea v-else-if="child.kind === 'note'" v-model="child.value" class="form-input min-h-20"></textarea>
+                        <input v-else v-model="child.value" class="form-input" />
+                      </label>
+                    </div>
+                  </div>
+                </template>
+                <template v-else>
+                  <div class="grid grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-2 text-xs font-bold text-slate-500">
+                    <button
+                      v-if="canMoveField(field)"
+                      class="grid size-6 cursor-grab place-items-center rounded-md text-slate-500 hover:bg-white active:cursor-grabbing"
+                      type="button"
+                      draggable="true"
+                      :title="t('editor.dragField')"
+                      :aria-label="t('editor.dragField')"
+                      @dragstart="startFieldDrag(field, $event)"
+                      @dragend="endFieldDrag"
+                    >
+                      <GripVertical class="size-4" />
+                    </button>
+                    <span v-else></span>
+                    <span v-if="!fieldLabelEditable(field)">
+                      {{ draftFieldLabel(field) }}
+                      <span v-if="isRequiredField(field)" class="required-mark" :title="t('editor.required')">*</span>
+                    </span>
+                    <input
+                      v-else
+                      v-model="field.label"
+                      class="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-sm font-bold text-slate-700 outline-none hover:border-slate-200 focus:border-sky-300 focus:bg-white"
+                      :placeholder="draftFieldLabel(field)"
+                    />
+                    <button v-if="canRemoveField(field)" class="text-xs font-semibold text-slate-500 hover:text-rose-600" type="button" @click="emit('removeField', field.id)">
+                      {{ t("editor.removeOptionalField") }}
+                    </button>
+                    <span v-else></span>
+                  </div>
+                  <div v-if="isGeneratedField(field.kind)" class="grid grid-cols-[1fr_auto] gap-2">
+                    <input v-model="field.value" class="form-input" />
+                    <button class="plain-button" type="button" @click="emit('generateField', field)">
+                      <WandSparkles class="size-4" />
+                      {{ t("editor.generate") }}
+                    </button>
+                  </div>
+                  <input v-else-if="field.kind === 'date'" v-model="field.value" class="form-input" type="date" />
+                  <input v-else-if="field.kind === 'totp'" v-model="field.value" class="form-input" autocomplete="off" :placeholder="t('editor.totpPlaceholder')" />
+                  <textarea v-else-if="field.kind === 'note'" v-model="field.value" class="form-input min-h-20"></textarea>
+                  <input v-else v-model="field.value" class="form-input" />
+                </template>
+              </div>
             </template>
 
             <div v-if="draft.type === 'payment-card' && cardContactFields.length" class="form-label">
@@ -240,11 +432,28 @@ onBeforeUnmount(revokePreviewUrl);
                 <div
                   v-for="field in cardContactFields"
                   :key="field.id"
-                  class="grid min-h-14 grid-cols-[24px_minmax(0,1fr)_34px] items-center gap-2 border-b border-slate-200 p-2 last:border-b-0"
+                  class="grid min-h-14 grid-cols-[24px_minmax(0,1fr)_34px] items-center gap-2 border-b border-slate-200 p-2 transition last:border-b-0"
+                  :class="fieldDragClasses(field)"
+                  @dragover="dragFieldOver(field, $event)"
+                  @drop="dropFieldOn(field, $event)"
                 >
-                  <GripVertical class="size-4 text-slate-600" />
+                  <button
+                    class="grid size-6 cursor-grab place-items-center rounded-md text-slate-600 hover:bg-white active:cursor-grabbing"
+                    type="button"
+                    draggable="true"
+                    :title="t('editor.dragField')"
+                    :aria-label="t('editor.dragField')"
+                    @dragstart="startFieldDrag(field, $event)"
+                    @dragend="endFieldDrag"
+                  >
+                    <GripVertical class="size-4" />
+                  </button>
                   <label class="grid gap-0.5">
-                    <span class="text-sm font-bold text-slate-700">{{ fieldDisplayLabel(field) }}</span>
+                    <input
+                      v-model="field.label"
+                      class="rounded-md border border-transparent bg-transparent px-1 py-0.5 text-sm font-bold text-slate-700 outline-none hover:border-slate-200 focus:border-sky-300 focus:bg-white"
+                      :placeholder="draftFieldLabel(field)"
+                    />
                     <input v-model="field.value" class="border-0 bg-transparent text-sm outline-none" :placeholder="t('fields.text')" />
                   </label>
                   <button class="icon-button text-rose-600" type="button" @click="emit('removeField', field.id)">
@@ -262,16 +471,6 @@ onBeforeUnmount(revokePreviewUrl);
                 </span>
               </span>
               <textarea v-model="draft.notes" class="form-input min-h-20"></textarea>
-            </label>
-
-            <label v-for="field in extraNoteFields" :key="field.id" class="form-label">
-              <span class="flex items-center justify-between gap-3">
-                <span>{{ t("editor.notes") }}</span>
-                <button class="text-xs font-semibold text-slate-500 hover:text-rose-600" type="button" @click="emit('removeField', field.id)">
-                  {{ t("editor.removeOptionalField") }}
-                </button>
-              </span>
-              <textarea v-model="field.value" class="form-input min-h-20"></textarea>
             </label>
 
             <div v-for="block in draft.attachmentBlocks" :key="block.id" class="grid gap-2">

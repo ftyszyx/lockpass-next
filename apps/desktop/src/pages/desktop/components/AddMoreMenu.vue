@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ChevronDown, Plus } from "@lucide/vue";
-import { ref } from "vue";
+import { onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { isEventOutsideElement } from "../domEvents";
 import type { AddMoreItemKind, AddMoreMenuItem } from "../types";
 
 defineProps<{
@@ -14,15 +15,29 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const open = ref(false);
+const menuRoot = ref<HTMLElement | null>(null);
 
 function select(kind: AddMoreItemKind): void {
   open.value = false;
   emit("select", kind);
 }
+
+function onDocumentPointerDown(event: PointerEvent): void {
+  if (isEventOutsideElement(event, menuRoot.value)) {
+    open.value = false;
+  }
+}
+
+onMounted(() =>
+  document.addEventListener("pointerdown", onDocumentPointerDown, true),
+);
+onBeforeUnmount(() =>
+  document.removeEventListener("pointerdown", onDocumentPointerDown, true),
+);
 </script>
 
 <template>
-  <div class="relative justify-self-start">
+  <div ref="menuRoot" class="relative justify-self-start">
     <button
       class="inline-flex h-9 items-center gap-2 rounded-lg bg-slate-200 px-3 text-sm font-bold text-sky-700 hover:bg-slate-300/70"
       type="button"

@@ -1,96 +1,46 @@
 <script setup lang="ts">
-import {
-  generatePassword,
-  type VaultItem,
-  type VaultItemField,
-  type VaultItemType,
-} from "@lockpass/core";
-import { RefreshCw, TriangleAlert } from "@lucide/vue";
+import { type VaultItem } from "@lockpass/core";
 import { storeToRefs } from "pinia";
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, provide, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { setI18nLocale, type SupportedLocale } from "@/i18n";
-import {
-  assertBackupPackage,
-  backupFileName,
-  csvFileName,
-  downloadTextFile,
-  openSavedFileDirectory,
-  parseCsvImport,
-  readLegacyLockPassBackup,
-  type ExternalImportItem,
-  type ExternalImportVault,
-  type ImportFieldLabelMap,
-  type TextFileSaveResult,
-} from "@/services/backup";
 import {
   startDeepLinkListener,
   subscribeToDeepLinks,
 } from "@/services/deepLink";
 import { openLogDir } from "@/services/logger";
-import { generateRecoveryKey } from "@/services/masterPassword";
 import { createPerfTrace } from "@/services/perfTrace";
-import { isUserWebRuntime } from "@/services/runtime";
 import type { SyncMode } from "@/services/syncClient";
 import { shortcutMatchesEvent } from "@/services/shortcuts";
 import {
   openExternalUrl,
-  saveAttachmentFile,
   type DesktopLogLevel,
   type DesktopSecuritySettings,
   type ShortcutAction,
   type ShortcutScope,
 } from "@/services/vaultRepository";
-import { loadWebDeviceBinding } from "@/services/webDeviceBinding";
 import {
   useVaultStore,
-  type PendingSyncDeviceBindExchange,
 } from "@/stores/vault";
-import BackupSavedModal from "./components/BackupSavedModal.vue";
-import DeleteVaultConfirmModal from "./components/DeleteVaultConfirmModal.vue";
-import DesktopDrawer from "./components/DesktopDrawer.vue";
 import DesktopHeader from "./components/DesktopHeader.vue";
-import ItemDetailPane from "./components/ItemDetailPane.vue";
-import ItemEditorModal from "./components/ItemEditorModal.vue";
-import ItemListPane from "./components/ItemListPane.vue";
-import LockOverlay from "./components/LockOverlay.vue";
-import ManagementPage from "./components/ManagementPage.vue";
-import ProgressModal from "./components/ProgressModal.vue";
-import QuickSearchModal from "./components/QuickSearchModal.vue";
-import RemoveUserModal from "./components/RemoveUserModal.vue";
-import RecoveryKeyModal from "./components/RecoveryKeyModal.vue";
-import ResizeHandle from "./components/ResizeHandle.vue";
-import SwitchUserConfirmModal from "./components/SwitchUserConfirmModal.vue";
-import ToastNotice from "./components/ToastNotice.vue";
-import UserManagementModal from "./components/UserManagementModal.vue";
-import UserSetupModal from "./components/UserSetupModal.vue";
-import VaultModal from "./components/VaultModal.vue";
-import VaultSidebar from "./components/VaultSidebar.vue";
-import {
-  detailFields,
-  getInitials,
-} from "./formatters";
-import {
-  appendExtraDraftField,
-  buildDefaultDraftFields,
-  flattenAttachmentDraftBlocks,
-  makeAttachmentDraftBlock,
-  makeDraftField,
-  normalizeDraftFieldsForSave,
-} from "./itemDrafts";
+import DesktopStartupState from "./components/DesktopStartupState.vue";
+import DesktopVaultModalLayer from "./components/DesktopVaultModalLayer.vue";
+import DesktopVaultWorkspace from "./components/DesktopVaultWorkspace.vue";
+import { desktopPageContextKey } from "./desktopPageContext";
+import { getInitials } from "./formatters";
 import type {
   DetailTab,
   DrawerName,
-  ItemDraft,
   ManagementPageName,
   ModalName,
   OperationProgressState,
-  PasswordOptions,
   ToastState,
-  UserDraft,
   VaultDraft,
 } from "./types";
+import { useBackupActions } from "./useBackupActions";
 import { useColumnResize } from "./useColumnResize";
+import { useItemEditor } from "./useItemEditor";
+import { useUserSessionFlow } from "./useUserSessionFlow";
 
 const { t } = useI18n();
 const vaultStore = useVaultStore();
@@ -103,42 +53,25 @@ const {
   writableVaults,
 } = storeToRefs(vaultStore);
 
-const mainGrid = ref<HTMLElement | null>(null);
+const workspaceRef = ref<InstanceType<typeof DesktopVaultWorkspace> | null>(
+  null,
+);
+const mainGrid = computed(
+  () => workspaceRef.value?.mainGridElement ?? null,
+);
 const activeTab = ref<DetailTab>("details");
 const showSensitive = ref(false);
 const activeDrawer = ref<DrawerName>(null);
 const activeManagementPage = ref<ManagementPageName | null>(null);
 const activeModal = ref<ModalName>(null);
-const pickingItemType = ref(false);
-const returnToUserManagementAfterSetup = ref(false);
-const editingItemId = ref<string | null>(null);
-const passwordTargetFieldId = ref<string | null>(null);
 const quickQuery = ref("");
-const uploadingFiles = ref(false);
-const itemError = ref("");
-const authError = ref("");
-const unlockPassword = ref("");
-const unlockRecoveryKey = ref("");
-const unlockingVault = ref(false);
-const creatingUser = ref(false);
-const generatedRecoveryKey = ref("");
-const recoveryUserName = ref("");
-const userSetupInitialMode = ref<"choice" | "new" | "restore">("choice");
-const setupServerMode = ref<SyncMode>("official");
-const setupServerUrl = ref(vaultStore.settings.sync.serverUrl);
-const setupServerBusy = ref(false);
-const pendingServerExchange = ref<PendingSyncDeviceBindExchange | null>(null);
 const revealedRecoveryKey = ref("");
 const revealError = ref("");
 const revealRecoveryKeyIssue = ref<"missing" | "unsupported" | "">("");
 const savingRecoveryKeyToDevice = ref(false);
-const signingOutCurrentUser = ref(false);
-const pendingSwitchUserId = ref<string | null>(null);
 const pendingDeleteVaultId = ref<string | null>(null);
 const deletingVault = ref(false);
 const sensitiveViewKey = ref(0);
-const backupBusy = ref(false);
-const savedBackupResult = ref<TextFileSaveResult | null>(null);
 const initializing = ref(true);
 const isOnline = ref(typeof navigator === "undefined" ? true : navigator.onLine);
 let clipboardCleanupTimer: number | null = null;
@@ -148,45 +81,19 @@ let deepLinkListenerStop: (() => void) | null = null;
 let autoLockTimer: number | null = null;
 let autoSyncTimer: number | null = null;
 
-const passwordOptions = reactive<PasswordOptions>({
-  length: 18,
-  lowercase: true,
-  uppercase: true,
-  numbers: true,
-  symbols: true,
-  avoidAmbiguous: false,
-});
-
-const generatedPassword = ref(generatePassword(passwordOptions));
 const toast = reactive<ToastState>({ visible: false, message: "" });
-const operationProgress = reactive<OperationProgressState>({
+const operationProgress = reactive({
   visible: false,
   title: "",
   body: "",
 });
 let operationProgressToken = 0;
 
-const itemDraft = reactive<ItemDraft>({
-  type: "login",
-  vaultId: "",
-  title: "",
-  notes: "",
-  fields: [],
-  attachments: [],
-  attachmentBlocks: [],
-});
-
 const vaultDraft = reactive<VaultDraft>({
   name: "",
   description: "",
   color: "slate",
   icon: "folder-lock",
-});
-
-const userDraft = reactive<UserDraft>({
-  username: "",
-  password: "",
-  confirmPassword: "",
 });
 
 const {
@@ -198,9 +105,6 @@ const {
 
 const activeUserName = computed(() => vaultStore.activeUser?.displayName ?? "");
 const activeUserInitials = computed(() => getInitials(activeUserName.value));
-const hasLegacyImport = computed(
-  () => Object.keys(vaultStore.legacyPayloads).length > 0,
-);
 const pendingDeleteVault = computed(
   () =>
     vaultStore.vaults.find(
@@ -212,26 +116,6 @@ const pendingDeleteVaultItemCount = computed(() =>
     ? vaultStore.vaultCount(pendingDeleteVaultId.value)
     : 0,
 );
-const pendingSwitchUserName = computed(() => {
-  return (
-    vaultStore.users.find((user) => user.id === pendingSwitchUserId.value)
-      ?.displayName ?? ""
-  );
-});
-const setupRequiresServerLogin = computed(() => {
-  return (
-    vaultStore.hydrated &&
-    (vaultStore.needsUserSetup || activeModal.value === "user") &&
-    !pendingServerExchange.value &&
-    !generatedRecoveryKey.value
-  );
-});
-const setupServerAccountFlow = computed(
-  () => setupRequiresServerLogin.value || Boolean(pendingServerExchange.value),
-);
-const setupServerConnected = computed(
-  () => Boolean(pendingServerExchange.value) || !setupRequiresServerLogin.value,
-);
 const connectionStatus = computed(() => {
   if (!isOnline.value) return "offline";
   if (
@@ -242,10 +126,283 @@ const connectionStatus = computed(() => {
   }
   return "online";
 });
-const setupServerAccountLabel = computed(() => {
-  const exchange = pendingServerExchange.value;
-  return exchange?.account.email ?? exchange?.account.displayName ?? "";
+const {
+  addDraftExtra,
+  addWebsiteField,
+  backToItemTypePicker,
+  clearPasswordTarget,
+  editingItemId,
+  generatedPassword,
+  itemDraft,
+  itemError,
+  moveDraftField,
+  onFilesSelected,
+  openEditItem,
+  openNewItem,
+  openPasswordGenerator,
+  openStandalonePasswordGenerator,
+  passwordOptions,
+  passwordTargetFieldId,
+  pickingItemType,
+  regeneratePassword,
+  removeDraftAttachment,
+  removeDraftAttachmentBlock,
+  removeDraftField,
+  resetItemDraft,
+  saveItem,
+  startNewItem,
+  uploadingFiles,
+  useGeneratedPassword,
+} = useItemEditor({
+  activeDrawer,
+  activeModal,
+  selectedItem,
+  selectedItemAttachments,
+  showToast,
+  t,
+  vaultStore,
+  writableVaults,
 });
+
+const {
+  applyPendingServerExchange,
+  applyWebDeviceBindingIfAvailable,
+  authError,
+  backToUserDraftFromRecoveryKey,
+  closeSwitchUserConfirm,
+  closeUserSetup,
+  confirmSwitchUser,
+  createNewUserFromLock,
+  createUser,
+  creatingUser,
+  generatedRecoveryKey,
+  hasLegacyImport,
+  openAddUserFromManagement,
+  openUserManagement,
+  pendingServerExchange,
+  pendingSwitchUserName,
+  prepareUserRecoveryKey,
+  recoveryUserName,
+  requestSwitchUser,
+  resetUserDraft,
+  restoreExistingServerAccount,
+  setupServerAccountFlow,
+  setupServerAccountLabel,
+  setupServerBusy,
+  setupServerConnected,
+  setupServerMode,
+  setupServerUrl,
+  showUnavailableRecoveryQr,
+  signOutCurrentUser,
+  signingOutCurrentUser,
+  switchUser,
+  unlockPassword,
+  unlockRecoveryKey,
+  unlockingVault,
+  updateSetupServerMode,
+  updateSetupServerUrl,
+  userDraft,
+  userSetupInitialMode,
+} = useUserSessionFlow({
+  activeDrawer,
+  activeModal,
+  clearPendingClipboard,
+  clearSensitiveUiState,
+  promptServerSignInIfNeeded,
+  scheduleAutoSync,
+  showToast,
+  syncErrorToast,
+  t,
+  vaultStore,
+});
+
+const {
+  backupBusy,
+  copySavedBackupPath,
+  createBackup,
+  exportCsv,
+  importCsv,
+  importLegacyBackup,
+  openSavedBackupDirectory,
+  restoreBackup,
+  savedBackupResult,
+} = useBackupActions({
+  copyValue,
+  lockAfterRestore: () => {
+    activeManagementPage.value = null;
+    activeModal.value = "lock";
+  },
+  runWithOperationProgress,
+  showToast,
+  t,
+  vaultStore,
+});
+
+provide(
+  desktopPageContextKey,
+  reactive({
+    activeDrawer,
+    activeKeyId: computed(() => vaultStore.activeKeyId),
+    activeManagementPage,
+    activeModal,
+    activeTab,
+    activeUserInitials,
+    activeUserName,
+    authError,
+    backupBusy,
+    canUseGeneratedPassword: computed(() => passwordTargetFieldId.value !== null),
+    connectionStatus,
+    creatingUser,
+    deletingVault,
+    editingItemId,
+    filteredItems,
+    generatedPassword,
+    generatedRecoveryKey,
+    hasLegacyImport,
+    itemDraft,
+    itemError,
+    keyId: computed(() => vaultStore.activeKeyId),
+    mainGridStyle,
+    operationProgress,
+    passwordOptions,
+    pendingDeleteVault,
+    pendingDeleteVaultItemCount,
+    pendingSwitchUserName,
+    pickingItemType,
+    quickQuery,
+    recoveryUserName,
+    revealError,
+    revealedRecoveryKey,
+    revealRecoveryKeyIssue,
+    resizingTarget,
+    savedBackupResult,
+    savingRecoveryKeyToDevice,
+    selectedItem,
+    selectedItemAttachments,
+    sensitiveViewKey,
+    serverAccountLabel: setupServerAccountLabel,
+    serverBusy: setupServerBusy,
+    serverConnected: setupServerConnected,
+    serverFirst: setupServerAccountFlow,
+    serverMode: setupServerMode,
+    serverUrl: setupServerUrl,
+    showSensitive,
+    signingOutCurrentUser,
+    toast,
+    unlockingVault,
+    unlockPassword,
+    unlockRecoveryKey,
+    uploadingFiles,
+    userDraft,
+    userSetupInitialMode,
+    vaultDraft,
+    vaultHasUsers: computed(() => vaultStore.hasUsers),
+    vaultHydrated: computed(() => vaultStore.hydrated),
+    vaultKey: computed(() => vaultStore.vaultKey),
+    vaultNeedsUserSetup: computed(() => vaultStore.needsUserSetup),
+    vaultStore,
+    vaultUnlocked: computed(() => vaultStore.unlocked),
+    visibleAttachments,
+    visibleItems,
+    visibleItemsCount: computed(() => visibleItems.value.length),
+    addDraftExtra,
+    addWebsiteField,
+    backToItemTypePicker,
+    backToUserDraftFromRecoveryKey,
+    changeLocale,
+    changeLogLevel,
+    changeSecuritySettings,
+    changeShortcut,
+    clearAuthError: () => {
+      authError.value = "";
+    },
+    closeActiveModal: () => {
+      activeModal.value = null;
+    },
+    closeDrawer,
+    closeManagement: () => {
+      activeManagementPage.value = null;
+    },
+    closeRecoveryKeyModal,
+    closeSavedBackup: () => {
+      savedBackupResult.value = null;
+    },
+    closeSwitchUserConfirm,
+    confirmDeleteVault,
+    confirmSwitchUser,
+    copySavedBackupPath,
+    copyValue,
+    createBackup,
+    createNewUserFromLock,
+    createUser,
+    exportCsv,
+    hideOperationProgress,
+    importCsv,
+    importLegacyBackup,
+    lockApp,
+    moveDraftField,
+    notReady: () => showToast(t("toast.notReady")),
+    onFilesSelected,
+    onResizeHandleKeydown,
+    openDesktopLogDir,
+    openEditItem,
+    openImportFromItemPicker,
+    openInitialServerLogin,
+    openManagement,
+    openNewItem,
+    openNewVault,
+    openPasswordGenerator,
+    openQuickSearch,
+    openRecoveryKeyModal,
+    openSavedBackupDirectory,
+    openSignOutCurrentUserModal,
+    prepareUserRecoveryKey,
+    regeneratePassword,
+    removeDraftAttachment,
+    removeDraftAttachmentBlock,
+    removeDraftField,
+    requestDeleteVault,
+    requestSwitchUser,
+    resetShortcuts,
+    restoreBackup,
+    restoreExistingServerAccount,
+    saveItem,
+    saveRecoveryKeyToDevice,
+    saveVault,
+    securityChecked: () => showToast(t("toast.securityChecked")),
+    selectItem,
+    selectQuickResult,
+    showOperationProgress,
+    showToast,
+    showUnavailableRecoveryQr,
+    signOutCurrentUser,
+    startColumnResize,
+    startNewItem,
+    updateActiveTab: (tab: DetailTab) => {
+      activeTab.value = tab;
+    },
+    updateManagementPage: (page: ManagementPageName) => {
+      activeManagementPage.value = page;
+    },
+    updateQuickQuery: (query: string) => {
+      quickQuery.value = query;
+    },
+    updateSetupServerMode,
+    updateSetupServerUrl,
+    updateShowSensitive: (show: boolean) => {
+      showSensitive.value = show;
+    },
+    updateUnlockPassword: (value: string) => {
+      unlockPassword.value = value;
+    },
+    updateUnlockRecoveryKey: (value: string) => {
+      unlockRecoveryKey.value = value;
+    },
+    unlockApp,
+    useGeneratedPassword,
+    useSavedRecoveryKey,
+  }),
+);
 
 onMounted(async () => {
   await initializeVaultPage();
@@ -335,49 +492,6 @@ function openQuickSearch(): void {
   activeModal.value = "quick";
 }
 
-function resetUserDraft(): void {
-  userDraft.username = "";
-  userDraft.password = "";
-  userDraft.confirmPassword = "";
-  authError.value = "";
-  generatedRecoveryKey.value = "";
-  recoveryUserName.value = "";
-  if (!vaultStore.needsUserSetup) {
-    pendingServerExchange.value = null;
-  }
-  setupServerMode.value = vaultStore.settings.sync.mode;
-  setupServerUrl.value = vaultStore.settings.sync.serverUrl;
-  setupServerBusy.value = false;
-}
-
-function applyWebDeviceBindingIfAvailable(): void {
-  if (!isUserWebRuntime()) return;
-  const exchange = loadWebDeviceBinding();
-  if (!exchange) return;
-  pendingServerExchange.value = exchange;
-  setupServerMode.value = exchange.mode;
-  setupServerUrl.value = exchange.serverUrl;
-  userDraft.username =
-    exchange.account.email ??
-    exchange.account.displayName ??
-    exchange.account.id;
-  authError.value = "";
-}
-
-function resetItemDraft(): void {
-  editingItemId.value = null;
-  passwordTargetFieldId.value = null;
-  itemError.value = "";
-  itemDraft.type = "login";
-  itemDraft.vaultId = "";
-  itemDraft.title = "";
-  itemDraft.notes = "";
-  itemDraft.fields = [];
-  itemDraft.attachments = [];
-  itemDraft.attachmentBlocks = [];
-  pickingItemType.value = false;
-}
-
 function resetVaultDraft(): void {
   vaultDraft.name = "";
   vaultDraft.description = "";
@@ -409,240 +523,6 @@ function clearRecoveryReveal(): void {
 function openSignOutCurrentUserModal(): void {
   if (!vaultStore.activeUser) return;
   activeModal.value = "removeUser";
-}
-
-function closeSwitchUserConfirm(): void {
-  pendingSwitchUserId.value = null;
-  activeModal.value = null;
-}
-
-function openUserManagement(): void {
-  returnToUserManagementAfterSetup.value = false;
-  activeModal.value = "userManagement";
-}
-
-function openAddUser(
-  initialMode: "choice" | "new" | "restore" = "choice",
-  options: { returnToUserManagement?: boolean } = {},
-): void {
-  resetUserDraft();
-  userSetupInitialMode.value = initialMode;
-  returnToUserManagementAfterSetup.value = Boolean(
-    options.returnToUserManagement,
-  );
-  activeModal.value = "user";
-}
-
-function createNewUserFromLock(): void {
-  unlockPassword.value = "";
-  unlockRecoveryKey.value = "";
-  authError.value = "";
-  openAddUser("new");
-}
-
-function closeUserSetup(
-  options: { returnToPrevious?: boolean } = { returnToPrevious: true },
-): void {
-  const shouldReturnToUserManagement =
-    options.returnToPrevious !== false &&
-    returnToUserManagementAfterSetup.value;
-  activeModal.value = shouldReturnToUserManagement ? "userManagement" : null;
-  returnToUserManagementAfterSetup.value = false;
-  resetUserDraft();
-}
-
-function validateUserDraft(): string {
-  if (!setupServerAccountFlow.value && !userDraft.username.trim()) {
-    return t("user.usernameRequired");
-  }
-  if (userDraft.password.length < 8) {
-    return t("user.passwordTooShort");
-  }
-  if (userDraft.password !== userDraft.confirmPassword) {
-    return t("user.passwordMismatch");
-  }
-
-  return "";
-}
-
-function prepareUserRecoveryKey(): void {
-  const validationError = validateUserDraft();
-  authError.value = validationError;
-  if (validationError) {
-    return;
-  }
-
-  generatedRecoveryKey.value = generateRecoveryKey();
-  recoveryUserName.value =
-    userDraft.username.trim() ||
-    setupServerAccountLabel.value ||
-    t("user.currentUser");
-}
-
-function backToUserDraftFromRecoveryKey(): void {
-  authError.value = "";
-  generatedRecoveryKey.value = "";
-  recoveryUserName.value = "";
-  userSetupInitialMode.value = "new";
-}
-
-async function restoreExistingServerAccount(payload: {
-  password: string;
-  recoveryKey: string;
-}): Promise<void> {
-  if (!pendingServerExchange.value) {
-    authError.value = t("sync.syncOfficialAuthorizationMissing");
-    return;
-  }
-  creatingUser.value = true;
-  authError.value = "";
-  try {
-    await vaultStore.restoreServerAccount({
-      exchange: pendingServerExchange.value,
-      password: payload.password,
-      recoveryKey: payload.recoveryKey,
-    });
-    pendingServerExchange.value = null;
-    closeUserSetup({ returnToPrevious: false });
-    showToast(t("toast.unlocked"));
-    scheduleAutoSync("restore-server-account");
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    authError.value =
-      message === "serverVaultKeyMissing"
-        ? t("user.serverVaultKeyMissing")
-        : message === "duplicate-username"
-          ? t("user.duplicateUsername")
-          : t("user.wrongUnlockSecret");
-  } finally {
-    creatingUser.value = false;
-  }
-}
-
-function showUnavailableRecoveryQr(): void {
-  showToast(t("user.restoreQrUnavailable"));
-}
-
-async function createUser(): Promise<void> {
-  const validationError = validateUserDraft();
-  authError.value = validationError;
-  if (validationError) {
-    generatedRecoveryKey.value = "";
-    userSetupInitialMode.value = "new";
-    return;
-  }
-  if (!generatedRecoveryKey.value) {
-    prepareUserRecoveryKey();
-    return;
-  }
-
-  creatingUser.value = true;
-  try {
-    const result = await vaultStore.createUser({
-      username:
-        userDraft.username.trim() ||
-        setupServerAccountLabel.value ||
-        "server-user",
-      password: userDraft.password,
-      recoveryKey: generatedRecoveryKey.value,
-      sync: {
-        mode: setupServerMode.value,
-        serverUrl: setupServerUrl.value,
-      },
-    });
-    if (pendingServerExchange.value) {
-      await vaultStore.applyPendingServerAccountExchange(
-        pendingServerExchange.value,
-      );
-      pendingServerExchange.value = null;
-    }
-    const toastMessage =
-      result.recoveryKeyStorage === "unsupported"
-        ? t("toast.recoveryKeyBrowserPreview")
-        : result.recoveryKeyStorage === "saved"
-          ? t("toast.recoveryKeySaved")
-          : t("toast.recoveryKeySaveFailed");
-    closeUserSetup({ returnToPrevious: false });
-    showToast(toastMessage);
-    promptServerSignInIfNeeded();
-  } catch (error) {
-    authError.value =
-      error instanceof Error && error.message === "duplicate-username"
-        ? t("user.duplicateUsername")
-        : error instanceof Error
-          ? error.message
-          : String(error);
-  } finally {
-    creatingUser.value = false;
-  }
-}
-
-async function switchUser(userId: string): Promise<void> {
-  authError.value = "";
-  unlockPassword.value = "";
-  unlockRecoveryKey.value = "";
-  pendingSwitchUserId.value = null;
-  clearPendingClipboard();
-  clearSensitiveUiState();
-  await vaultStore.switchUser(userId);
-  activeDrawer.value = null;
-  activeModal.value = vaultStore.needsUserSetup ? null : "lock";
-}
-
-function requestSwitchUser(userId: string): void {
-  if (!userId || userId === vaultStore.activeUserId) {
-    return;
-  }
-
-  pendingSwitchUserId.value = userId;
-  activeModal.value = "switchUserConfirm";
-}
-
-async function confirmSwitchUser(): Promise<void> {
-  const userId = pendingSwitchUserId.value;
-  if (!userId) return;
-  await switchUser(userId);
-}
-
-function openAddUserFromManagement(): void {
-  openAddUser("choice", { returnToUserManagement: true });
-}
-
-async function signOutCurrentUser(payload: {
-  deleteLocalData: boolean;
-}): Promise<void> {
-  signingOutCurrentUser.value = true;
-  const userName = activeUserName.value;
-  try {
-    if (payload.deleteLocalData) {
-      const removed = await vaultStore.removeActiveUserFromDevice();
-      clearPendingClipboard();
-      clearSensitiveUiState();
-      activeDrawer.value = null;
-      activeModal.value = vaultStore.needsUserSetup ? null : "lock";
-      if (removed) {
-        showToast(
-          t("toast.userRemovedFromDevice", { name: removed.displayName }),
-        );
-      }
-      return;
-    }
-
-    if (vaultStore.unlocked) await vaultStore.persist();
-    clearPendingClipboard();
-    clearSensitiveUiState();
-    vaultStore.lock();
-    unlockPassword.value = "";
-    unlockRecoveryKey.value = "";
-    authError.value = "";
-    activeDrawer.value = null;
-    activeModal.value = "lock";
-    showToast(t("toast.userSignedOut", { name: userName }));
-  } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error));
-  } finally {
-    signingOutCurrentUser.value = false;
-  }
 }
 
 function requestDeleteVault(vaultId: string): void {
@@ -686,117 +566,9 @@ async function confirmDeleteVault(): Promise<void> {
   }
 }
 
-function openNewItem(type: VaultItemType = "login"): void {
-  editingItemId.value = null;
-  itemError.value = "";
-  pickingItemType.value = arguments.length === 0;
-  itemDraft.type = type;
-  itemDraft.vaultId =
-    vaultStore.selectedVaultId === "all"
-      ? (writableVaults.value[0]?.id ?? "")
-      : vaultStore.selectedVaultId;
-  itemDraft.title = "";
-  itemDraft.notes = "";
-  itemDraft.fields = buildDefaultDraftFields(t, type);
-  itemDraft.attachments = [];
-  itemDraft.attachmentBlocks = [];
-  activeModal.value = "item";
-}
-
-function startNewItem(type: VaultItemType): void {
-  openNewItem(type);
-  pickingItemType.value = false;
-}
-
 function openImportFromItemPicker(): void {
   activeModal.value = null;
   void openManagement("backup");
-}
-
-function openEditItem(): void {
-  const item = selectedItem.value;
-  if (!item) return;
-
-  itemError.value = "";
-  pickingItemType.value = false;
-  editingItemId.value = item.id;
-  itemDraft.type = item.type;
-  itemDraft.vaultId = item.vaultId;
-  itemDraft.title = item.title;
-  itemDraft.notes =
-    item.notes ||
-    item.fields.find((field) => field.kind === "note")?.value ||
-    "";
-  itemDraft.fields = detailFields(t, item).map((field) => ({ ...field }));
-  const attachmentDrafts = selectedItemAttachments.value.map((attachment) => ({
-    id: attachment.id,
-    fileName: attachment.fileName,
-    mimeType: attachment.mimeType,
-    sizeBytes: attachment.sizeBytes,
-    checksumSha256: attachment.checksumSha256,
-    encryptedBlobRef: attachment.encryptedBlobRef,
-    state: attachment.state,
-  }));
-  itemDraft.attachments = attachmentDrafts;
-  itemDraft.attachmentBlocks = attachmentDrafts.length
-    ? [makeAttachmentDraftBlock(attachmentDrafts)]
-    : [];
-  activeModal.value = "item";
-}
-
-function backToItemTypePicker(): void {
-  editingItemId.value = null;
-  itemError.value = "";
-  pickingItemType.value = true;
-}
-
-function addDraftAttachmentBlock(): void {
-  itemDraft.attachmentBlocks = [
-    ...itemDraft.attachmentBlocks,
-    makeAttachmentDraftBlock(),
-  ];
-}
-
-function removeDraftAttachmentBlock(id: string): void {
-  itemDraft.attachmentBlocks = itemDraft.attachmentBlocks.filter(
-    (block) => block.id !== id,
-  );
-  itemDraft.attachments = flattenAttachmentDraftBlocks(
-    itemDraft.attachmentBlocks,
-  );
-}
-
-function addWebsiteField(): void {
-  if (itemDraft.type !== "login") return;
-  itemDraft.fields = [...itemDraft.fields, makeDraftField(t, "url")];
-}
-
-function addTotpField(): void {
-  if (itemDraft.type !== "login") return;
-  itemDraft.fields = appendExtraDraftField(t, itemDraft.fields, "totp");
-}
-
-function addDraftExtra(kind: "totp" | "note" | "attachment"): void {
-  if (kind === "totp") {
-    addTotpField();
-    return;
-  }
-  if (kind === "note") {
-    itemDraft.fields = appendExtraDraftField(t, itemDraft.fields, "note");
-    return;
-  }
-  addDraftAttachmentBlock();
-}
-
-function openPasswordGenerator(target: VaultItemField): void {
-  passwordTargetFieldId.value = target.id;
-  generatedPassword.value = generatePassword(passwordOptions);
-  activeDrawer.value = "generator";
-}
-
-function openStandalonePasswordGenerator(): void {
-  passwordTargetFieldId.value = null;
-  activeDrawer.value = "generator";
 }
 
 async function openManagement(
@@ -812,7 +584,7 @@ async function openManagement(
 
 function closeDrawer(): void {
   activeDrawer.value = null;
-  passwordTargetFieldId.value = null;
+  clearPasswordTarget();
   clearRecoveryReveal();
 }
 
@@ -826,63 +598,6 @@ async function openRecoveryKeyModal(): Promise<void> {
 function closeRecoveryKeyModal(): void {
   activeModal.value = null;
   clearRecoveryReveal();
-}
-
-function useGeneratedPassword(): void {
-  const targetId = passwordTargetFieldId.value;
-  if (!targetId) return;
-
-  const target = itemDraft.fields.find((field) => field.id === targetId);
-  if (target) target.value = generatedPassword.value;
-  closeDrawer();
-}
-
-function removeDraftField(id: string): void {
-  itemDraft.fields = itemDraft.fields.filter((field) => field.id !== id);
-}
-
-async function saveItem(): Promise<void> {
-  const validationError = validateItemDraft();
-  if (validationError) {
-    itemError.value = validationError;
-    return;
-  }
-
-  const isEditing = editingItemId.value !== null;
-  const saved = await vaultStore.saveItem({
-    editingItemId: editingItemId.value,
-    type: itemDraft.type,
-    vaultId: itemDraft.vaultId,
-    title: itemDraft.title,
-    notes: itemDraft.type === "secure-note" ? itemDraft.notes : "",
-    fields: normalizeDraftFieldsForSave(itemDraft.fields),
-    attachments: flattenAttachmentDraftBlocks(itemDraft.attachmentBlocks),
-  });
-
-  activeModal.value = null;
-  editingItemId.value = null;
-  itemError.value = "";
-  showToast(t(isEditing ? "toast.itemUpdated" : "toast.itemCreated"));
-  vaultStore.selectItem(saved.id);
-}
-
-function validateItemDraft(): string {
-  if (!itemDraft.vaultId || !itemDraft.title.trim())
-    return t("editor.requiredMissing");
-
-  if (itemDraft.type === "login" && !fieldValue("password"))
-    return t("editor.requiredMissing");
-  if (itemDraft.type === "payment-card" && !fieldValue("card-number"))
-    return t("editor.requiredMissing");
-  if (itemDraft.type === "secure-note" && !itemDraft.notes.trim())
-    return t("editor.requiredMissing");
-  return "";
-}
-
-function fieldValue(kind: VaultItemField["kind"]): string {
-  return (
-    itemDraft.fields.find((field) => field.kind === kind)?.value.trim() ?? ""
-  );
 }
 
 function openNewVault(): void {
@@ -903,261 +618,6 @@ async function saveVault(): Promise<void> {
 
   activeModal.value = null;
   showToast(t("toast.vaultCreated", { name: vault.name }));
-}
-
-async function onFilesSelected(payload: { blockId: string; event: Event }): Promise<void> {
-  const { blockId, event } = payload;
-  const input = event.target as HTMLInputElement;
-  const files = Array.from(input.files ?? []);
-  if (files.length === 0) return;
-
-  uploadingFiles.value = true;
-  try {
-    const sessionKey = vaultStore.requireVaultKey();
-    const activeUserId = vaultStore.activeUserId;
-    if (!activeUserId) throw new Error("active-user-required");
-    const drafts = await Promise.all(
-      files.map(async (file) => {
-        const id = `attachment-${crypto.randomUUID()}`;
-        const saved = await saveAttachmentFile(
-          activeUserId,
-          id,
-          file,
-          sessionKey.vaultKey,
-          sessionKey.keyId,
-        );
-        return {
-          id,
-          fileName: file.name,
-          mimeType: file.type || "application/octet-stream",
-          sizeBytes: file.size,
-          checksumSha256: saved.checksumSha256,
-          encryptedBlobRef: saved.encryptedBlobRef,
-          state: "available" as const,
-          previewFile: file,
-        };
-      }),
-    );
-
-    itemDraft.attachmentBlocks = itemDraft.attachmentBlocks.map((block) =>
-      block.id === blockId
-        ? { ...block, attachments: [...block.attachments, ...drafts] }
-        : block,
-    );
-    itemDraft.attachments = flattenAttachmentDraftBlocks(
-      itemDraft.attachmentBlocks,
-    );
-    showToast(t("toast.filesSelected", { count: drafts.length }));
-  } finally {
-    input.value = "";
-    uploadingFiles.value = false;
-  }
-}
-
-async function createBackup(): Promise<void> {
-  await runBackupTask(
-    {
-      title: t("progress.backupExportTitle"),
-      body: t("progress.backupExportBody"),
-    },
-    async () => {
-      const backup = await vaultStore.exportBackupPackage();
-      const result = await downloadTextFile(
-        backupFileName(),
-        JSON.stringify(backup, null, 2),
-      );
-      savedBackupResult.value = result;
-    },
-  );
-}
-
-async function restoreBackup(file: File): Promise<void> {
-  await runBackupTask(
-    {
-      title: t("progress.backupRestoreTitle"),
-      body: t("progress.backupRestoreBody"),
-    },
-    async () => {
-      const backup = assertBackupPackage(JSON.parse(await file.text()));
-      await vaultStore.restoreBackupPackage(backup);
-      activeManagementPage.value = null;
-      activeModal.value = "lock";
-      showToast(t("backup.restoreSuccess"));
-    },
-  );
-}
-
-async function importCsv(file: File): Promise<void> {
-  await runBackupTask(
-    { title: t("progress.csvImportTitle"), body: t("progress.csvImportBody") },
-    async () => {
-      const items = parseCsvImport(await file.text(), importFieldLabels());
-      const result = await importExternalItems(items, t("backup.csvVaultName"));
-      showToast(
-        t("backup.importSuccess", {
-          count: result.imported,
-          vault: result.vaultName,
-        }),
-      );
-    },
-  );
-}
-
-async function exportCsv(): Promise<void> {
-  await runBackupTask(
-    { title: t("progress.csvExportTitle"), body: t("progress.csvExportBody") },
-    async () => {
-      const result = await downloadTextFile(
-        csvFileName(),
-        await vaultStore.exportCsvText(),
-        "text/csv",
-      );
-      showToast(textFileSavedToast("backup.csvExportSuccess", result));
-    },
-  );
-}
-
-async function importLegacyBackup(payload: {
-  file: File;
-  password: string;
-}): Promise<void> {
-  await runBackupTask(
-    {
-      title: t("progress.legacyImportTitle"),
-      body: t("progress.legacyImportBody"),
-    },
-    async () => {
-      const result = await readLegacyLockPassBackup(
-        payload.file,
-        payload.password,
-        importFieldLabels(),
-        t("backup.legacyVaultName"),
-      );
-      const imported = await importExternalVaults(
-        result.vaults,
-        t("backup.legacyVaultName"),
-      );
-      showToast(
-        t("backup.legacyImportSuccess", {
-          count: imported.imported,
-          vaults: imported.vaults,
-        }),
-      );
-    },
-  );
-}
-
-async function importExternalItems(
-  items: ExternalImportItem[],
-  vaultName: string,
-): Promise<{ imported: number; vaultName: string }> {
-  if (!vaultStore.unlocked) throw new Error("syncLocked");
-  const result = await vaultStore.importExternalItems(items, vaultName);
-  if (result.imported === 0) throw new Error("backup-empty-import");
-  return { imported: result.imported, vaultName: result.vaultName };
-}
-
-async function importExternalVaults(
-  vaults: ExternalImportVault[],
-  fallbackVaultName: string,
-): Promise<{ imported: number; vaults: number }> {
-  if (!vaultStore.unlocked) throw new Error("syncLocked");
-  const result = await vaultStore.importExternalVaults(
-    vaults,
-    fallbackVaultName,
-  );
-  if (result.imported === 0 && result.vaults === 0)
-    throw new Error("backup-empty-import");
-  return { imported: result.imported, vaults: result.vaults };
-}
-
-async function runBackupTask(
-  progress: Pick<OperationProgressState, "title" | "body">,
-  task: () => Promise<void>,
-): Promise<void> {
-  if (backupBusy.value) return;
-  backupBusy.value = true;
-  try {
-    await runWithOperationProgress(progress, task);
-  } catch (error) {
-    showToast(backupErrorToast(error));
-  } finally {
-    backupBusy.value = false;
-  }
-}
-
-function backupErrorToast(error: unknown): string {
-  const message =
-    error instanceof Error
-      ? error.message
-      : typeof error === "string"
-        ? error
-        : "";
-  if (message === "syncLocked") return t("backup.unlockRequired");
-  if (message === "invalid-backup-file") return t("backup.invalidBackup");
-  if (message === "legacy-password-invalid")
-    return t("backup.legacyPasswordInvalid");
-  if (message === "backup-empty-import") return t("backup.emptyImport");
-  return message || t("backup.failed");
-}
-
-function textFileSavedToast(
-  messageKey: "backup.exportSuccess" | "backup.csvExportSuccess",
-  result: TextFileSaveResult,
-): string {
-  if (result.target === "tauri") {
-    return t("backup.exportSavedTo", { path: result.path });
-  }
-  return t("backup.exportDownloadedToBrowser", {
-    fileName: result.fileName,
-    message: t(messageKey),
-  });
-}
-
-async function copySavedBackupPath(path: string): Promise<void> {
-  await copyValue(path, t("backup.pathCopied"));
-}
-
-async function openSavedBackupDirectory(path: string): Promise<void> {
-  try {
-    const opened = await openSavedFileDirectory(path);
-    showToast(
-      opened
-        ? t("backup.directoryOpened")
-        : t("backup.browserDirectoryOpenUnsupported"),
-    );
-  } catch (error) {
-    showToast(
-      error instanceof Error ? error.message : t("backup.directoryOpenFailed"),
-    );
-  }
-}
-
-function importFieldLabels(): ImportFieldLabelMap {
-  return {
-    username: t("fields.username"),
-    password: t("fields.password"),
-    url: t("fields.url"),
-    note: t("fields.note"),
-    cardholder: t("fields.cardholder"),
-    cardNumber: t("fields.cardNumber"),
-    expiry: t("fields.expiry"),
-    cvv: t("fields.cvv"),
-  };
-}
-
-function removeDraftAttachment(id: string): void {
-  itemDraft.attachmentBlocks = itemDraft.attachmentBlocks.map((block) => ({
-    ...block,
-    attachments: block.attachments.filter((attachment) => attachment.id !== id),
-  }));
-  itemDraft.attachments = flattenAttachmentDraftBlocks(
-    itemDraft.attachmentBlocks,
-  );
-}
-
-function regeneratePassword(): void {
-  generatedPassword.value = generatePassword(passwordOptions);
 }
 
 async function copyValue(
@@ -1317,29 +777,6 @@ async function openInitialServerLogin(
     authError.value = syncErrorToast(error);
   } finally {
     setupServerBusy.value = false;
-  }
-}
-
-function updateSetupServerMode(mode: SyncMode): void {
-  setupServerMode.value = mode;
-  authError.value = "";
-  if (mode === "selfhost") {
-    setupServerUrl.value = "";
-  }
-}
-
-async function updateSetupServerUrl(serverUrl: string): Promise<void> {
-  setupServerUrl.value = serverUrl;
-  authError.value = "";
-  if (!vaultStore.hasUsers) {
-    try {
-      await vaultStore.saveSyncSettings({
-        mode: setupServerMode.value,
-        serverUrl,
-      });
-    } catch (error) {
-      authError.value = syncErrorToast(error);
-    }
   }
 }
 
@@ -1767,57 +1204,20 @@ function cancelAutoLock(): void {
 </script>
 
 <template>
-  <div
+  <DesktopStartupState
     v-if="initializing && !vaultStore.hydrated && !vaultStore.storageError"
-    class="grid h-screen min-h-[560px] place-items-center bg-[#f7f8fa] p-6 text-slate-950"
-  >
-    <div
-      class="inline-flex items-center gap-2 text-sm font-semibold text-slate-500"
-    >
-      <RefreshCw class="size-4 animate-spin" />
-      {{ t("app.loading") }}
-    </div>
-  </div>
+    :initializing="initializing"
+    storage-error=""
+    variant="loading"
+  />
 
-  <div
+  <DesktopStartupState
     v-else-if="vaultStore.storageError && !vaultStore.hydrated"
-    class="grid h-screen min-h-[560px] place-items-center bg-[#f7f8fa] p-6 text-slate-950"
-  >
-    <section
-      class="grid w-full max-w-xl gap-5 rounded-lg border border-rose-200 bg-white p-6 shadow-xl shadow-rose-950/5"
-    >
-      <span
-        class="grid size-12 place-items-center rounded-lg bg-rose-50 text-rose-700"
-      >
-        <TriangleAlert class="size-6" />
-      </span>
-      <div class="grid gap-2">
-        <h1 class="text-2xl font-black">{{ t("app.storageError") }}</h1>
-        <p class="text-sm leading-6 text-slate-600">
-          {{ t("app.storageErrorBody") }}
-        </p>
-      </div>
-      <div
-        class="grid gap-1 rounded-lg border border-rose-100 bg-rose-50 px-3 py-2"
-      >
-        <span class="text-xs font-bold text-rose-700">{{
-          t("app.storageErrorDetail")
-        }}</span>
-        <code class="break-words font-mono text-xs text-rose-900">{{
-          vaultStore.storageError
-        }}</code>
-      </div>
-      <button
-        class="primary-button justify-self-start"
-        type="button"
-        :disabled="initializing"
-        @click="initializeVaultPage"
-      >
-        <RefreshCw class="size-4" :class="{ 'animate-spin': initializing }" />
-        {{ initializing ? t("app.loading") : t("app.retry") }}
-      </button>
-    </section>
-  </div>
+    :initializing="initializing"
+    :storage-error="vaultStore.storageError"
+    variant="storageError"
+    @retry="initializeVaultPage"
+  />
 
   <div
     v-else
@@ -1830,250 +1230,8 @@ function cancelAutoLock(): void {
       @lock="lockApp"
     />
 
-    <main
-      ref="mainGrid"
-      class="grid min-h-0"
-      :style="activeManagementPage ? undefined : mainGridStyle"
-    >
-      <ManagementPage
-        v-if="activeManagementPage"
-        :active-page="activeManagementPage"
-        :backup-busy="backupBusy"
-        @close="activeManagementPage = null"
-        @update-page="activeManagementPage = $event"
-        @copy-value="copyValue"
-        @change-locale="changeLocale"
-        @change-log-level="changeLogLevel"
-        @change-security-settings="changeSecuritySettings"
-        @change-shortcut="changeShortcut"
-        @reset-shortcuts="resetShortcuts"
-        @open-log-dir="openDesktopLogDir"
-        @system-toast="showToast"
-        @create-backup="createBackup"
-        @restore-backup="restoreBackup"
-        @import-csv="importCsv"
-        @export-csv="exportCsv"
-        @import-legacy-backup="importLegacyBackup"
-        @not-ready="showToast(t('toast.notReady'))"
-      />
+    <DesktopVaultWorkspace ref="workspaceRef" />
 
-      <template v-else>
-        <VaultSidebar
-          :active-user-name="activeUserName"
-          :active-user-initials="activeUserInitials"
-          :connection-status="connectionStatus"
-          @create-vault="openNewVault"
-          @delete-vault="requestDeleteVault"
-          @manage-users="openUserManagement"
-          @open-management="openManagement"
-          @show-recovery-key="openRecoveryKeyModal"
-          @sign-out-current-user="openSignOutCurrentUserModal"
-          @lock="lockApp"
-        />
-
-        <ResizeHandle
-          :active="resizingTarget === 'sidebar'"
-          :label="t('layout.resizeSidebar')"
-          target="sidebar"
-          @resize-keydown="onResizeHandleKeydown"
-          @resize-start="startColumnResize"
-        />
-
-        <ItemListPane
-          :items="filteredItems"
-          :selected-item="selectedItem"
-          :has-items="visibleItems.length > 0"
-          @select-item="selectItem"
-          @create-item="openNewItem()"
-          @import-csv="openManagement('backup')"
-          @quick-search="openQuickSearch"
-        />
-
-        <ResizeHandle
-          :active="resizingTarget === 'itemList'"
-          :label="t('layout.resizeItemList')"
-          target="itemList"
-          @resize-keydown="onResizeHandleKeydown"
-          @resize-start="startColumnResize"
-        />
-
-        <ItemDetailPane
-          :key="sensitiveViewKey"
-          v-model:active-tab="activeTab"
-          v-model:show-sensitive="showSensitive"
-          :selected-item="selectedItem"
-          :attachments="selectedItemAttachments"
-          :vault-key="vaultStore.vaultKey"
-          :key-id="vaultStore.activeKeyId"
-          @edit="openEditItem"
-          @copy-value="copyValue"
-          @security-check="showToast(t('toast.securityChecked'))"
-        />
-      </template>
-    </main>
-
-    <DesktopDrawer
-      v-if="activeDrawer"
-      :active-drawer="activeDrawer"
-      :generated-password="generatedPassword"
-      :password-options="passwordOptions"
-      :can-use-password="passwordTargetFieldId !== null"
-      @close="closeDrawer"
-      @copy-value="copyValue"
-      @regenerate="regeneratePassword()"
-      @use-password="useGeneratedPassword"
-      @sync-toast="showToast"
-      @operation-start="showOperationProgress"
-      @operation-end="hideOperationProgress"
-    />
-
-    <ItemEditorModal
-      v-if="activeModal === 'item'"
-      :editing-item-id="editingItemId"
-      :picking-type="pickingItemType"
-      :draft="itemDraft"
-      :uploading-files="uploadingFiles"
-      :error="itemError"
-      :vault-key="vaultStore.vaultKey"
-      :key-id="vaultStore.activeKeyId"
-      @close="activeModal = null"
-      @save="saveItem"
-      @pick-type="startNewItem"
-      @import-choice="openImportFromItemPicker"
-      @back-to-types="backToItemTypePicker"
-      @files-selected="onFilesSelected"
-      @remove-attachment="removeDraftAttachment"
-      @remove-attachment-block="removeDraftAttachmentBlock"
-      @remove-field="removeDraftField"
-      @generate-field="openPasswordGenerator"
-      @add-website="addWebsiteField"
-      @add-extra="addDraftExtra"
-    />
-
-    <VaultModal
-      v-if="activeModal === 'vault'"
-      :draft="vaultDraft"
-      @close="activeModal = null"
-      @save="saveVault"
-    />
-
-    <UserSetupModal
-      v-if="
-        (vaultStore.hydrated && vaultStore.needsUserSetup) ||
-        activeModal === 'user' ||
-        generatedRecoveryKey
-      "
-      :draft="userDraft"
-      :auth-error="authError"
-      :creating="creatingUser"
-      :is-adding="activeModal === 'user'"
-      :is-legacy-import="hasLegacyImport"
-      :recovery-key="generatedRecoveryKey"
-      :created-user-name="recoveryUserName"
-      :initial-mode="userSetupInitialMode"
-      :server-first="setupServerAccountFlow"
-      :server-connected="setupServerConnected"
-      :server-account-label="setupServerAccountLabel"
-      :server-mode="setupServerMode"
-      :server-url="setupServerUrl"
-      :server-busy="setupServerBusy"
-      @close="closeUserSetup"
-      @generate-recovery-key="prepareUserRecoveryKey"
-      @back-to-new-user="backToUserDraftFromRecoveryKey"
-      @restore-existing="restoreExistingServerAccount"
-      @scan-recovery-qr="showUnavailableRecoveryQr"
-      @submit="createUser"
-      @update-server-mode="updateSetupServerMode"
-      @update-server-url="updateSetupServerUrl"
-      @open-server-login="openInitialServerLogin"
-    />
-
-    <QuickSearchModal
-      v-if="activeModal === 'quick'"
-      v-model:query="quickQuery"
-      :items="visibleItems"
-      :attachments="visibleAttachments"
-      @close="activeModal = null"
-      @select-and-copy="selectQuickResult"
-    />
-
-    <UserManagementModal
-      v-if="activeModal === 'userManagement'"
-      @close="activeModal = null"
-      @switch-user="requestSwitchUser"
-      @add-user="openAddUserFromManagement"
-    />
-
-    <RecoveryKeyModal
-      v-if="activeModal === 'recoveryKey'"
-      :revealed-recovery-key="revealedRecoveryKey"
-      :reveal-error="revealError"
-      :reveal-issue="revealRecoveryKeyIssue"
-      :saving-to-device="savingRecoveryKeyToDevice"
-      @close="closeRecoveryKeyModal"
-      @copy-value="copyValue"
-      @save-recovery-key-to-device="saveRecoveryKeyToDevice"
-    />
-
-    <RemoveUserModal
-      v-if="activeModal === 'removeUser'"
-      :user-name="activeUserName"
-      :busy="signingOutCurrentUser"
-      @close="activeModal = null"
-      @confirm="signOutCurrentUser"
-    />
-
-    <SwitchUserConfirmModal
-      v-if="activeModal === 'switchUserConfirm'"
-      :from-user-name="activeUserName"
-      :to-user-name="pendingSwitchUserName"
-      @close="closeSwitchUserConfirm"
-      @confirm="confirmSwitchUser"
-    />
-
-    <DeleteVaultConfirmModal
-      v-if="activeModal === 'deleteVaultConfirm' && pendingDeleteVault"
-      :vault-name="pendingDeleteVault.name"
-      :item-count="pendingDeleteVaultItemCount"
-      :deleting="deletingVault"
-      @close="closeDeleteVaultConfirm"
-      @confirm="confirmDeleteVault"
-    />
-
-    <LockOverlay
-      v-if="
-        activeModal === 'lock' ||
-        (!activeModal &&
-          vaultStore.hydrated &&
-          vaultStore.hasUsers &&
-          !vaultStore.needsUserSetup &&
-          !vaultStore.unlocked)
-      "
-      v-model:password="unlockPassword"
-      v-model:recovery-key="unlockRecoveryKey"
-      :active-user-name="activeUserName"
-      :active-user-initials="activeUserInitials"
-      :auth-error="authError"
-      :unlocking="unlockingVault"
-      @unlock="unlockApp"
-      @use-saved-recovery-key="useSavedRecoveryKey"
-      @create-new-user="createNewUserFromLock"
-      @clear-auth-error="authError = ''"
-      @switch-user="switchUser"
-    />
-
-    <ProgressModal
-      :visible="operationProgress.visible"
-      :title="operationProgress.title"
-      :body="operationProgress.body"
-    />
-    <BackupSavedModal
-      v-if="savedBackupResult"
-      :result="savedBackupResult"
-      @close="savedBackupResult = null"
-      @copy-path="copySavedBackupPath"
-      @open-directory="openSavedBackupDirectory"
-    />
-    <ToastNotice :visible="toast.visible" :message="toast.message" />
+    <DesktopVaultModalLayer />
   </div>
 </template>

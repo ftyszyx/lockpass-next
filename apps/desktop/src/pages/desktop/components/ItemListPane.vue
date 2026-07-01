@@ -17,7 +17,7 @@ import type { VaultItem } from '@lockpass/core'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useVaultStore } from '@/stores/vault'
-import type { SelectedType } from '@/stores/vault'
+import type { SelectedType } from '@/stores/vault/types'
 import { itemIconText, typeLabel } from '../formatters'
 import { typeFilters } from '../types'
 
