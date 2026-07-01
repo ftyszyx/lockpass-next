@@ -31,6 +31,7 @@ import {
 import { editorTypes, type AddMoreItemKind, type ItemDraft } from "../types";
 import {
   getAddMoreMenuItems,
+  isAttachmentDraftField,
   isCardContactDraftField,
   isOptionalDraftField,
   isUserEditableDraftField,
@@ -116,12 +117,21 @@ function canRemoveField(field: VaultItemField): boolean {
   return field.kind === "group" || isOptionalDraftField(field) || field.kind === "totp";
 }
 
-function canMoveField(field: VaultItemField): boolean {
+function canDragField(field: VaultItemField): boolean {
   if (field.kind === "group") return true;
   if (props.draft.type === "login" && field.kind === "url") {
     return websiteFields.value.length > 1;
   }
   return isUserEditableDraftField(field);
+}
+
+function canDropOnField(field: VaultItemField): boolean {
+  if (!draggingFieldId.value || draggingFieldId.value === field.id) return false;
+
+  const draggedField = props.draft.fields.find(
+    (candidate) => candidate.id === draggingFieldId.value,
+  );
+  return Boolean(draggedField && canDragField(draggedField));
 }
 
 function isGroupField(field: VaultItemField): boolean {
@@ -132,6 +142,10 @@ function groupChildren(field: VaultItemField): VaultItemField[] {
   return field.children ?? [];
 }
 
+function attachmentBlock(field: VaultItemField) {
+  return props.draft.attachmentBlocks.find((block) => block.id === field.value);
+}
+
 function fieldLabelEditable(field: VaultItemField): boolean {
   return isGroupField(field) || isUserEditableDraftField(field);
 }
@@ -139,9 +153,9 @@ function fieldLabelEditable(field: VaultItemField): boolean {
 function fieldDragClasses(field: VaultItemField): Record<string, boolean> {
   const isDragging = draggingFieldId.value === field.id;
   const isDropTarget = Boolean(
-    draggingFieldId.value &&
+      draggingFieldId.value &&
       draggingFieldId.value !== field.id &&
-      canMoveField(field),
+      canDropOnField(field),
   );
   return {
     "opacity-50": isDragging,
@@ -150,7 +164,7 @@ function fieldDragClasses(field: VaultItemField): Record<string, boolean> {
 }
 
 function startFieldDrag(field: VaultItemField, event: DragEvent): void {
-  if (!canMoveField(field)) return;
+  if (!canDragField(field)) return;
   draggingFieldId.value = field.id;
   event.dataTransfer?.setData(FIELD_DRAG_MIME, field.id);
   event.dataTransfer?.setData("text/plain", field.id);
@@ -158,13 +172,13 @@ function startFieldDrag(field: VaultItemField, event: DragEvent): void {
 }
 
 function dragFieldOver(field: VaultItemField, event: DragEvent): void {
-  if (!canMoveField(field) || draggingFieldId.value === field.id) return;
+  if (!canDropOnField(field)) return;
   event.preventDefault();
   if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
 }
 
 function dropFieldOn(field: VaultItemField, event: DragEvent): void {
-  if (!canMoveField(field)) return;
+  if (!canDropOnField(field)) return;
 
   event.preventDefault();
   const draggedId =
@@ -384,7 +398,7 @@ onBeforeUnmount(revokePreviewUrl);
                 <template v-else>
                   <div class="grid grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-2 text-xs font-bold text-slate-500">
                     <button
-                      v-if="canMoveField(field)"
+                      v-if="canDragField(field)"
                       class="grid size-6 cursor-grab place-items-center rounded-md text-slate-500 hover:bg-white active:cursor-grabbing"
                       type="button"
                       draggable="true"
@@ -411,7 +425,50 @@ onBeforeUnmount(revokePreviewUrl);
                     </button>
                     <span v-else></span>
                   </div>
-                  <div v-if="isGeneratedField(field.kind)" class="grid grid-cols-[1fr_auto] gap-2">
+                  <template v-if="isAttachmentDraftField(field)">
+                    <div
+                      v-if="attachmentBlock(field)"
+                      class="grid gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3"
+                    >
+                      <div class="flex items-center justify-between gap-3">
+                        <div>
+                          <strong>{{ t("editor.uploadTitle") }}</strong>
+                          <span class="block text-xs text-slate-500">{{ t("editor.uploadHint") }}</span>
+                        </div>
+                        <label class="plain-button">
+                          <Upload class="size-4" />
+                          {{ uploadingFiles ? t("app.loading") : t("editor.upload") }}
+                          <input class="hidden" type="file" multiple :disabled="uploadingFiles" @change="emit('filesSelected', { blockId: field.value, event: $event })" />
+                        </label>
+                      </div>
+                      <div class="grid gap-2">
+                        <div v-if="!attachmentBlock(field)?.attachments.length" class="grid grid-cols-[34px_minmax(0,1fr)] items-center gap-3 rounded-lg border border-slate-200 bg-white p-2">
+                          <span class="file-icon"><Paperclip class="size-4" /></span>
+                          <span><strong class="block">{{ t("editor.noDraftAttachments") }}</strong><small class="text-slate-500">{{ t("editor.draftHint") }}</small></span>
+                        </div>
+                        <div
+                          v-for="attachment in attachmentBlock(field)?.attachments ?? []"
+                          :key="attachment.id"
+                          class="grid grid-cols-[42px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-slate-200 bg-white p-2"
+                          :class="{ 'cursor-pointer hover:border-teal-200 hover:bg-teal-50/40': isImageAttachment(attachment) }"
+                          @click="previewImage(attachment)"
+                        >
+                          <span class="file-icon">{{ attachmentIcon(attachment) }}</span>
+                          <span class="min-w-0">
+                            <strong class="block truncate">{{ attachment.fileName }}</strong>
+                            <small class="text-slate-500">{{ attachmentKind(t, attachment) }} / {{ formatFileSize(attachment.sizeBytes) }}</small>
+                          </span>
+                          <span class="flex items-center gap-1">
+                            <button v-if="isImageAttachment(attachment)" class="icon-button" :title="t('attachment.previewImage')" @click.stop="previewImage(attachment)">
+                              <Image class="size-4" />
+                            </button>
+                            <button class="icon-button" @click.stop="emit('removeAttachment', attachment.id)"><X class="size-4" /></button>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                  <div v-else-if="isGeneratedField(field.kind)" class="grid grid-cols-[1fr_auto] gap-2">
                     <input v-model="field.value" class="form-input" />
                     <button class="plain-button" type="button" @click="emit('generateField', field)">
                       <WandSparkles class="size-4" />
@@ -472,53 +529,6 @@ onBeforeUnmount(revokePreviewUrl);
               </span>
               <textarea v-model="draft.notes" class="form-input min-h-20"></textarea>
             </label>
-
-            <div v-for="block in draft.attachmentBlocks" :key="block.id" class="grid gap-2">
-              <span class="flex items-center justify-between gap-3 text-xs font-bold text-slate-500">
-                <span>{{ t("detail.attachments") }}</span>
-                <button class="text-xs font-semibold text-slate-500 hover:text-rose-600" type="button" @click="emit('removeAttachmentBlock', block.id)">
-                  {{ t("editor.removeOptionalField") }}
-                </button>
-              </span>
-              <div class="grid gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3">
-                <div class="flex items-center justify-between gap-3">
-                  <div>
-                    <strong>{{ t("editor.uploadTitle") }}</strong>
-                    <span class="block text-xs text-slate-500">{{ t("editor.uploadHint") }}</span>
-                  </div>
-                  <label class="plain-button">
-                    <Upload class="size-4" />
-                    {{ uploadingFiles ? t("app.loading") : t("editor.upload") }}
-                    <input class="hidden" type="file" multiple :disabled="uploadingFiles" @change="emit('filesSelected', { blockId: block.id, event: $event })" />
-                  </label>
-                </div>
-                <div class="grid gap-2">
-                  <div v-if="!block.attachments.length" class="grid grid-cols-[34px_minmax(0,1fr)] items-center gap-3 rounded-lg border border-slate-200 bg-white p-2">
-                    <span class="file-icon"><Paperclip class="size-4" /></span>
-                    <span><strong class="block">{{ t("editor.noDraftAttachments") }}</strong><small class="text-slate-500">{{ t("editor.draftHint") }}</small></span>
-                  </div>
-                  <div
-                    v-for="attachment in block.attachments"
-                    :key="attachment.id"
-                    class="grid grid-cols-[42px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-slate-200 bg-white p-2"
-                    :class="{ 'cursor-pointer hover:border-teal-200 hover:bg-teal-50/40': isImageAttachment(attachment) }"
-                    @click="previewImage(attachment)"
-                  >
-                    <span class="file-icon">{{ attachmentIcon(attachment) }}</span>
-                    <span class="min-w-0">
-                      <strong class="block truncate">{{ attachment.fileName }}</strong>
-                      <small class="text-slate-500">{{ attachmentKind(t, attachment) }} / {{ formatFileSize(attachment.sizeBytes) }}</small>
-                    </span>
-                    <span class="flex items-center gap-1">
-                      <button v-if="isImageAttachment(attachment)" class="icon-button" :title="t('attachment.previewImage')" @click.stop="previewImage(attachment)">
-                        <Image class="size-4" />
-                      </button>
-                      <button class="icon-button" @click.stop="emit('removeAttachment', attachment.id)"><X class="size-4" /></button>
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
 
             <AddMoreMenu :items="addMoreItems" @select="emit('addExtra', $event)" />
 

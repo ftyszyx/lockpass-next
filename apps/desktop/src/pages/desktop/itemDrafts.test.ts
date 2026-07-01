@@ -5,7 +5,9 @@ import {
   flattenAttachmentDraftBlocks,
   getAddMoreMenuItems,
   isCardContactDraftField,
+  isAttachmentDraftField,
   isUserEditableDraftField,
+  makeAttachmentDraftField,
   makeAttachmentDraftBlock,
   makeDraftField,
   makeDraftGroupField,
@@ -25,6 +27,7 @@ const t = (key: string) =>
     "fields.cvv": "CVC",
     "fields.secret": "secret",
     "fields.note": "note",
+    "fields.attachment": "attachments",
     "fields.totp": "one-time password",
     "fields.text": "text",
     "fields.phone": "phone",
@@ -292,9 +295,9 @@ const attachmentTwo = {
   state: "pending-upload" as const,
 };
 const attachmentBlocks = [
-  makeAttachmentDraftBlock([attachmentOne]),
+  makeAttachmentDraftBlock("block-one", [attachmentOne]),
   makeAttachmentDraftBlock(),
-  makeAttachmentDraftBlock([attachmentTwo]),
+  makeAttachmentDraftBlock("block-two", [attachmentTwo]),
 ];
 
 assert.equal(attachmentBlocks.length, 3);
@@ -302,6 +305,28 @@ assert.deepEqual(flattenAttachmentDraftBlocks(attachmentBlocks), [
   attachmentOne,
   attachmentTwo,
 ]);
+
+const attachmentFieldOne = makeAttachmentDraftField(t, attachmentBlocks[0].id);
+const attachmentFieldTwo = makeAttachmentDraftField(t, attachmentBlocks[2].id);
+attachmentFieldOne.label = "Files for onboarding";
+
+assert.equal(attachmentFieldOne.kind, "attachment");
+assert.equal(attachmentFieldOne.value, attachmentBlocks[0].id);
+assert.equal(isAttachmentDraftField(attachmentFieldOne), true);
+assert.equal(isUserEditableDraftField(attachmentFieldOne), true);
+assert.equal(
+  normalizeDraftFieldsForSave([attachmentFieldOne], attachmentBlocks)[0]?.label,
+  "Files for onboarding",
+);
+assert.deepEqual(
+  reorderDraftFieldsByDrop(
+    [loginFields[1], attachmentFieldOne, attachmentFieldTwo],
+    attachmentFieldTwo.id,
+    loginFields[1].id,
+    "before",
+  ).map((field) => field.id),
+  [attachmentFieldTwo.id, loginFields[1].id, attachmentFieldOne.id],
+);
 
 assert.deepEqual(
   getAddMoreMenuItems(t, "login").map((item) => item.kind),

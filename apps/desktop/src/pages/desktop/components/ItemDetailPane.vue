@@ -129,14 +129,31 @@ onBeforeUnmount(revokePreviewUrl)
         <div
           v-for="field in detailFields(t, selectedItem)"
           :key="field.id"
-          class="grid min-h-12 grid-cols-[140px_minmax(0,1fr)_40px] items-center gap-3 border-b border-slate-100 px-3 py-2 last:border-b-0"
+          class="border-b border-slate-100 last:border-b-0"
         >
-          <span class="text-sm font-bold text-slate-500">{{ fieldLabel(t, field.kind, field.label) }}</span>
-          <span class="break-words" :class="{ 'font-mono': field.sensitive }">{{ displayValue(field, showSensitive) }}</span>
-          <button class="icon-button" @click="onFieldAction(field)">
-            <Eye v-if="field.sensitive && !showSensitive" class="size-4" />
-            <Copy v-else class="size-4" />
-          </button>
+          <div v-if="field.kind === 'group'" class="grid gap-1 bg-slate-50 px-3 py-3">
+            <span class="text-sm font-black text-slate-700">{{ fieldLabel(t, field.kind, field.label) }}</span>
+            <div
+              v-for="child in field.children ?? []"
+              :key="child.id"
+              class="grid min-h-10 grid-cols-[124px_minmax(0,1fr)_40px] items-center gap-3 rounded-md bg-white px-2 py-1"
+            >
+              <span class="text-sm font-bold text-slate-500">{{ fieldLabel(t, child.kind, child.label) }}</span>
+              <span class="break-words" :class="{ 'font-mono': child.sensitive }">{{ displayValue(child, showSensitive) }}</span>
+              <button class="icon-button" @click="onFieldAction(child)">
+                <Eye v-if="child.sensitive && !showSensitive" class="size-4" />
+                <Copy v-else class="size-4" />
+              </button>
+            </div>
+          </div>
+          <div v-else class="grid min-h-12 grid-cols-[140px_minmax(0,1fr)_40px] items-center gap-3 px-3 py-2">
+            <span class="text-sm font-bold text-slate-500">{{ fieldLabel(t, field.kind, field.label) }}</span>
+            <span class="break-words" :class="{ 'font-mono': field.sensitive }">{{ displayValue(field, showSensitive) }}</span>
+            <button class="icon-button" @click="onFieldAction(field)">
+              <Eye v-if="field.sensitive && !showSensitive" class="size-4" />
+              <Copy v-else class="size-4" />
+            </button>
+          </div>
         </div>
 
         <div v-if="notesText" class="grid min-h-12 grid-cols-[140px_minmax(0,1fr)] gap-3 border-b border-slate-100 px-3 py-3 last:border-b-0">

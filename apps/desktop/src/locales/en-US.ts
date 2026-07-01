@@ -381,6 +381,7 @@ const enUS: LocaleMessages = {
     date: "Date",
     secret: "Secret",
     note: "Note",
+    attachment: "Attachments",
     cardholder: "Cardholder",
     cardNumber: "Card number",
     expiry: "Expiry",

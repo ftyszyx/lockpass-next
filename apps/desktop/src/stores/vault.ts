@@ -2,7 +2,8 @@ import { defineStore } from 'pinia'
 import type {
   Vault,
   VaultAttachment,
-  VaultItem
+  VaultItem,
+  VaultItemField
 } from '@lockpass/core'
 import { desktopMessages, type SupportedLocale } from '@/i18n'
 import { detectBrowserLocale, loadSystemLocale } from '@/services/locale'
@@ -1318,8 +1319,8 @@ export const useVaultStore = defineStore('vault', {
         ? this.items.find((item) => item.id === input.editingItemId) ?? null
         : null
       const itemId = existing?.id ?? `item-${crypto.randomUUID()}`
-      const urlFields = input.fields.filter((field) => field.kind === 'url').map((field) => field.value)
-      const visibleFields = input.fields.filter((field) => field.kind !== 'url')
+      const urlFields = collectUrlFieldValues(input.fields)
+      const visibleFields = stripUrlFields(input.fields)
       const nextRevision = (existing?.sync.revision ?? 0) + 1
       const attachmentIds = input.attachments.map((attachment) => attachment.id)
 
@@ -1551,3 +1552,21 @@ export const useVaultStore = defineStore('vault', {
     }
   }
 })
+
+function collectUrlFieldValues(fields: VaultItemField[]): string[] {
+  return fields.flatMap((field) => {
+    if (field.kind === 'url') return [field.value]
+    return collectUrlFieldValues(field.children ?? [])
+  })
+}
+
+function stripUrlFields(fields: VaultItemField[]): VaultItemField[] {
+  return fields
+    .filter((field) => field.kind !== 'url')
+    .flatMap((field) => {
+      if (!field.children?.length) return field
+      const children = stripUrlFields(field.children)
+      if (field.kind === 'group' && children.length === 0) return []
+      return children.length ? [{ ...field, children }] : [field]
+    })
+}

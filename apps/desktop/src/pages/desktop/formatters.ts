@@ -56,6 +56,7 @@ export function fieldLabel(
     date: t("fields.date"),
     secret: t("fields.secret"),
     note: t("fields.note"),
+    attachment: t("fields.attachment"),
     cardholder: t("fields.cardholder"),
     "card-number": t("fields.cardNumber"),
     expiry: t("fields.expiry"),
@@ -98,7 +99,9 @@ export function detailFields(t: Translate, item: VaultItem): VaultItemField[] {
   return [
     ...urlFields,
     ...item.fields.filter(
-      (field) => field.kind !== "note" || (field.children?.length ?? 0) > 0,
+      (field) =>
+        field.kind !== "attachment" &&
+        (field.kind !== "note" || (field.children?.length ?? 0) > 0),
     ),
   ];
 }

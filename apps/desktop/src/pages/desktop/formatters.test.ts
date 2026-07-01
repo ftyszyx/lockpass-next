@@ -14,6 +14,7 @@ const t = (key: string) =>
     "fields.date": "Date",
     "fields.secret": "Secret",
     "fields.note": "Note",
+    "fields.attachment": "Attachments",
     "fields.cardholder": "Cardholder",
     "fields.cardNumber": "Card number",
     "fields.expiry": "Expiry",
@@ -22,6 +23,7 @@ const t = (key: string) =>
   })[key] ?? key;
 
 assert.equal(fieldLabel(t, "password"), "Password");
+assert.equal(fieldLabel(t, "attachment"), "Attachments");
 assert.equal(fieldLabel(t, "password", "Admin password"), "Admin password");
 assert.equal(
   fieldDisplayLabel(t, {

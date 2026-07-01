@@ -348,6 +348,7 @@ const zhCN = {
     date: "日期",
     secret: "密钥",
     note: "备注",
+    attachment: "附件",
     cardholder: "持卡人",
     cardNumber: "卡号",
     expiry: "有效期",

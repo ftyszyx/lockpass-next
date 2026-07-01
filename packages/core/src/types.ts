@@ -54,6 +54,7 @@ export type VaultItemFieldKind =
   | "date"
   | "secret"
   | "note"
+  | "attachment"
   | "cardholder"
   | "card-number"
   | "expiry"

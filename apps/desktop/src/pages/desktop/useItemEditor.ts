@@ -12,6 +12,8 @@ import {
   appendExtraDraftField,
   buildDefaultDraftFields,
   flattenAttachmentDraftBlocks,
+  hydrateAttachmentDraftFields,
+  makeAttachmentDraftField,
   makeAttachmentDraftBlock,
   makeDraftField,
   normalizeDraftFieldsForSave,
@@ -123,7 +125,7 @@ export function useItemEditor(input: UseItemEditorInput) {
     const urlFields = item.urls.map((url) =>
       makeDraftField(input.t, "url", url, false, input.t("fields.url")),
     );
-    itemDraft.fields = [
+    const draftFields = [
       ...urlFields,
       ...item.fields,
     ].map((field) => ({
@@ -141,9 +143,13 @@ export function useItemEditor(input: UseItemEditorInput) {
       }),
     );
     itemDraft.attachments = attachmentDrafts;
-    itemDraft.attachmentBlocks = attachmentDrafts.length
-      ? [makeAttachmentDraftBlock(attachmentDrafts)]
-      : [];
+    const hydrated = hydrateAttachmentDraftFields(
+      input.t,
+      draftFields,
+      attachmentDrafts,
+    );
+    itemDraft.fields = hydrated.fields;
+    itemDraft.attachmentBlocks = hydrated.attachmentBlocks;
     input.activeModal.value = "item";
   }
 
@@ -154,15 +160,20 @@ export function useItemEditor(input: UseItemEditorInput) {
   }
 
   function addDraftAttachmentBlock(): void {
-    itemDraft.attachmentBlocks = [
-      ...itemDraft.attachmentBlocks,
-      makeAttachmentDraftBlock(),
+    const block = makeAttachmentDraftBlock();
+    itemDraft.attachmentBlocks = [...itemDraft.attachmentBlocks, block];
+    itemDraft.fields = [
+      ...itemDraft.fields,
+      makeAttachmentDraftField(input.t, block.id),
     ];
   }
 
   function removeDraftAttachmentBlock(id: string): void {
     itemDraft.attachmentBlocks = itemDraft.attachmentBlocks.filter(
       (block) => block.id !== id,
+    );
+    itemDraft.fields = itemDraft.fields.filter(
+      (field) => !(field.kind === "attachment" && field.value === id),
     );
     syncDraftAttachments();
   }
@@ -214,6 +225,12 @@ export function useItemEditor(input: UseItemEditorInput) {
   }
 
   function removeDraftField(id: string): void {
+    const field = itemDraft.fields.find((candidate) => candidate.id === id);
+    if (field?.kind === "attachment") {
+      removeDraftAttachmentBlock(field.value);
+      return;
+    }
+
     itemDraft.fields = itemDraft.fields.filter((field) => field.id !== id);
   }
 
@@ -248,7 +265,10 @@ export function useItemEditor(input: UseItemEditorInput) {
       vaultId: itemDraft.vaultId,
       title: itemDraft.title,
       notes: itemDraft.type === "secure-note" ? itemDraft.notes : "",
-      fields: normalizeDraftFieldsForSave(itemDraft.fields),
+      fields: normalizeDraftFieldsForSave(
+        itemDraft.fields,
+        itemDraft.attachmentBlocks,
+      ),
       attachments: flattenAttachmentDraftBlocks(itemDraft.attachmentBlocks),
     });
 

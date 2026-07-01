@@ -7,7 +7,7 @@ import type {
   VaultItemType
 } from "./types";
 
-export type VaultItemFieldInput = Partial<VaultItemField> & {
+export type VaultItemFieldInput = Omit<Partial<VaultItemField>, "children"> & {
   kind: VaultItemFieldKind;
   value?: string | null;
   children?: readonly VaultItemFieldInput[];
@@ -38,6 +38,7 @@ const DEFAULT_FIELD_LABELS: Record<VaultItemFieldKind, string> = {
   date: "Date",
   secret: "Secret",
   note: "Note",
+  attachment: "Attachments",
   cardholder: "Cardholder",
   "card-number": "Card number",
   expiry: "Expiry",

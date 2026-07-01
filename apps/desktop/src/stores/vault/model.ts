@@ -433,18 +433,30 @@ export function buildSubtitle(
     });
   if (type === "payment-card")
     return (
-      fields.find((field) => field.kind === "cardholder")?.value ||
+      findFieldValue(fields, "cardholder") ||
       defaults.paymentCard
     );
   if (type === "secure-note")
     return notes.trim().slice(0, 80) || defaults.secureNote;
 
   const account =
-    fields.find((field) => field.kind === "username")?.value ||
+    findFieldValue(fields, "username") ||
     defaults.account;
   const website =
-    fields.find((field) => field.kind === "url")?.value || defaults.website;
+    findFieldValue(fields, "url") || defaults.website;
   return formatMessage(defaults.loginSubtitle, { account, website });
+}
+
+function findFieldValue(
+  fields: VaultItemField[],
+  kind: VaultItemField["kind"],
+): string {
+  for (const field of fields) {
+    if (field.kind === kind && field.value) return field.value;
+    const childValue = findFieldValue(field.children ?? [], kind);
+    if (childValue) return childValue;
+  }
+  return "";
 }
 
 export function formatMessage(

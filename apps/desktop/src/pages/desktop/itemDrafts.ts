@@ -9,6 +9,7 @@ import type { AddMoreMenuItem, AttachmentDraftBlock } from "./types";
 
 type Translate = (key: string) => string;
 type ExtraFieldKind = "password" | "date" | "totp" | "note";
+const ATTACHMENT_FIELD_ID_PREFIX = "optional-field-attachment-";
 
 export const CARD_CONTACT_FIELD_LABEL_KEYS = {
   issuer: "editor.cardIssuer",
@@ -90,16 +91,36 @@ export function isCardContactDraftField(field: VaultItemField): boolean {
 
 export function normalizeDraftFieldsForSave(
   fields: VaultItemField[],
+  attachmentBlocks: AttachmentDraftBlock[] = [],
 ): VaultItemField[] {
-  return fields.map((field) => normalizeDraftFieldForSave(field));
+  return fields.flatMap((field) =>
+    normalizeDraftFieldForSave(field, attachmentBlocks),
+  );
 }
 
 export function makeAttachmentDraftBlock(
+  blockIdOrAttachments: string | AttachmentDraft[] = [],
   attachments: AttachmentDraft[] = [],
 ): AttachmentDraftBlock {
+  const hasExplicitBlockId = typeof blockIdOrAttachments === "string";
   return {
-    id: `attachment-block-${crypto.randomUUID()}`,
-    attachments,
+    id: hasExplicitBlockId
+      ? blockIdOrAttachments
+      : `attachment-block-${crypto.randomUUID()}`,
+    attachments: hasExplicitBlockId ? attachments : blockIdOrAttachments,
+  };
+}
+
+export function makeAttachmentDraftField(
+  t: Translate,
+  blockId: string,
+): VaultItemField {
+  return {
+    id: `${ATTACHMENT_FIELD_ID_PREFIX}${crypto.randomUUID()}`,
+    kind: "attachment",
+    label: t("detail.attachments"),
+    value: blockId,
+    sensitive: false,
   };
 }
 
@@ -107,6 +128,58 @@ export function flattenAttachmentDraftBlocks(
   blocks: AttachmentDraftBlock[],
 ): AttachmentDraft[] {
   return blocks.flatMap((block) => block.attachments);
+}
+
+export function hydrateAttachmentDraftFields(
+  t: Translate,
+  fields: VaultItemField[],
+  attachments: AttachmentDraft[],
+): { fields: VaultItemField[]; attachmentBlocks: AttachmentDraftBlock[] } {
+  const attachmentsById = new Map(
+    attachments.map((attachment) => [attachment.id, attachment]),
+  );
+  const usedAttachmentIds = new Set<string>();
+  const nextFields: VaultItemField[] = [];
+  const attachmentBlocks: AttachmentDraftBlock[] = [];
+
+  for (const field of fields) {
+    if (!isAttachmentDraftField(field)) {
+      nextFields.push({ ...field });
+      continue;
+    }
+
+    const attachmentIds = parseAttachmentDraftFieldValue(field.value);
+    const blockAttachments = attachmentIds.flatMap((id) => {
+      const attachment = attachmentsById.get(id);
+      if (!attachment) return [];
+      usedAttachmentIds.add(id);
+      return [attachment];
+    });
+    const block = makeAttachmentDraftBlock(blockAttachments);
+    attachmentBlocks.push(block);
+    nextFields.push({ ...field, value: block.id });
+  }
+
+  const unassignedAttachments = attachments.filter(
+    (attachment) => !usedAttachmentIds.has(attachment.id),
+  );
+  if (unassignedAttachments.length > 0) {
+    if (attachmentBlocks.length > 0) {
+      attachmentBlocks[0] = {
+        ...attachmentBlocks[0],
+        attachments: [
+          ...attachmentBlocks[0].attachments,
+          ...unassignedAttachments,
+        ],
+      };
+    } else {
+      const block = makeAttachmentDraftBlock(unassignedAttachments);
+      attachmentBlocks.push(block);
+      nextFields.push(makeAttachmentDraftField(t, block.id));
+    }
+  }
+
+  return { fields: nextFields, attachmentBlocks };
 }
 
 export function getAddMoreMenuItems(
@@ -152,8 +225,16 @@ export function isOptionalDraftField(field: VaultItemField): boolean {
   return field.id.startsWith("optional-field-");
 }
 
+export function isAttachmentDraftField(field: VaultItemField): boolean {
+  return field.kind === "attachment";
+}
+
 export function isUserEditableDraftField(field: VaultItemField): boolean {
-  return isOptionalDraftField(field) || isCardContactDraftField(field);
+  return (
+    isOptionalDraftField(field) ||
+    isCardContactDraftField(field) ||
+    isAttachmentDraftField(field)
+  );
 }
 
 export function makeDraftGroupField(t: Translate): VaultItemField {
@@ -215,10 +296,51 @@ function todayDateValue(): string {
   return `${year}-${month}-${day}`;
 }
 
-function normalizeDraftFieldForSave(field: VaultItemField): VaultItemField {
+function normalizeDraftFieldForSave(
+  field: VaultItemField,
+  attachmentBlocks: AttachmentDraftBlock[],
+): VaultItemField[] {
   const { collapsed: _collapsed, children, ...savedField } = field;
-  const normalizedChildren = children?.map(normalizeDraftFieldForSave) ?? [];
-  return normalizedChildren.length
+  if (isAttachmentDraftField(field)) {
+    const attachmentIds =
+      attachmentBlocks
+        .find((block) => block.id === field.value)
+        ?.attachments.map((attachment) => attachment.id) ??
+      parseAttachmentDraftFieldValue(field.value);
+
+    return attachmentIds.length
+      ? [{ ...savedField, value: encodeAttachmentDraftFieldValue(attachmentIds) }]
+      : [];
+  }
+
+  const normalizedChildren =
+    children?.flatMap((child) =>
+      normalizeDraftFieldForSave(child, attachmentBlocks),
+    ) ?? [];
+  const normalizedField = normalizedChildren.length
     ? { ...savedField, children: normalizedChildren }
     : savedField;
+  return [normalizedField];
+}
+
+function encodeAttachmentDraftFieldValue(attachmentIds: string[]): string {
+  return JSON.stringify(attachmentIds);
+}
+
+function parseAttachmentDraftFieldValue(value: string): string[] {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.startsWith("attachment-block-")) return [];
+
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) {
+      return parsed.filter(
+        (id): id is string => typeof id === "string" && id.length > 0,
+      );
+    }
+  } catch {
+    // Older local drafts may have stored a single attachment id directly.
+  }
+
+  return trimmed.startsWith("attachment-") ? [trimmed] : [];
 }
