@@ -66,14 +66,13 @@
       }
 
       .titlebar {
-        display: flex;
+        display: grid;
+        grid-template-columns: minmax(260px, 520px) 1fr;
         align-items: center;
-        justify-content: space-between;
         gap: 16px;
-        padding: 0 18px;
+        padding: 0 14px;
         border-bottom: 1px solid var(--line);
-        background: rgba(255, 255, 255, 0.82);
-        backdrop-filter: blur(16px);
+        background: #ffffff;
       }
 
       .brand {
@@ -104,7 +103,7 @@
       .global-search {
         position: relative;
         display: block;
-        width: min(480px, 38vw);
+        width: 100%;
       }
 
       .global-search i,
@@ -120,17 +119,18 @@
 
       .global-search input {
         width: 100%;
-        height: 34px;
+        height: 36px;
         padding: 0 14px 0 38px;
         border: 1px solid var(--line);
         border-radius: 8px;
         outline: none;
-        background: #ffffff;
+        background: #f8fafc;
         color: var(--text);
       }
 
       .global-search input:focus {
         border-color: var(--teal);
+        background: #ffffff;
         box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.13);
       }
 
@@ -138,8 +138,8 @@
         display: flex;
         align-items: center;
         justify-content: flex-end;
-        gap: 8px;
-        min-width: 330px;
+        gap: 6px;
+        min-width: 0;
       }
 
       .button {
@@ -172,6 +172,11 @@
         border-color: var(--teal);
         background: var(--teal);
         color: #ffffff;
+      }
+
+      .toolbar .button.primary {
+        height: 36px;
+        padding: 0 16px;
       }
 
       .button.danger {
@@ -494,100 +499,6 @@
         font-size: 12px;
       }
 
-      .sidebar-footer {
-        margin-top: auto;
-        padding: 12px;
-        border-top: 1px solid rgba(203, 213, 221, 0.8);
-      }
-
-      .sync-box {
-        display: grid;
-        gap: 9px;
-        margin-bottom: 12px;
-        padding: 11px;
-        border: 1px solid #d5e6df;
-        border-radius: 8px;
-        background: #ffffff;
-      }
-
-      .sync-box.offline {
-        border-color: #fda4af;
-        background: #fff1f2;
-      }
-
-      .sync-box.unsynced {
-        border-color: #fcd34d;
-        background: #fffbeb;
-      }
-
-      .sync-box.synced {
-        border-color: #bcdcd6;
-        background: #eff8f6;
-      }
-
-      .sync-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-      }
-
-      .sync-row > span {
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .status-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        height: 24px;
-        padding: 0 8px;
-        border: 1px solid transparent;
-        border-radius: 999px;
-        background: var(--teal-soft);
-        color: var(--teal);
-        cursor: pointer;
-        font-size: 12px;
-        font-weight: 720;
-      }
-
-      .status-dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 999px;
-        background: currentColor;
-      }
-
-      .sidebar-tool-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 4px;
-        margin-bottom: 12px;
-        padding: 4px;
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.72);
-      }
-
-      .sidebar-tool-grid .mini-button {
-        width: 100%;
-        height: 32px;
-      }
-
-      .storage-box {
-        min-width: 0;
-        padding: 0 4px;
-        color: var(--muted);
-        font-size: 12px;
-        line-height: 1.5;
-      }
-
-      .storage-box strong {
-        color: #4c5d66;
-      }
-
       .content-list {
         display: flex;
         min-height: 0;
@@ -603,44 +514,114 @@
         border-bottom: 1px solid var(--line);
       }
 
-      .list-heading {
+      .filters {
+        position: relative;
         display: flex;
         align-items: center;
         justify-content: space-between;
-      }
-
-      .list-heading h1 {
-        margin: 0;
-        font-size: 20px;
-        line-height: 1.2;
-      }
-
-      .filters {
-        display: flex;
         gap: 8px;
       }
 
-      .segmented {
-        display: inline-flex;
-        height: 30px;
-        overflow: hidden;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: #f7f9fa;
+      .category-dropdown {
+        position: relative;
+        min-width: 0;
       }
 
-      .segmented button {
-        min-width: 64px;
-        padding: 0 10px;
-        background: transparent;
-        color: var(--muted);
+      .category-pill {
+        display: inline-flex;
+        height: 30px;
+        align-items: center;
+        gap: 8px;
+        border: 0;
+        border-radius: 8px;
+        background: #e7f1ff;
+        padding: 0 12px;
+        color: #38445a;
+        font-weight: 720;
         cursor: pointer;
       }
 
-      .segmented button.active {
+      .category-pill i,
+      .category-pill svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      .tiny-grid {
+        display: grid;
+        width: 16px;
+        height: 16px;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 3px;
+      }
+
+      .tiny-grid span {
+        border-radius: 3px;
+        background: #66b6ff;
+      }
+
+      .category-menu {
+        position: absolute;
+        top: 36px;
+        left: 0;
+        z-index: 10;
+        display: none;
+        width: 206px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
         background: #ffffff;
+        box-shadow: 0 14px 32px rgba(15, 23, 42, 0.18);
+      }
+
+      .category-menu.open {
+        display: block;
+      }
+
+      .category-option {
+        display: grid;
+        width: 100%;
+        min-height: 36px;
+        grid-template-columns: 18px minmax(0, 1fr) 18px;
+        align-items: center;
+        gap: 8px;
+        background: #ffffff;
+        padding: 0 12px;
         color: var(--text);
-        box-shadow: inset 0 0 0 1px var(--line);
+        text-align: left;
+      }
+
+      .category-option.active {
+        background: #0b72e7;
+        color: #ffffff;
+      }
+
+      .category-option.active .tiny-grid span {
+        background: #ffffff;
+      }
+
+      .category-option .item-kind-icon {
+        width: 18px;
+        height: 18px;
+        border-radius: 5px;
+      }
+
+      .category-option .item-kind-icon i,
+      .category-option .item-kind-icon svg {
+        width: 12px;
+        height: 12px;
+      }
+
+      .category-option .item-type-dot {
+        display: block;
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+      }
+
+      .list-tools {
+        display: flex;
+        gap: 4px;
       }
 
       .item-list {
@@ -651,7 +632,7 @@
 
       .item-row {
         display: grid;
-        grid-template-columns: 38px minmax(0, 1fr) auto;
+        grid-template-columns: 38px minmax(0, 1fr);
         gap: 10px;
         align-items: center;
         width: 100%;
@@ -669,8 +650,8 @@
       }
 
       .item-row.active {
-        border-color: #bcdcd6;
-        background: #eff8f6;
+        border-color: transparent;
+        background: #ebebec;
       }
 
       .item-icon {
@@ -1045,6 +1026,383 @@
         padding-top: 2px;
       }
 
+      .item-modal {
+        width: 580px;
+        max-height: 86vh;
+        overflow: hidden;
+        background: #f8f8f8;
+      }
+
+      .item-pick-screen,
+      .item-edit-screen {
+        display: none;
+        min-height: 0;
+      }
+
+      .item-pick-screen.active,
+      .item-edit-screen.active {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+      }
+
+      .item-type-picker {
+        position: relative;
+        overflow: auto;
+        padding: 20px;
+      }
+
+      .item-type-picker h3 {
+        margin: 6px 0 18px;
+        text-align: center;
+        font-size: 22px;
+      }
+
+      .item-type-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .item-type-card {
+        display: grid;
+        min-height: 96px;
+        align-content: center;
+        justify-items: start;
+        gap: 12px;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+        color: var(--text);
+        text-align: left;
+      }
+
+      .item-type-card:hover {
+        border-color: #8ec5ff;
+        box-shadow: 0 0 0 3px rgba(11, 114, 231, 0.12);
+      }
+
+      .item-kind-icon {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border-radius: 8px;
+        color: #06353b;
+      }
+
+      .kind-login {
+        background: linear-gradient(135deg, #bdf3ef, #52d4d0);
+      }
+
+      .kind-note {
+        background: linear-gradient(180deg, #ffb703 0 28%, #ffefd5 28%);
+      }
+
+      .kind-card {
+        background: linear-gradient(180deg, #2d9bf0 0 45%, #9ee2ff 45%);
+      }
+
+      .kind-import {
+        background: #e7f1ff;
+        color: #0b72e7;
+      }
+
+      .item-picker-footer {
+        margin-top: 26px;
+        padding-top: 16px;
+        border-top: 1px solid var(--line);
+      }
+
+      .item-picker-row {
+        display: grid;
+        width: 100%;
+        min-height: 48px;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        padding: 0 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+        color: var(--text);
+        text-align: left;
+      }
+
+      .item-edit-top {
+        flex: 0 0 auto;
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr) 44px;
+        align-items: center;
+        min-height: 50px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.92);
+      }
+
+      .item-edit-top h3 {
+        margin: 0;
+        text-align: center;
+      }
+
+      .item-edit-body {
+        display: grid;
+        gap: 14px;
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+        padding: 18px;
+      }
+
+      .item-edit-screen .modal-actions {
+        flex: 0 0 auto;
+      }
+
+      .item-edit-hero {
+        display: grid;
+        grid-template-columns: 60px minmax(0, 1fr);
+        gap: 14px;
+        align-items: center;
+      }
+
+      .item-edit-hero .item-kind-icon {
+        width: 60px;
+        height: 60px;
+      }
+
+      .item-title-input {
+        min-height: 50px;
+        padding: 0 14px;
+        border: 3px solid #a7d0ff;
+        border-radius: 8px;
+        background: #ffffff;
+        font-size: 22px;
+        font-weight: 760;
+        outline: none;
+      }
+
+      .website-stack {
+        display: grid;
+        gap: 8px;
+      }
+
+      .website-row {
+        display: grid;
+        grid-template-columns: 22px minmax(0, 1fr) 34px 34px;
+        gap: 8px;
+        align-items: center;
+        padding: 8px;
+        border-radius: 8px;
+        background: #f0f1f2;
+      }
+
+      .website-row:focus-within {
+        box-shadow: 0 0 0 3px #a7d0ff;
+      }
+
+      .website-drag {
+        display: grid;
+        color: #2c3a3f;
+        place-items: center;
+      }
+
+      .website-main {
+        display: grid;
+        gap: 4px;
+      }
+
+      .website-main label {
+        color: #52636b;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .website-main input {
+        min-height: 28px;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        color: var(--text);
+        font-size: 16px;
+        outline: none;
+      }
+
+      .website-row .button {
+        border-color: transparent;
+        background: transparent;
+      }
+
+      .website-row [data-remove-website] {
+        color: #ef4444;
+      }
+
+      .website-add {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        justify-self: start;
+        border: 0;
+        background: transparent;
+        color: #005fcc;
+        font-weight: 760;
+        cursor: pointer;
+      }
+
+      .website-add i,
+      .website-add svg {
+        width: 15px;
+        height: 15px;
+      }
+
+      .card-contact-group {
+        display: grid;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #f1f2f3;
+      }
+
+      .card-contact-row {
+        display: grid;
+        grid-template-columns: 28px minmax(0, 1fr) 34px;
+        align-items: center;
+        min-height: 52px;
+        gap: 8px;
+        border-bottom: 1px solid #d9dee2;
+        padding: 7px 8px;
+      }
+
+      .card-contact-row:last-child {
+        border-bottom: 0;
+      }
+
+      .card-contact-drag {
+        display: grid;
+        place-items: center;
+        color: #1f2933;
+      }
+
+      .card-contact-main {
+        display: grid;
+        gap: 2px;
+      }
+
+      .card-contact-main label {
+        color: #1f2937;
+        font-size: 13px;
+        font-weight: 720;
+      }
+
+      .card-contact-main input {
+        min-height: 23px;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        color: var(--text);
+        font-size: 13px;
+        outline: none;
+      }
+
+      .card-contact-main input::placeholder {
+        color: #6b7280;
+      }
+
+      .card-contact-row .button {
+        border-color: transparent;
+        background: transparent;
+        color: #ff3b30;
+      }
+
+      .item-action-strip {
+        position: relative;
+      }
+
+      .optional-field {
+        position: relative;
+        display: grid;
+        gap: 8px;
+      }
+
+      .optional-field > .form-field {
+        margin: 0;
+      }
+
+      .remove-optional-field {
+        position: absolute;
+        top: 0;
+        right: 0;
+        z-index: 1;
+        width: 28px;
+        height: 28px;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: #ef4444;
+        cursor: pointer;
+      }
+
+      .remove-optional-field:hover {
+        background: #fee2e2;
+      }
+
+      .remove-optional-field i,
+      .remove-optional-field svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      .item-strip-button {
+        display: grid;
+        width: 100%;
+        min-height: 32px;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 8px;
+        padding: 0 14px;
+        border-radius: 7px;
+        background: #eef0f2;
+        color: #005fcc;
+        text-align: left;
+        font-size: 13px;
+        font-weight: 760;
+      }
+
+      .item-more-menu {
+        position: absolute;
+        top: 36px;
+        left: 0;
+        z-index: 10;
+        display: none;
+        width: 210px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 14px 32px rgba(15, 23, 42, 0.18);
+      }
+
+      .item-more-menu.open {
+        display: block;
+      }
+
+      .item-more-menu button {
+        display: block;
+        width: 100%;
+        min-height: 34px;
+        padding: 0 14px;
+        background: #ffffff;
+        text-align: left;
+      }
+
+      .item-more-menu button:hover {
+        background: #e9f2ff;
+      }
+
+      .item-more-divider {
+        height: 1px;
+        margin: 6px 14px;
+        background: var(--line);
+      }
+
       .upload-box {
         display: grid;
         gap: 10px;
@@ -1402,73 +1760,15 @@
         text-align: center;
       }
 
-      .sync-card-grid {
-        display: grid;
-        align-content: start;
-        gap: 12px;
-      }
-
-      .sync-state-card {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 10px 12px;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: #ffffff;
-      }
-
-      .sync-state-card.connected {
-        border-color: #bcdcd6;
-        background: #eff8f6;
-      }
-
-      .sync-state-card.offline {
-        border-color: #fda4af;
-        background: #fff1f2;
-      }
-
-      .sync-state-card.unsynced {
-        border-color: #fcd34d;
-        background: #fffbeb;
-      }
-
-      .sync-state-card p,
       .sync-note {
         margin: 0;
-        color: var(--muted);
-        font-size: 12px;
-        line-height: 1.55;
-      }
-
-      .sync-state-card p {
-        text-align: right;
-      }
-
-      .sync-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-
-      .sync-note {
         padding: 10px;
         border: 1px solid #dbe6ea;
         border-radius: 8px;
         background: #f8fbfc;
-      }
-
-      .status-pill.offline {
-        border-color: #fda4af;
-        background: #ffe4e6;
-        color: #be123c;
-      }
-
-      .status-pill.unsynced {
-        border-color: #fcd34d;
-        background: #fef3c7;
-        color: #92400e;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.55;
       }
 
       .toggle-row {
@@ -1555,18 +1855,6 @@
           grid-template-columns: var(--sidebar-width) 6px var(--list-width) 6px minmax(420px, 1fr);
         }
 
-        .brand {
-          min-width: 216px;
-        }
-
-        .global-search {
-          width: min(400px, 34vw);
-        }
-
-        .toolbar {
-          min-width: 262px;
-        }
-
         .field-row {
           grid-template-columns: 124px minmax(0, 1fr) auto;
         }
@@ -1576,24 +1864,16 @@
   <body>
     <div class="app-shell">
       <header class="titlebar">
-        <div class="brand">
-          <div class="brand-mark"><i data-lucide="lock-keyhole"></i></div>
-          <div>
-            LockPass Next
-            <small>Desktop Prototype</small>
-          </div>
-        </div>
         <label class="global-search">
           <i data-lucide="search"></i>
-          <input id="globalSearch" type="search" placeholder="搜索条目、网址、账号" autocomplete="off" />
+          <input id="globalSearch" type="search" placeholder="搜索条目、网址、标签" autocomplete="off" />
         </label>
         <div class="toolbar">
           <button class="button icon-only" id="quickOpen" title="快速搜索" aria-label="快速搜索">
             <i data-lucide="command"></i>
           </button>
-          <button class="button" id="generatorOpen">
+          <button class="button icon-only" id="generatorOpen" title="密码生成器" aria-label="密码生成器">
             <i data-lucide="wand-sparkles"></i>
-            生成
           </button>
           <button class="button primary" id="newItemOpen">
             <i data-lucide="plus"></i>
@@ -1638,40 +1918,6 @@
             <div id="vaultNav"></div>
           </nav>
 
-          <div class="sidebar-footer">
-            <div class="sync-box offline" id="syncSidebarBox">
-              <div class="sync-row">
-                <strong>同步</strong>
-                <button class="status-pill offline" id="syncSidebarPill" type="button"><span class="status-dot"></span><span id="syncSidebarStatus">未登录</span></button>
-              </div>
-              <div class="sync-row">
-                <span id="syncSidebarHost" style="color: var(--muted); font-size: 12px">点击配置同步</span>
-                <span style="display: flex; gap: 6px">
-                  <button class="button icon-only" id="syncNow" title="立即同步" aria-label="立即同步">
-                    <i data-lucide="refresh-cw"></i>
-                  </button>
-                  <button class="button icon-only" id="syncManage" title="同步设置" aria-label="同步设置">
-                    <i data-lucide="server-cog"></i>
-                  </button>
-                </span>
-              </div>
-            </div>
-            <div class="sidebar-tool-grid" aria-label="工具">
-              <button class="mini-button" id="showConflicts" title="同步冲突" aria-label="同步冲突">
-                <i data-lucide="triangle-alert"></i>
-              </button>
-              <button class="mini-button" id="backupAction" title="备份恢复" aria-label="备份恢复">
-                <i data-lucide="archive-restore"></i>
-              </button>
-              <button class="mini-button" id="settingsAction" title="设置" aria-label="设置">
-                <i data-lucide="settings"></i>
-              </button>
-            </div>
-            <div class="storage-box">
-              <strong>存储</strong>
-              <span>系统应用数据目录</span>
-            </div>
-          </div>
         </aside>
 
         <div
@@ -1685,18 +1931,25 @@
 
         <section class="content-list">
           <div class="list-header">
-            <div class="list-heading">
-              <h1 id="listTitle">全部条目</h1>
-              <span class="tag" id="listCount">0 项</span>
-            </div>
             <div class="filters">
-              <div class="segmented" aria-label="条目类型">
-                <button class="active" data-type="all">全部</button>
-                <button data-type="login">登录</button>
-                <button data-type="card">银行卡</button>
-                <button data-type="note">笔记</button>
+              <div class="category-dropdown">
+                <button class="category-pill" id="categoryFilterButton" type="button" aria-haspopup="menu" aria-expanded="false">
+                  <span class="tiny-grid" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+                  <span id="activeTypeLabel">所有类别</span>
+                  <i data-lucide="chevron-down"></i>
+                </button>
+                <div class="category-menu" id="categoryMenu" role="menu"></div>
+              </div>
+              <div class="list-tools">
+                <button class="button icon-only" type="button" title="搜索" aria-label="搜索">
+                  <i data-lucide="search"></i>
+                </button>
+                <button class="button icon-only" type="button" title="排序" aria-label="排序">
+                  <i data-lucide="arrow-down-up"></i>
+                </button>
               </div>
             </div>
+            <span class="tag" id="listCount">0 项</span>
           </div>
           <div class="item-list" id="itemList"></div>
         </section>
@@ -1964,64 +2217,6 @@
       </aside>
     </div>
 
-    <div class="drawer" id="syncDrawer" aria-hidden="true">
-      <div class="scrim" data-close="syncDrawer"></div>
-      <aside class="drawer-panel">
-        <div class="panel-head">
-          <h3>同步</h3>
-          <button class="button icon-only" data-close="syncDrawer" title="关闭" aria-label="关闭">
-            <i data-lucide="x"></i>
-          </button>
-        </div>
-        <div class="panel-body">
-          <div class="sync-card-grid">
-            <div class="sync-state-card offline" id="syncStatusCard">
-              <strong id="syncStatusTitle">未登录</strong>
-              <p id="syncStatusBody">选择官方登录，或连接自部署服务器。</p>
-            </div>
-
-            <div class="form-grid">
-              <div class="form-field">
-                <label for="syncMode">同步模式</label>
-                <select id="syncMode" class="select">
-                  <option value="official">LockPass 官方托管</option>
-                  <option value="selfhost">自建服务器</option>
-                </select>
-              </div>
-              <div class="form-field" id="selfHostServerField">
-                <label for="serverUrl">服务器地址</label>
-                <input id="serverUrl" class="input" placeholder="https://lockpass.example.com" />
-              </div>
-              <div class="form-field" id="selfHostSessionField">
-                <label for="syncSessionToken">登录 Token</label>
-                <input id="syncSessionToken" class="input" placeholder="登录后获得的 Web session token" />
-              </div>
-            </div>
-
-            <div class="sync-actions">
-              <button class="button primary" id="syncLogin">
-                <i data-lucide="log-in"></i>
-                跳转官方登录
-              </button>
-              <button class="button hidden" id="syncLogout">
-                <i data-lucide="log-out"></i>
-                退出登录
-              </button>
-              <button class="button hidden" id="syncNowSettings">
-                <i data-lucide="refresh-cw"></i>
-                立即同步
-              </button>
-            </div>
-
-            <button class="button" id="saveSyncSettings">
-              <i data-lucide="save"></i>
-              保存自部署设置
-            </button>
-          </div>
-        </div>
-      </aside>
-    </div>
-
     <div class="modal-layer" id="vaultModal" aria-hidden="true">
       <div class="scrim" data-close="vaultModal"></div>
       <section class="modal" role="dialog" aria-modal="true" aria-labelledby="vaultModalTitle">
@@ -2061,41 +2256,61 @@
 
     <div class="modal-layer" id="itemModal" aria-hidden="true">
       <div class="scrim" data-close="itemModal"></div>
-      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="itemModalTitle">
-        <div class="panel-head">
-          <h3 id="itemModalTitle">新建条目</h3>
-          <button class="button icon-only" data-close="itemModal" title="关闭" aria-label="关闭">
-            <i data-lucide="x"></i>
-          </button>
-        </div>
-        <div class="modal-body">
-          <div class="form-grid">
-            <div class="form-field">
-              <label for="newType">类型<span class="required-mark">*</span></label>
-              <select id="newType" class="select">
-                <option value="login">登录密码</option>
-                <option value="card">银行卡</option>
-                <option value="note">安全笔记</option>
-              </select>
+      <section class="modal item-modal" role="dialog" aria-modal="true" aria-labelledby="itemModalTitle">
+        <div class="item-pick-screen active" id="itemTypePickerScreen">
+          <div class="item-type-picker">
+            <button class="button icon-only" data-close="itemModal" title="关闭" aria-label="关闭" style="position: absolute; top: 14px; right: 14px">
+              <i data-lucide="x"></i>
+            </button>
+            <h3>你想要添加什么？</h3>
+            <div class="item-type-grid" id="itemTypeGrid"></div>
+            <div class="item-picker-footer">
+              <button class="item-picker-row" type="button" data-item-kind="import">
+                <span>从浏览器或文件导入</span>
+                <i data-lucide="arrow-right"></i>
+              </button>
             </div>
-            <div class="form-field">
-              <label for="newVault">保险库<span class="required-mark">*</span></label>
-              <select id="newVault" class="select"></select>
-            </div>
-            <div class="form-field">
-              <label for="newName">名称<span class="required-mark">*</span></label>
-              <input id="newName" class="input" value="登录密码" />
-            </div>
-            <div id="typeFields" class="type-fields"></div>
-            <div class="form-error hidden" id="itemError"></div>
           </div>
         </div>
-        <div class="modal-actions">
-          <button class="button" data-close="itemModal">取消</button>
-          <button class="button primary" id="saveNewItem">
-            <i data-lucide="save"></i>
-            保存
-          </button>
+        <div class="item-edit-screen" id="itemEditScreen">
+          <div class="item-edit-top">
+            <button class="button icon-only" id="backToItemPicker" type="button" title="返回" aria-label="返回">
+              <i data-lucide="arrow-left"></i>
+            </button>
+            <h3 id="itemModalTitle">新的项目</h3>
+            <button class="button icon-only" data-close="itemModal" title="关闭" aria-label="关闭">
+              <i data-lucide="x"></i>
+            </button>
+          </div>
+          <div class="item-edit-body">
+            <div class="item-edit-hero">
+              <span class="item-kind-icon kind-login" id="itemEditIcon"><i data-lucide="key-round"></i></span>
+              <input id="newName" class="item-title-input" value="登录密码" aria-label="条目名称" />
+            </div>
+            <input id="newType" type="hidden" value="login" />
+            <div id="typeFields" class="type-fields"></div>
+            <div class="item-action-strip">
+              <button class="item-strip-button" id="itemMoreButton" type="button" aria-haspopup="menu" aria-expanded="false">
+                <i data-lucide="plus-circle"></i>
+                添加更多
+                <i data-lucide="chevron-down"></i>
+              </button>
+              <div class="item-more-menu" id="itemMoreMenu" role="menu">
+                <button type="button" data-add-field="totp">一次性验证码</button>
+                <button type="button" data-add-field="attachment">附件</button>
+                <div class="item-more-divider"></div>
+                <button type="button" data-add-field="note">备注</button>
+              </div>
+            </div>
+            <div class="form-error hidden" id="itemError"></div>
+          </div>
+          <div class="modal-actions">
+            <button class="button" data-close="itemModal">取消</button>
+            <button class="button primary" id="saveNewItem">
+              <i data-lucide="save"></i>
+              保存
+            </button>
+          </div>
         </div>
       </section>
     </div>
@@ -2387,6 +2602,19 @@
         { id: "user-demo", name: "Demo User", initials: "DU" }
       ]
 
+      const categoryFilters = [
+        { type: "all", label: "所有类别", icon: "grid" },
+        { type: "login", label: "登录密码", icon: "key-round", className: "kind-login" },
+        { type: "note", label: "安全笔记", icon: "file-text", className: "kind-note" },
+        { type: "card", label: "银行卡", icon: "credit-card", className: "kind-card" }
+      ]
+
+      const itemKinds = [
+        { type: "login", label: "登录信息", icon: "key-round", className: "kind-login" },
+        { type: "note", label: "安全备注", icon: "file-text", className: "kind-note" },
+        { type: "card", label: "信用卡", icon: "credit-card", className: "kind-card" }
+      ]
+
       const items = [
         {
           id: "github",
@@ -2447,6 +2675,21 @@
           password: "6225 **** **** 2037",
           totp: "",
           notes: "账单日 12 号。",
+          fields: {
+            cardNumber: "6225 **** **** 2037",
+            holder: "张宇新",
+            expiry: "08/28",
+            cvc: "123",
+            pin: "",
+            contactInfo: [
+              { key: "issuer", label: "发卡行", placeholder: "文本", value: "招商银行" },
+              { key: "phoneLocal", label: "电话（本地）", placeholder: "文本", value: "95555" },
+              { key: "phoneTollFree", label: "电话（免费）", placeholder: "文本", value: "400-820-5555" },
+              { key: "phoneInternational", label: "电话（国际）", placeholder: "文本", value: "+86 755 8439 1000" },
+              { key: "site", label: "网站", placeholder: "文本", value: "cmbchina.com" }
+            ],
+            notes: "账单日 12 号。"
+          },
           updated: "2026-05-11 08:03",
           favorite: false,
           strength: 0,
@@ -2520,14 +2763,6 @@
         layout: {
           sidebarWidth: 236,
           itemListWidth: 358
-        },
-        sync: {
-          mode: "official",
-          connected: false,
-          serverUrl: "",
-          sessionToken: "",
-          account: "",
-          lastSync: "从未同步"
         }
       }
 
@@ -2895,8 +3130,7 @@
         return items.filter((item) => {
           const matchVault = state.vault === "all" || item.vault === state.vault
           const matchType = state.type === "all" || item.type === state.type
-          const attachmentText = (item.attachments || []).map((file) => file.name).join(" ")
-          const text = `${item.name} ${item.url || ""} ${item.username || ""} ${item.notes || ""} ${attachmentText}`.toLowerCase()
+          const text = itemSearchText(item).toLowerCase()
           return matchVault && matchType && (!query || text.includes(query))
         })
       }
@@ -2913,16 +3147,32 @@
         return vaults.find((item) => item.id === vault)?.name || "全部条目"
       }
 
+      function defaultWritableVault() {
+        return vaults.find((vault) => !vault.system) || vaults[0]
+      }
+
+      function selectedWritableVaultId() {
+        const selectedVault = vaults.find((vault) => vault.id === state.vault && !vault.system)
+        return selectedVault?.id || defaultWritableVault()?.id || "work"
+      }
+
+      const defaultCardContactFields = [
+        { key: "issuer", label: "发卡行", placeholder: "文本" },
+        { key: "phoneLocal", label: "电话（本地）", placeholder: "文本" },
+        { key: "phoneTollFree", label: "电话（免费）", placeholder: "文本" },
+        { key: "phoneInternational", label: "电话（国际）", placeholder: "文本" },
+        { key: "site", label: "网站", placeholder: "文本" }
+      ]
+
       function defaultFieldsForType(type) {
         if (type === "card") {
           return {
-            issuer: "",
             cardNumber: "",
             holder: "",
             expiry: "",
             cvc: "",
             pin: "",
-            site: "",
+            contactInfo: defaultCardContactFields.map((field) => ({ ...field, value: "" })),
             notes: "",
             attachments: []
           }
@@ -2930,13 +3180,13 @@
         if (type === "note") {
           return {
             noteText: "",
-            recoveryCode: "",
             notes: "",
             attachments: []
           }
         }
         return {
           url: "",
+          websites: [""],
           username: "",
           password: "",
           totp: "",
@@ -2946,13 +3196,24 @@
       }
 
       function fieldsFromItem(item) {
-        if (item.fields) return { ...defaultFieldsForType(item.type), ...item.fields, attachments: item.attachments || item.fields.attachments || [] }
+        if (item.fields) {
+          const fields = { ...defaultFieldsForType(item.type), ...item.fields, attachments: item.attachments || item.fields.attachments || [] }
+          if (item.type === "login" && (!fields.websites || !fields.websites.length)) fields.websites = fields.url ? [fields.url] : item.url ? [item.url] : [""]
+          if (item.type === "card") fields.contactInfo = item.fields.contactInfo || defaultFieldsForType("card").contactInfo
+          return fields
+        }
         if (item.type === "card") {
           return {
             ...defaultFieldsForType("card"),
-            issuer: item.url || "招商银行",
             cardNumber: item.password || "",
             holder: item.username || "",
+            contactInfo: [
+              { ...defaultCardContactFields[0], value: item.issuer || "" },
+              { ...defaultCardContactFields[1], value: item.phoneLocal || "" },
+              { ...defaultCardContactFields[2], value: item.phoneTollFree || "" },
+              { ...defaultCardContactFields[3], value: item.phoneInternational || "" },
+              { ...defaultCardContactFields[4], value: item.url || "" }
+            ],
             notes: item.notes || "",
             attachments: item.attachments || []
           }
@@ -2967,6 +3228,7 @@
         return {
           ...defaultFieldsForType("login"),
           url: item.url || "",
+          websites: item.fields?.websites || (item.url ? [item.url] : [""]),
           username: item.username || "",
           password: item.password || "",
           totp: item.totp || "",
@@ -2977,16 +3239,104 @@
 
       function itemSubtitle(item) {
         const fields = fieldsFromItem(item)
-        if (item.type === "card") return `${fields.holder || "持卡人"} · ${fields.issuer || "发卡机构"}`
+        if (item.type === "card") return `${fields.holder || "持卡人"} · ${fields.cardNumber || "卡号"}`
         if (item.type === "note") return fields.noteText || "安全笔记"
-        return `${fields.username || "账号"} · ${fields.url || "网址"}`
+        return `${fields.username || "账号"} · ${primaryWebsite(fields) || "网址"}`
       }
 
       function itemDetailSubtitle(item) {
         const fields = fieldsFromItem(item)
-        if (item.type === "card") return fields.issuer || "银行卡"
+        if (item.type === "card") return fields.holder || "银行卡"
         if (item.type === "note") return "安全笔记"
-        return fields.url || "登录密码"
+        return primaryWebsite(fields) || "登录密码"
+      }
+
+      function primaryWebsite(fields) {
+        return (fields.websites || []).map((url) => String(url || "").trim()).find(Boolean) || fields.url || ""
+      }
+
+      function websiteList(fields) {
+        const websites = (fields.websites || []).map((url) => String(url || "").trim()).filter(Boolean)
+        if (!websites.length && fields.url) websites.push(fields.url)
+        return websites
+      }
+
+      function cardContactList(fields) {
+        return normalizeCardContactInfo(fields.contactInfo || []).filter((field) => field.value)
+      }
+
+      function itemSearchText(item) {
+        const fields = fieldsFromItem(item)
+        const attachmentText = (item.attachments || []).map((file) => file.name).join(" ")
+        const contactText = cardContactList(fields).map((field) => field.value).join(" ")
+        return `${item.name} ${websiteList(fields).join(" ")} ${contactText} ${item.url || ""} ${item.username || ""} ${item.notes || ""} ${attachmentText}`
+      }
+
+      function itemKind(type) {
+        return itemKinds.find((item) => item.type === type) || itemKinds[0]
+      }
+
+      function renderItemTypeCards() {
+        $("#itemTypeGrid").innerHTML = itemKinds
+          .map(
+            (kind) => `
+              <button class="item-type-card" type="button" data-item-type="${escapeHtml(kind.type)}">
+                <span class="item-kind-icon ${escapeHtml(kind.className)}"><i data-lucide="${escapeHtml(kind.icon)}"></i></span>
+                <strong>${escapeHtml(kind.label)}</strong>
+              </button>
+            `
+          )
+          .join("")
+        $$("#itemTypeGrid [data-item-type]").forEach((button) => {
+          button.addEventListener("click", () => startItemDraft(button.dataset.itemType))
+        })
+        refreshIcons()
+      }
+
+      function showItemPickerScreen() {
+        $("#itemTypePickerScreen").classList.add("active")
+        $("#itemEditScreen").classList.remove("active")
+        renderItemTypeCards()
+        setTimeout(() => $("#itemTypeGrid [data-item-type]")?.focus(), 0)
+      }
+
+      function showItemEditScreen({ allowBack = true } = {}) {
+        $("#itemTypePickerScreen").classList.remove("active")
+        $("#itemEditScreen").classList.add("active")
+        $("#backToItemPicker").classList.toggle("hidden", !allowBack)
+        setTimeout(() => $("#newName")?.focus(), 0)
+        refreshIcons()
+      }
+
+      function setItemDraft(type, values = defaultFieldsForType(type), name = defaultNameForType(type)) {
+        const kind = itemKind(type)
+        $("#itemError").classList.add("hidden")
+        $("#itemModalTitle").textContent = state.editingId ? "编辑条目" : "新的项目"
+        $("#newType").value = type
+        $("#newName").value = name
+        $("#itemEditIcon").className = `item-kind-icon ${kind.className}`
+        $("#itemEditIcon").innerHTML = `<i data-lucide="${kind.icon}"></i>`
+        renderTypeFields(type, values)
+      }
+
+      function startItemDraft(type) {
+        state.editingId = null
+        setItemDraft(type)
+        showItemEditScreen({ allowBack: true })
+      }
+
+      function openItemPicker() {
+        state.editingId = null
+        $("#itemError").classList.add("hidden")
+        showItemPickerScreen()
+        openLayer("itemModal")
+      }
+
+      function openItemEditor(item) {
+        state.editingId = item.id
+        setItemDraft(item.type, fieldsFromItem(item), item.name)
+        showItemEditScreen({ allowBack: false })
+        openLayer("itemModal")
       }
 
       function vaultCount(vaultId) {
@@ -3014,16 +3364,45 @@
         })
       }
 
-      function renderVaultOptions() {
-        const writableVaults = vaults.filter((vault) => !vault.system)
-        $("#newVault").innerHTML = writableVaults
-          .map((vault) => `<option value="${escapeHtml(vault.id)}">${escapeHtml(vault.name)}</option>`)
+      function renderCategoryMenu() {
+        const active = categoryFilters.find((item) => item.type === state.type) || categoryFilters[0]
+        $("#activeTypeLabel").textContent = active.label
+        $("#categoryMenu").innerHTML = categoryFilters
+          .map((item) => {
+            const activeClass = item.type === state.type ? "active" : ""
+            const icon =
+              item.icon === "grid"
+                ? '<span class="tiny-grid" aria-hidden="true"><span></span><span></span><span></span><span></span></span>'
+                : `<span class="item-kind-icon ${escapeHtml(item.className || "")}"><i data-lucide="${escapeHtml(item.icon)}"></i></span>`
+            return `
+              <button class="category-option ${activeClass}" type="button" data-filter-type="${escapeHtml(item.type)}" role="menuitem">
+                ${icon}
+                <span>${escapeHtml(item.label)}</span>
+                ${item.type === state.type ? '<i data-lucide="check"></i>' : "<span></span>"}
+              </button>
+            `
+          })
           .join("")
+        $$("#categoryMenu [data-filter-type]").forEach((button) => {
+          button.addEventListener("click", () => {
+            state.type = button.dataset.filterType
+            closeCategoryMenu()
+            render()
+          })
+        })
+      }
+
+      function closeCategoryMenu() {
+        const menu = $("#categoryMenu")
+        const button = $("#categoryFilterButton")
+        if (!menu || !button) return
+        menu.classList.remove("open")
+        button.setAttribute("aria-expanded", "false")
       }
 
       function renderList() {
         const list = filteredItems()
-        $("#listTitle").textContent = vaultLabel(state.vault)
+        renderCategoryMenu()
         $("#listCount").textContent = `${list.length} 项`
         $("#itemList").innerHTML = list
           .map(
@@ -3034,7 +3413,6 @@
                   <span class="item-name">${escapeHtml(item.name)}</span>
                   <span class="item-sub">${escapeHtml(itemSubtitle(item))}</span>
                 </span>
-                <span class="tag">${typeLabel(item.type)}</span>
               </button>
             `
           )
@@ -3165,13 +3543,12 @@
         let fields = ""
         if (item.type === "card") {
           fields = [
-            field("发卡机构", itemFields.issuer, "复制发卡机构"),
             field("持卡人", itemFields.holder, "复制持卡人"),
             field("卡号", itemFields.cardNumber, "复制卡号", true),
             field("有效期", itemFields.expiry, "复制有效期"),
             field("CVC", itemFields.cvc, "复制 CVC", true),
             itemFields.pin ? field("交易密码", itemFields.pin, "复制交易密码", true) : "",
-            itemFields.site ? field("官网", itemFields.site, "复制官网") : "",
+            ...cardContactList(itemFields).map((contact) => field(contact.label, contact.value, `复制${contact.label}`)),
             field("备注", itemFields.notes, "复制备注")
           ]
             .filter(Boolean)
@@ -3185,8 +3562,9 @@
             .filter(Boolean)
             .join("")
         } else {
+          const websites = websiteList(itemFields)
           fields = [
-            field("网址", itemFields.url, "复制网址"),
+            ...websites.map((url, index) => field(index === 0 ? "网址" : "网站", url, "复制网站")),
             field("账号", itemFields.username, "复制账号"),
             field("密码", itemFields.password, "复制密码", true),
             itemFields.totp ? field("一次性验证码", itemFields.totp, "复制验证码") : "",
@@ -3254,9 +3632,95 @@
         `
       }
 
-      function uploadBlock() {
+      function websiteRows(values = [""]) {
+        const websites = values.length ? values : [""]
         return `
           <div class="form-field">
+            <label>网站</label>
+            <div class="website-stack" id="websiteStack">
+              ${websites.map((url, index) => websiteRow(url, index)).join("")}
+              <button class="website-add" id="addWebsite" type="button">
+                <i data-lucide="plus"></i>
+                添加另一个网站
+              </button>
+            </div>
+          </div>
+        `
+      }
+
+      function websiteRow(url = "", index = 0) {
+        return `
+          <div class="website-row" data-website-row>
+            <span class="website-drag" aria-hidden="true"><i data-lucide="grip-vertical"></i></span>
+            <span class="website-main">
+              <label for="loginWebsite${index}">网站</label>
+              <input id="loginWebsite${index}" class="loginWebsite" value="${escapeHtml(url)}" placeholder="https://example.com" />
+            </span>
+            <button class="button icon-only" type="button" title="网站设置" aria-label="网站设置">
+              <i data-lucide="sliders-horizontal"></i>
+            </button>
+            <button class="button icon-only" type="button" data-remove-website title="删除网站" aria-label="删除网站">
+              <i data-lucide="circle-minus"></i>
+            </button>
+          </div>
+        `
+      }
+
+      function cardContactRows(values = defaultCardContactFields) {
+        const contacts = normalizeCardContactInfo(values)
+        if (!contacts.length) return ""
+        return `
+          <div class="form-field">
+            <label>联系信息</label>
+            <div class="card-contact-group" id="cardContactGroup">
+              ${contacts.map((field, index) => cardContactRow(field, index)).join("")}
+            </div>
+          </div>
+        `
+      }
+
+      function cardContactRow(field, index) {
+        return `
+          <div class="card-contact-row" data-card-contact-row data-card-contact-key="${escapeHtml(field.key)}">
+            <span class="card-contact-drag" aria-hidden="true"><i data-lucide="grip-vertical"></i></span>
+            <span class="card-contact-main">
+              <label for="cardContact${index}">${escapeHtml(field.label)}</label>
+              <input id="cardContact${index}" class="cardContactInput" value="${escapeHtml(field.value || "")}" placeholder="${escapeHtml(field.placeholder || "文本")}" />
+            </span>
+            <button class="button icon-only" type="button" data-remove-card-contact title="删除" aria-label="删除">
+              <i data-lucide="circle-minus"></i>
+            </button>
+          </div>
+        `
+      }
+
+      function normalizeCardContactInfo(values) {
+        const byKey = new Map((values || []).map((field) => [field.key, field]))
+        return (values || []).map((field) => {
+          const template = defaultCardContactFields.find((item) => item.key === field.key) || field
+          return {
+            key: field.key,
+            label: field.label || template.label,
+            placeholder: field.placeholder || template.placeholder || "文本",
+            value: field.value || ""
+          }
+        }).filter((field) => field.key && byKey.has(field.key))
+      }
+
+      function optionalBlock(kind, html) {
+        return `
+          <div class="optional-field" data-optional-field="${escapeHtml(kind)}">
+            <button class="remove-optional-field" type="button" data-remove-optional-field="${escapeHtml(kind)}" title="删除" aria-label="删除">
+              <i data-lucide="circle-minus"></i>
+            </button>
+            ${html}
+          </div>
+        `
+      }
+
+      function uploadBlock(options = {}) {
+        const content = `
+          <div class="form-field" id="attachmentField">
             <label for="attachmentFiles">附件</label>
             <div class="upload-box">
               <div class="upload-head">
@@ -3274,6 +3738,17 @@
             </div>
           </div>
         `
+        return options.optional ? optionalBlock("attachment", content) : content
+      }
+
+      function totpBlock(value = "") {
+        return optionalBlock("totp", formInput("loginTotp", "一次性验证码密钥", value, {
+          placeholder: "粘贴 otpauth://... 或手动输入密钥"
+        }))
+      }
+
+      function notesBlock(value = "") {
+        return optionalBlock("note", formInput("loginNotes", "备注", value, { multiline: true }))
       }
 
       function formatFileSize(bytes) {
@@ -3337,39 +3812,79 @@
         refreshIcons()
       }
 
+      function bindWebsiteRows() {
+        const stack = $("#websiteStack")
+        if (!stack) return
+        $("#addWebsite")?.addEventListener("click", () => {
+          const rows = Array.from(stack.querySelectorAll(".loginWebsite")).map((input) => input.value)
+          const addButton = $("#addWebsite")
+          addButton.insertAdjacentHTML("beforebegin", websiteRow("", rows.length))
+          bindWebsiteRows()
+          refreshIcons()
+          const inputs = Array.from(stack.querySelectorAll(".loginWebsite"))
+          inputs[inputs.length - 1]?.focus()
+        }, { once: true })
+        Array.from(stack.querySelectorAll("[data-remove-website]")).forEach((button) => {
+          button.addEventListener("click", () => {
+            const rows = Array.from(stack.querySelectorAll("[data-website-row]"))
+            if (rows.length <= 1) {
+              rows[0]?.querySelector(".loginWebsite")?.focus()
+              return
+            }
+            button.closest("[data-website-row]")?.remove()
+          }, { once: true })
+        })
+      }
+
+      function bindCardContactRows() {
+        $$("[data-remove-card-contact]").forEach((button) => {
+          button.addEventListener("click", () => {
+            button.closest("[data-card-contact-row]")?.remove()
+            if (!$$("[data-card-contact-row]").length) $("#cardContactGroup")?.closest(".form-field")?.remove()
+          }, { once: true })
+        })
+      }
+
+      function clearPendingAttachments() {
+        state.pendingAttachments.forEach((file) => {
+          if (file?.previewUrl) URL.revokeObjectURL(file.previewUrl)
+        })
+        state.pendingAttachments = []
+      }
+
+      function bindOptionalFieldRemovers() {
+        $$("[data-remove-optional-field]").forEach((button) => {
+          button.addEventListener("click", () => {
+            if (button.dataset.removeOptionalField === "attachment") clearPendingAttachments()
+            button.closest("[data-optional-field]")?.remove()
+          }, { once: true })
+        })
+      }
+
       function renderTypeFields(type, values = defaultFieldsForType(type)) {
         let html = ""
         state.pendingAttachments = [...(values.attachments || [])]
         if (type === "card") {
           html = [
-            formInput("cardIssuer", "发卡机构", values.issuer || ""),
             formInput("cardHolder", "持卡人", values.holder || ""),
             formInput("cardNumber", "卡号", values.cardNumber || "", { required: true }),
             formInput("cardExpiry", "有效期", values.expiry || ""),
             formInput("cardCvc", "CVC", values.cvc || ""),
             formInput("cardPin", "交易密码", values.pin || "", { generate: true }),
-            formInput("cardSite", "官网", values.site || ""),
-            formInput("cardNotes", "备注", values.notes || "", { multiline: true }),
-            uploadBlock()
+            cardContactRows(values.contactInfo),
+            `<div id="optionalLoginFields">${values.notes ? notesBlock(values.notes) : ""}${(values.attachments || []).length ? uploadBlock({ optional: true }) : ""}</div>`
           ].join("")
         } else if (type === "note") {
           html = [
             formInput("noteText", "笔记内容", values.noteText || "", { multiline: true, required: true }),
-            formInput("noteRecoveryCode", "恢复码", values.recoveryCode || "", { generate: true }),
-            formInput("noteNotes", "备注", values.notes || "", { multiline: true }),
-            uploadBlock()
+            `<div id="optionalLoginFields">${values.notes ? notesBlock(values.notes) : ""}${(values.attachments || []).length ? uploadBlock({ optional: true }) : ""}</div>`
           ].join("")
         } else {
-          const totpField = values.totp
-            ? formInput("loginTotp", "一次性验证码密钥", values.totp || "")
-            : `<button class="button" id="addTotpField" type="button"><i data-lucide="plus"></i>添加二步验证码</button><div id="totpPlaceholder"></div>`
           html = [
-            formInput("loginUrl", "网址", values.url || ""),
+            websiteRows(values.websites || (values.url ? [values.url] : [""])),
             formInput("loginUsername", "账号", values.username || ""),
             formInput("loginPassword", "密码", values.password || "", { generate: true, required: true }),
-            totpField,
-            formInput("loginNotes", "备注", values.notes || "", { multiline: true }),
-            uploadBlock()
+            `<div id="optionalLoginFields">${values.totp ? totpBlock(values.totp) : ""}${values.notes ? notesBlock(values.notes) : ""}${(values.attachments || []).length ? uploadBlock({ optional: true }) : ""}</div>`
           ].join("")
         }
 
@@ -3379,58 +3894,101 @@
             openPasswordGenerator(button.dataset.generateTarget)
           })
         })
-        const addTotp = $("#addTotpField")
-        if (addTotp) {
-          addTotp.addEventListener("click", () => {
-            $("#totpPlaceholder").innerHTML = formInput("loginTotp", "一次性验证码密钥", "", {
-              placeholder: "粘贴 otpauth://... 或手动输入密钥"
-            })
-            addTotp.remove()
-            refreshIcons()
-          })
-        }
         bindAttachmentUploader()
+        bindWebsiteRows()
+        bindCardContactRows()
+        bindOptionalFieldRemovers()
         renderAttachmentPreview()
         refreshIcons()
+      }
+
+      function readCardContactInfo() {
+        return $$("[data-card-contact-row]").map((row) => {
+          const key = row.dataset.cardContactKey
+          const template = defaultCardContactFields.find((field) => field.key === key) || {}
+          return {
+            key,
+            label: template.label || row.querySelector("label")?.textContent || "",
+            placeholder: template.placeholder || "文本",
+            value: row.querySelector(".cardContactInput")?.value.trim() || ""
+          }
+        }).filter((field) => field.key)
       }
 
       function readTypeFields(type) {
         if (type === "card") {
           return {
-            issuer: $("#cardIssuer").value.trim(),
             holder: $("#cardHolder").value.trim(),
             cardNumber: $("#cardNumber").value.trim(),
             expiry: $("#cardExpiry").value.trim(),
             cvc: $("#cardCvc").value.trim(),
             pin: $("#cardPin").value.trim(),
-            site: $("#cardSite").value.trim(),
-            notes: $("#cardNotes").value.trim(),
+            contactInfo: readCardContactInfo(),
+            notes: $("#loginNotes")?.value.trim() || "",
             attachments: [...state.pendingAttachments]
           }
         }
         if (type === "note") {
           return {
             noteText: $("#noteText").value.trim(),
-            recoveryCode: $("#noteRecoveryCode").value.trim(),
-            notes: $("#noteNotes").value.trim(),
+            notes: $("#loginNotes")?.value.trim() || "",
             attachments: [...state.pendingAttachments]
           }
         }
+        const websites = $$(".loginWebsite").map((input) => input.value.trim()).filter(Boolean)
         return {
-          url: $("#loginUrl").value.trim(),
+          url: websites[0] || "",
+          websites: websites.length ? websites : [""],
           username: $("#loginUsername").value.trim(),
           password: $("#loginPassword").value,
           totp: $("#loginTotp")?.value.trim() || "",
-          notes: $("#loginNotes").value.trim(),
+          notes: $("#loginNotes")?.value.trim() || "",
           attachments: [...state.pendingAttachments]
         }
+      }
+
+      function addOptionalLoginField(kind) {
+        const container = $("#optionalLoginFields")
+        if (!container) return
+        if (kind === "totp") {
+          if ($("#newType").value !== "login") {
+            toast("当前类型不需要一次性验证码")
+            return
+          }
+          if ($("#loginTotp")) {
+            $("#loginTotp").focus()
+            return
+          }
+          container.insertAdjacentHTML("beforeend", totpBlock())
+          bindOptionalFieldRemovers()
+          $("#loginTotp")?.focus()
+        }
+        if (kind === "note") {
+          if ($("#loginNotes")) {
+            $("#loginNotes").focus()
+            return
+          }
+          container.insertAdjacentHTML("beforeend", notesBlock())
+          bindOptionalFieldRemovers()
+          $("#loginNotes")?.focus()
+        }
+        if (kind === "attachment") {
+          if ($("#attachmentField")) {
+            $("#attachmentFiles")?.focus()
+            return
+          }
+          container.insertAdjacentHTML("beforeend", uploadBlock({ optional: true }))
+          bindAttachmentUploader()
+          bindOptionalFieldRemovers()
+          renderAttachmentPreview()
+        }
+        refreshIcons()
       }
 
       function renderQuickResults(query = "") {
         const q = query.toLowerCase()
         const results = items.filter((item) => {
-          const attachmentText = (item.attachments || []).map((file) => file.name).join(" ")
-          return `${item.name} ${item.url || ""} ${item.username || ""} ${item.notes || ""} ${attachmentText}`.toLowerCase().includes(q)
+          return itemSearchText(item).toLowerCase().includes(q)
         })
         state.quickIndex = Math.min(state.quickIndex, Math.max(results.length - 1, 0))
         $("#quickResults").innerHTML = results
@@ -3462,11 +4020,9 @@
         applyLayout()
         renderProfile()
         renderVaultNav()
-        renderVaultOptions()
         renderList()
         renderDetails()
         renderTabs()
-        renderSyncStatus()
         refreshIcons()
       }
 
@@ -3497,140 +4053,6 @@
         node.classList.add("show")
         window.clearTimeout(window.toastTimer)
         window.toastTimer = window.setTimeout(() => node.classList.remove("show"), 1800)
-      }
-
-      function syncHostLabel() {
-        if (state.sync.mode === "official") return "LockPass 官方托管"
-        return state.sync.serverUrl.replace(/^https?:\/\//, "").replace(/\/$/, "") || "自建服务器"
-      }
-
-      function renderSyncStatus(hydrateForm = false) {
-        const connected = state.sync.connected
-        const syncState = !connected ? "offline" : state.sync.lastSync === "从未同步" ? "unsynced" : "synced"
-        const selfHost = state.sync.mode === "selfhost"
-        const sidebarBox = $("#syncSidebarBox")
-        const sidebarPill = $("#syncSidebarPill")
-        const sidebarStatus = $("#syncSidebarStatus")
-        const sidebarHost = $("#syncSidebarHost")
-        const card = $("#syncStatusCard")
-        const title = $("#syncStatusTitle")
-        const body = $("#syncStatusBody")
-
-        if (sidebarBox) {
-          sidebarBox.classList.toggle("offline", syncState === "offline")
-          sidebarBox.classList.toggle("unsynced", syncState === "unsynced")
-          sidebarBox.classList.toggle("synced", syncState === "synced")
-        }
-        if (sidebarPill) {
-          sidebarPill.classList.toggle("offline", syncState === "offline")
-          sidebarPill.classList.toggle("unsynced", syncState === "unsynced")
-        }
-        if (sidebarStatus) sidebarStatus.textContent = syncState === "offline" ? "未登录" : syncState === "unsynced" ? "未同步" : "已连接"
-        if (sidebarHost) sidebarHost.textContent = connected ? syncHostLabel() : "点击配置同步"
-
-        if (card) {
-          card.classList.toggle("connected", syncState === "synced")
-          card.classList.toggle("offline", syncState === "offline")
-          card.classList.toggle("unsynced", syncState === "unsynced")
-        }
-        if (title) title.textContent = syncState === "offline" ? "未登录" : syncState === "unsynced" ? "已连接，尚未同步" : "已登录"
-        if (body) {
-          body.textContent =
-            syncState === "synced"
-              ? `当前用户：${state.sync.account}`
-              : syncState === "unsynced"
-                ? "请先执行一次同步，上传和下载加密数据。"
-                : "选择官方登录，或连接自部署服务器。"
-        }
-
-        const loginButton = $("#syncLogin")
-        const logoutButton = $("#syncLogout")
-        const syncButton = $("#syncNowSettings")
-        const saveButton = $("#saveSyncSettings")
-        const serverField = $("#selfHostServerField")
-        const sessionField = $("#selfHostSessionField")
-        if (serverField) serverField.classList.toggle("hidden", !selfHost)
-        if (sessionField) sessionField.classList.toggle("hidden", !selfHost)
-        if (saveButton) saveButton.classList.toggle("hidden", !selfHost)
-        if (loginButton) {
-          loginButton.classList.toggle("hidden", connected)
-          loginButton.innerHTML = `<i data-lucide="log-in"></i>${selfHost ? "绑定设备" : "跳转官方登录"}`
-        }
-        if (logoutButton) logoutButton.classList.toggle("hidden", !connected)
-        if (syncButton) syncButton.classList.toggle("hidden", !connected)
-        if (window.lucide) window.lucide.createIcons()
-
-        if (!hydrateForm) return
-        const mode = $("#syncMode")
-        const serverUrl = $("#serverUrl")
-        const sessionToken = $("#syncSessionToken")
-        if (mode) mode.value = state.sync.mode
-        if (serverUrl) serverUrl.value = state.sync.serverUrl
-        if (sessionToken) sessionToken.value = state.sync.sessionToken
-      }
-
-      function openSyncSettings() {
-        openLayer("syncDrawer")
-        renderSyncStatus(true)
-        setTimeout(() => {
-          if (state.sync.mode === "selfhost") $("#serverUrl")?.focus()
-          else $("#syncLogin")?.focus()
-        }, 0)
-      }
-
-      function saveSyncSettings() {
-        state.sync.mode = $("#syncMode")?.value || "official"
-        state.sync.serverUrl = $("#serverUrl")?.value.trim() || ""
-        state.sync.sessionToken = $("#syncSessionToken")?.value.trim() || ""
-        renderSyncStatus()
-        toast("同步设置已保存")
-      }
-
-      function loginSyncAccount() {
-        state.sync.mode = $("#syncMode")?.value || "official"
-        state.sync.serverUrl = $("#serverUrl")?.value.trim() || ""
-        state.sync.sessionToken = $("#syncSessionToken")?.value.trim() || ""
-        if (state.sync.mode === "selfhost") {
-          if (!state.sync.serverUrl || !state.sync.sessionToken) {
-            toast("请输入自建服务器地址和登录 Token")
-            ;(!state.sync.serverUrl ? $("#serverUrl") : $("#syncSessionToken"))?.focus()
-            return
-          }
-          state.sync.account = `self-host@${syncHostLabel()}`
-          state.sync.connected = true
-          state.sync.lastSync = "从未同步"
-          renderSyncStatus()
-          toast("已连接自建同步服务器")
-          return
-        }
-
-        toast("已打开官方登录页面")
-        window.setTimeout(() => {
-          state.sync.account = "zyx@example.com"
-          state.sync.connected = true
-          state.sync.lastSync = "从未同步"
-          renderSyncStatus()
-          toast("官方登录回调成功，已登录 zyx@example.com")
-        }, 900)
-      }
-
-      function logoutSyncAccount() {
-        state.sync.connected = false
-        state.sync.account = ""
-        state.sync.lastSync = "从未同步"
-        renderSyncStatus()
-        toast("已退出登录，本地保险库仍可离线使用")
-      }
-
-      function runSyncNow() {
-        if (!state.sync.connected) {
-          openSyncSettings()
-          toast("请先登录")
-          return
-        }
-        state.sync.lastSync = "刚刚"
-        renderSyncStatus()
-        toast("同步完成：上传 1 条，下载 0 条，冲突 0 条")
       }
 
       async function copyValue(value, message = "已复制，稍后自动清理剪贴板") {
@@ -3682,7 +4104,8 @@
         itemError.classList.add("hidden")
         const rawName = $("#newName").value.trim()
         const type = $("#newType").value
-        const vault = $("#newVault").value || "work"
+        const existingItem = state.editingId ? items.find((entry) => entry.id === state.editingId) : null
+        const vault = existingItem?.vault || selectedWritableVaultId()
         const typedFields = readTypeFields(type)
         const validationMessage =
           !rawName || !vault
@@ -3701,7 +4124,8 @@
         }
         const name = rawName
         const attachments = typedFields.attachments || []
-        const url = typedFields.url || typedFields.issuer || typedFields.site || ""
+        const cardSite = type === "card" ? (typedFields.contactInfo || []).find((field) => field.key === "site")?.value || "" : ""
+        const url = typedFields.url || cardSite || ""
         const username =
           typedFields.username ||
           typedFields.holder ||
@@ -3777,12 +4201,13 @@
         toast(`已创建保险库：${name}`)
       }
 
-      $$(".segmented button").forEach((button) => {
-        button.addEventListener("click", () => {
-          state.type = button.dataset.type
-          $$(".segmented button").forEach((item) => item.classList.toggle("active", item === button))
-          render()
-        })
+      $("#categoryFilterButton").addEventListener("click", (event) => {
+        event.stopPropagation()
+        const menu = $("#categoryMenu")
+        const open = !menu.classList.contains("open")
+        menu.classList.toggle("open", open)
+        $("#categoryFilterButton").setAttribute("aria-expanded", String(open))
+        refreshIcons()
       })
 
       $$(".tab").forEach((tab) => {
@@ -3798,10 +4223,21 @@
         refreshIcons()
       })
 
-      $("#newType").addEventListener("change", (event) => {
-        $("#itemError").classList.add("hidden")
-        $("#newName").value = defaultNameForType(event.target.value)
-        renderTypeFields(event.target.value, defaultFieldsForType(event.target.value))
+      $("[data-item-kind='import']").addEventListener("click", () => toast("导入流程会在后续原型中展开"))
+      $("#backToItemPicker").addEventListener("click", showItemPickerScreen)
+      $("#itemMoreButton").addEventListener("click", (event) => {
+        event.stopPropagation()
+        const menu = $("#itemMoreMenu")
+        const open = !menu.classList.contains("open")
+        menu.classList.toggle("open", open)
+        $("#itemMoreButton").setAttribute("aria-expanded", String(open))
+      })
+      $$("[data-add-field]").forEach((button) => {
+        button.addEventListener("click", () => {
+          $("#itemMoreMenu").classList.remove("open")
+          $("#itemMoreButton").setAttribute("aria-expanded", "false")
+          addOptionalLoginField(button.dataset.addField)
+        })
       })
       $("#addVaultOpen").addEventListener("click", () => {
         $("#vaultName").value = "个人"
@@ -3809,16 +4245,7 @@
         openLayer("vaultModal")
       })
       $("#generatorOpen").addEventListener("click", () => openPasswordGenerator())
-      $("#newItemOpen").addEventListener("click", () => {
-        state.editingId = null
-        $("#itemError").classList.add("hidden")
-        $("#itemModalTitle").textContent = "新建条目"
-        $("#newType").value = "login"
-        $("#newVault").value = state.vault === "all" ? "work" : state.vault
-        $("#newName").value = defaultNameForType("login")
-        renderTypeFields("login", defaultFieldsForType("login"))
-        openLayer("itemModal")
-      })
+      $("#newItemOpen").addEventListener("click", openItemPicker)
       $("#quickOpen").addEventListener("click", () => {
         openLayer("quickLayer")
         $("#quickInput").value = ""
@@ -3826,17 +4253,7 @@
         renderQuickResults()
         setTimeout(() => $("#quickInput").focus(), 0)
       })
-      $("#showConflicts").addEventListener("click", () => openLayer("conflictDrawer"))
       $("#openConflictFromNotice").addEventListener("click", () => openLayer("conflictDrawer"))
-      $("#backupAction").addEventListener("click", () => openLayer("backupDrawer"))
-      $("#settingsAction").addEventListener("click", () => {
-        openLayer("settingsDrawer")
-        renderUserOptions()
-      })
-      $("#syncManage").addEventListener("click", openSyncSettings)
-      $("#syncSidebarPill").addEventListener("click", openSyncSettings)
-      $("#syncSidebarHost").addEventListener("click", openSyncSettings)
-      $("#syncNow").addEventListener("click", runSyncNow)
       $("#profileButton").addEventListener("click", () => {
         $("#profileMenu").classList.toggle("hidden")
         $("#profileButton").setAttribute("aria-expanded", String(!$("#profileMenu").classList.contains("hidden")))
@@ -3857,14 +4274,7 @@
       $("#saveRecoveryTrust").addEventListener("click", saveRecoveryTrust)
       $("#editButton").addEventListener("click", () => {
         const item = currentItem()
-        state.editingId = item.id
-        $("#itemError").classList.add("hidden")
-        $("#itemModalTitle").textContent = "编辑条目"
-        $("#newType").value = item.type
-        $("#newVault").value = item.vault
-        $("#newName").value = item.name
-        renderTypeFields(item.type, fieldsFromItem(item))
-        openLayer("itemModal")
+        openItemEditor(item)
       })
       $("#toggleSecrets").addEventListener("click", () => {
         state.showSecrets = !state.showSecrets
@@ -3897,21 +4307,6 @@
         }
         toast("已有用户恢复需要同步服务接入后完成")
       })
-      $("#saveSyncSettings").addEventListener("click", saveSyncSettings)
-      $("#syncMode").addEventListener("change", () => {
-        state.sync.mode = $("#syncMode")?.value || "official"
-        state.sync.serverUrl = $("#serverUrl")?.value.trim() || ""
-        state.sync.sessionToken = $("#syncSessionToken")?.value.trim() || ""
-        if (state.sync.connected) {
-          state.sync.connected = false
-          state.sync.account = ""
-          state.sync.lastSync = "从未同步"
-        }
-        renderSyncStatus()
-      })
-      $("#syncLogin").addEventListener("click", loginSyncAccount)
-      $("#syncLogout").addEventListener("click", logoutSyncAccount)
-      $("#syncNowSettings").addEventListener("click", runSyncNow)
       $("#lockApp").addEventListener("click", () => openLayer("lockLayer"))
       function showPasswordUnlockStep() {
         $("#unlockBrand").classList.remove("hidden")
@@ -3998,6 +4393,11 @@
 
       document.addEventListener("click", (event) => {
         if (!event.target.closest(".profile")) $("#profileMenu").classList.add("hidden")
+        if (!event.target.closest(".category-dropdown")) closeCategoryMenu()
+        if (!event.target.closest(".item-action-strip")) {
+          $("#itemMoreMenu")?.classList.remove("open")
+          $("#itemMoreButton")?.setAttribute("aria-expanded", "false")
+        }
       })
 
       $$("[data-close]").forEach((node) => {
@@ -4058,7 +4458,6 @@
             "conflictDrawer",
             "backupDrawer",
             "settingsDrawer",
-            "syncDrawer",
             "vaultModal",
             "itemModal",
             "userModal",

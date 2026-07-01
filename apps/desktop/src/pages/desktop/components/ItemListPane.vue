@@ -1,12 +1,27 @@
 <script setup lang="ts">
-import { FolderLock, Paperclip, Plus, Upload } from '@lucide/vue'
+import {
+  ArrowDownUp,
+  Check,
+  ChevronDown,
+  CreditCard,
+  FolderLock,
+  Grid2X2,
+  KeyRound,
+  Paperclip,
+  Plus,
+  Search,
+  StickyNote,
+  Upload,
+} from '@lucide/vue'
 import type { VaultItem } from '@lockpass/core'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useVaultStore } from '@/stores/vault'
+import type { SelectedType } from '@/stores/vault'
 import { itemIconText, typeLabel } from '../formatters'
 import { typeFilters } from '../types'
 
-defineProps<{
+const props = defineProps<{
   items: VaultItem[]
   selectedItem: VaultItem | null
   hasItems: boolean
@@ -16,10 +31,42 @@ const emit = defineEmits<{
   selectItem: [item: VaultItem]
   createItem: []
   importCsv: []
+  quickSearch: []
 }>()
 
 const { t } = useI18n()
 const vaultStore = useVaultStore()
+const categoryMenuOpen = ref(false)
+const categoryDropdown = ref<HTMLElement | null>(null)
+const sortNewestFirst = ref(true)
+
+const sortedItems = computed(() => {
+  return [...props.items].sort((a, b) => {
+    const diff = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    return sortNewestFirst.value ? diff : -diff
+  })
+})
+
+function selectType(type: (typeof typeFilters)[number]): void {
+  vaultStore.selectedType = type
+  categoryMenuOpen.value = false
+}
+
+function typeIcon(type: SelectedType) {
+  if (type === 'login') return KeyRound
+  if (type === 'payment-card') return CreditCard
+  if (type === 'secure-note') return StickyNote
+  return Grid2X2
+}
+
+function onDocumentClick(event: MouseEvent): void {
+  if (!categoryDropdown.value?.contains(event.target as Node)) {
+    categoryMenuOpen.value = false
+  }
+}
+
+onMounted(() => document.addEventListener('click', onDocumentClick))
+onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
 </script>
 
 <template>
@@ -29,16 +76,54 @@ const vaultStore = useVaultStore()
         <strong class="text-[15px]">{{ t('list.title') }}</strong>
         <span class="text-xs font-bold text-slate-500">{{ t('list.count', { count: items.length }) }}</span>
       </div>
-      <div class="flex gap-1 overflow-x-auto rounded-lg bg-slate-100 p-1">
-        <button
-          v-for="type in typeFilters"
-          :key="type"
-          class="h-8 shrink-0 rounded-md px-2 text-sm font-semibold text-slate-600 hover:bg-white hover:text-slate-950"
-          :class="{ 'bg-white text-teal-800 shadow-sm': vaultStore.selectedType === type }"
-          @click="vaultStore.selectedType = type"
-        >
-          {{ typeLabel(t, type) }}
-        </button>
+      <div class="flex items-center justify-between gap-2">
+        <div ref="categoryDropdown" class="relative">
+          <button
+            class="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 shadow-sm hover:border-slate-300"
+            type="button"
+            :aria-expanded="categoryMenuOpen"
+            aria-haspopup="menu"
+            @click.stop="categoryMenuOpen = !categoryMenuOpen"
+          >
+            <component :is="typeIcon(vaultStore.selectedType)" class="size-4 text-teal-700" />
+            <span>{{ typeLabel(t, vaultStore.selectedType) }}</span>
+            <ChevronDown class="size-4 text-slate-500" />
+          </button>
+
+          <div
+            v-if="categoryMenuOpen"
+            class="absolute left-0 top-10 z-20 w-52 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-xl"
+            role="menu"
+          >
+            <button
+              v-for="type in typeFilters"
+              :key="type"
+              class="grid min-h-9 w-full grid-cols-[22px_minmax(0,1fr)_18px] items-center gap-2 px-3 text-left text-sm font-semibold hover:bg-slate-50"
+              :class="{ 'bg-teal-50 text-teal-900': vaultStore.selectedType === type }"
+              type="button"
+              role="menuitem"
+              @click="selectType(type)"
+            >
+              <component :is="typeIcon(type)" class="size-4" />
+              <span>{{ typeLabel(t, type) }}</span>
+              <Check v-if="vaultStore.selectedType === type" class="size-4" />
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1">
+          <button class="icon-button" type="button" :title="t('app.quickSearch')" @click="emit('quickSearch')">
+            <Search class="size-4" />
+          </button>
+          <button
+            class="icon-button"
+            type="button"
+            :title="sortNewestFirst ? t('list.sortNewestFirst') : t('list.sortOldestFirst')"
+            @click="sortNewestFirst = !sortNewestFirst"
+          >
+            <ArrowDownUp class="size-4" />
+          </button>
+        </div>
       </div>
     </div>
 
@@ -66,7 +151,7 @@ const vaultStore = useVaultStore()
 
     <div v-else class="min-h-0 flex-1 overflow-auto p-2">
       <button
-        v-for="item in items"
+        v-for="item in sortedItems"
         :key="item.id"
         class="grid min-h-[64px] w-full grid-cols-[38px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-1.5 text-left hover:bg-slate-50"
         :class="{ 'bg-teal-50 ring-1 ring-teal-100': selectedItem?.id === item.id }"

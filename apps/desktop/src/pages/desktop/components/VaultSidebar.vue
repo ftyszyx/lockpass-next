@@ -19,9 +19,10 @@ import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useVaultStore } from "@/stores/vault";
 
-defineProps<{
+const props = defineProps<{
   activeUserName: string;
   activeUserInitials: string;
+  connectionStatus: "online" | "offline" | "serverUnavailable";
 }>();
 
 const emit = defineEmits<{
@@ -37,6 +38,13 @@ const emit = defineEmits<{
 const vaultStore = useVaultStore();
 const userMenuOpen = ref(false);
 const { t } = useI18n();
+
+function accountStatusLabel(): string {
+  if (props.connectionStatus === "offline") return t("app.offline");
+  if (props.connectionStatus === "serverUnavailable")
+    return t("app.serverUnavailable");
+  return !vaultStore.unlocked ? t("app.locked") : t("app.unlocked");
+}
 
 function closeUserMenu(): void {
   userMenuOpen.value = false;
@@ -88,9 +96,16 @@ function requestDeleteVault(event: MouseEvent, vaultId: string): void {
           <strong class="block truncate leading-tight">{{
             activeUserName
           }}</strong>
-          <span class="text-xs text-slate-500">{{
-            !vaultStore.unlocked ? t("app.locked") : t("app.unlocked")
-          }}</span>
+          <span
+            class="inline-flex min-h-5 max-w-full items-center rounded px-1.5 text-xs font-semibold leading-none"
+            :class="
+              connectionStatus === 'online'
+                ? 'pl-0 text-slate-500'
+                : 'border border-rose-200 bg-rose-50 text-rose-700'
+            "
+          >
+            <span class="truncate">{{ accountStatusLabel() }}</span>
+          </span>
         </span>
         <ChevronDown
           class="size-4 text-slate-500"

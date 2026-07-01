@@ -37,7 +37,8 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const vaultStore = useVaultStore()
-const notesText = computed(() => props.selectedItem?.notes || props.selectedItem?.fields.find((field) => field.kind === 'note')?.value || '')
+const notesText = computed(() => props.selectedItem?.notes || '')
+const noteFields = computed(() => props.selectedItem?.fields.filter((field) => field.kind === 'note') ?? [])
 const preview = reactive({
   visible: false,
   loading: false,
@@ -141,6 +142,15 @@ onBeforeUnmount(revokePreviewUrl)
         <div v-if="notesText" class="grid min-h-12 grid-cols-[140px_minmax(0,1fr)] gap-3 border-b border-slate-100 px-3 py-3 last:border-b-0">
           <span class="text-sm font-bold text-slate-500">{{ t('editor.notes') }}</span>
           <span class="whitespace-pre-wrap break-words text-sm leading-6">{{ notesText }}</span>
+        </div>
+
+        <div
+          v-for="field in noteFields"
+          :key="field.id"
+          class="grid min-h-12 grid-cols-[140px_minmax(0,1fr)] gap-3 border-b border-slate-100 px-3 py-3 last:border-b-0"
+        >
+          <span class="text-sm font-bold text-slate-500">{{ fieldLabel(t, field.kind, field.label) }}</span>
+          <span class="whitespace-pre-wrap break-words text-sm leading-6">{{ field.value }}</span>
         </div>
       </div>
 

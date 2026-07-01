@@ -20,6 +20,7 @@ import {
 import { computed, ref, watch, type Component } from "vue";
 import { useI18n } from "vue-i18n";
 import { localeLabels, supportedLocales, type SupportedLocale } from "@/i18n";
+import { configuredOfficialApiUrl } from "@/services/appConfig";
 import { readDesktopLog } from "@/services/logger";
 import { isUserWebRuntime } from "@/services/runtime";
 import {
@@ -131,6 +132,11 @@ const shortcutsAreDefault = computed(() =>
     vaultStore.settings.shortcuts,
     DEFAULT_SHORTCUT_SETTINGS,
   ),
+);
+const currentServerUrl = computed(() =>
+  vaultStore.settings.sync.mode === "official"
+    ? configuredOfficialApiUrl()
+    : vaultStore.settings.sync.serverUrl.trim(),
 );
 watch(
   () => props.activePage,
@@ -955,6 +961,35 @@ function clearShortcutError(
               <p class="text-sm text-slate-500">
                 {{ t("system.storageBody") }}
               </p>
+            </div>
+
+            <div
+              class="grid gap-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+            >
+              <span class="text-xs font-bold text-slate-500">{{
+                t("system.currentServerUrl")
+              }}</span>
+              <div
+                v-if="currentServerUrl"
+                class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2"
+              >
+                <code
+                  class="min-w-0 break-all font-mono text-xs text-slate-700"
+                  >{{ currentServerUrl }}</code
+                >
+                <button
+                  class="icon-button"
+                  type="button"
+                  :title="t('quick.copy')"
+                  :aria-label="t('quick.copy')"
+                  @click="emit('copyValue', currentServerUrl)"
+                >
+                  <Copy class="size-4" />
+                </button>
+              </div>
+              <span v-else class="text-sm text-slate-400">{{
+                t("system.serverUrlNotConfigured")
+              }}</span>
             </div>
 
             <div

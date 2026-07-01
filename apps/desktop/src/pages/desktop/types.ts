@@ -18,6 +18,18 @@ export interface OperationProgressState {
   body: string
 }
 
+export interface AttachmentDraftBlock {
+  id: string
+  attachments: AttachmentDraft[]
+}
+
+export type AddMoreItemKind = 'totp' | 'attachment' | 'note'
+
+export interface AddMoreMenuItem {
+  kind: AddMoreItemKind
+  label: string
+}
+
 export interface ItemDraft {
   type: VaultItemType
   vaultId: string
@@ -25,6 +37,7 @@ export interface ItemDraft {
   notes: string
   fields: VaultItemField[]
   attachments: AttachmentDraft[]
+  attachmentBlocks: AttachmentDraftBlock[]
 }
 
 export interface VaultDraft {

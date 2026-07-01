@@ -67,11 +67,17 @@ import UserSetupModal from "./components/UserSetupModal.vue";
 import VaultModal from "./components/VaultModal.vue";
 import VaultSidebar from "./components/VaultSidebar.vue";
 import {
-  defaultFields,
   detailFields,
   getInitials,
-  makeField,
 } from "./formatters";
+import {
+  appendExtraDraftField,
+  buildDefaultDraftFields,
+  flattenAttachmentDraftBlocks,
+  makeAttachmentDraftBlock,
+  makeDraftField,
+  normalizeDraftFieldsForSave,
+} from "./itemDrafts";
 import type {
   DetailTab,
   DrawerName,
@@ -103,6 +109,7 @@ const showSensitive = ref(false);
 const activeDrawer = ref<DrawerName>(null);
 const activeManagementPage = ref<ManagementPageName | null>(null);
 const activeModal = ref<ModalName>(null);
+const pickingItemType = ref(false);
 const returnToUserManagementAfterSetup = ref(false);
 const editingItemId = ref<string | null>(null);
 const passwordTargetFieldId = ref<string | null>(null);
@@ -133,6 +140,7 @@ const sensitiveViewKey = ref(0);
 const backupBusy = ref(false);
 const savedBackupResult = ref<TextFileSaveResult | null>(null);
 const initializing = ref(true);
+const isOnline = ref(typeof navigator === "undefined" ? true : navigator.onLine);
 let clipboardCleanupTimer: number | null = null;
 let clipboardCleanupValue = "";
 let deepLinkUnlisten: (() => void) | null = null;
@@ -165,6 +173,7 @@ const itemDraft = reactive<ItemDraft>({
   notes: "",
   fields: [],
   attachments: [],
+  attachmentBlocks: [],
 });
 
 const vaultDraft = reactive<VaultDraft>({
@@ -223,6 +232,16 @@ const setupServerAccountFlow = computed(
 const setupServerConnected = computed(
   () => Boolean(pendingServerExchange.value) || !setupRequiresServerLogin.value,
 );
+const connectionStatus = computed(() => {
+  if (!isOnline.value) return "offline";
+  if (
+    vaultStore.autoSync.lastError === "syncNetworkBlocked" ||
+    vaultStore.officialLogin.lastError === "syncNetworkBlocked"
+  ) {
+    return "serverUnavailable";
+  }
+  return "online";
+});
 const setupServerAccountLabel = computed(() => {
   const exchange = pendingServerExchange.value;
   return exchange?.account.email ?? exchange?.account.displayName ?? "";
@@ -230,11 +249,14 @@ const setupServerAccountLabel = computed(() => {
 
 onMounted(async () => {
   await initializeVaultPage();
+  updateOnlineStatus();
   window.addEventListener("keydown", handleInternalShortcut);
   window.addEventListener("blur", scheduleAutoLock);
   window.addEventListener("focus", cancelAutoLock);
   window.addEventListener("focus", handleAutoSyncWake);
   window.addEventListener("online", handleAutoSyncWake);
+  window.addEventListener("online", updateOnlineStatus);
+  window.addEventListener("offline", updateOnlineStatus);
   document.addEventListener("visibilitychange", handleVisibilityAutoLock);
 });
 
@@ -274,6 +296,8 @@ onUnmounted(() => {
   window.removeEventListener("focus", cancelAutoLock);
   window.removeEventListener("focus", handleAutoSyncWake);
   window.removeEventListener("online", handleAutoSyncWake);
+  window.removeEventListener("online", updateOnlineStatus);
+  window.removeEventListener("offline", updateOnlineStatus);
   document.removeEventListener("visibilitychange", handleVisibilityAutoLock);
   cancelAutoLock();
   cancelAutoSync();
@@ -350,6 +374,8 @@ function resetItemDraft(): void {
   itemDraft.notes = "";
   itemDraft.fields = [];
   itemDraft.attachments = [];
+  itemDraft.attachmentBlocks = [];
+  pickingItemType.value = false;
 }
 
 function resetVaultDraft(): void {
@@ -663,6 +689,7 @@ async function confirmDeleteVault(): Promise<void> {
 function openNewItem(type: VaultItemType = "login"): void {
   editingItemId.value = null;
   itemError.value = "";
+  pickingItemType.value = arguments.length === 0;
   itemDraft.type = type;
   itemDraft.vaultId =
     vaultStore.selectedVaultId === "all"
@@ -670,9 +697,20 @@ function openNewItem(type: VaultItemType = "login"): void {
       : vaultStore.selectedVaultId;
   itemDraft.title = "";
   itemDraft.notes = "";
-  itemDraft.fields = defaultFields(t, type);
+  itemDraft.fields = buildDefaultDraftFields(t, type);
   itemDraft.attachments = [];
+  itemDraft.attachmentBlocks = [];
   activeModal.value = "item";
+}
+
+function startNewItem(type: VaultItemType): void {
+  openNewItem(type);
+  pickingItemType.value = false;
+}
+
+function openImportFromItemPicker(): void {
+  activeModal.value = null;
+  void openManagement("backup");
 }
 
 function openEditItem(): void {
@@ -680,6 +718,7 @@ function openEditItem(): void {
   if (!item) return;
 
   itemError.value = "";
+  pickingItemType.value = false;
   editingItemId.value = item.id;
   itemDraft.type = item.type;
   itemDraft.vaultId = item.vaultId;
@@ -689,7 +728,7 @@ function openEditItem(): void {
     item.fields.find((field) => field.kind === "note")?.value ||
     "";
   itemDraft.fields = detailFields(t, item).map((field) => ({ ...field }));
-  itemDraft.attachments = selectedItemAttachments.value.map((attachment) => ({
+  const attachmentDrafts = selectedItemAttachments.value.map((attachment) => ({
     id: attachment.id,
     fileName: attachment.fileName,
     mimeType: attachment.mimeType,
@@ -698,23 +737,55 @@ function openEditItem(): void {
     encryptedBlobRef: attachment.encryptedBlobRef,
     state: attachment.state,
   }));
+  itemDraft.attachments = attachmentDrafts;
+  itemDraft.attachmentBlocks = attachmentDrafts.length
+    ? [makeAttachmentDraftBlock(attachmentDrafts)]
+    : [];
   activeModal.value = "item";
 }
 
-function changeDraftType(type: VaultItemType): void {
+function backToItemTypePicker(): void {
+  editingItemId.value = null;
   itemError.value = "";
-  itemDraft.type = type;
-  if (!editingItemId.value) {
-    itemDraft.title = "";
-  }
-  itemDraft.fields = defaultFields(t, type);
+  pickingItemType.value = true;
+}
+
+function addDraftAttachmentBlock(): void {
+  itemDraft.attachmentBlocks = [
+    ...itemDraft.attachmentBlocks,
+    makeAttachmentDraftBlock(),
+  ];
+}
+
+function removeDraftAttachmentBlock(id: string): void {
+  itemDraft.attachmentBlocks = itemDraft.attachmentBlocks.filter(
+    (block) => block.id !== id,
+  );
+  itemDraft.attachments = flattenAttachmentDraftBlocks(
+    itemDraft.attachmentBlocks,
+  );
+}
+
+function addWebsiteField(): void {
+  if (itemDraft.type !== "login") return;
+  itemDraft.fields = [...itemDraft.fields, makeDraftField(t, "url")];
 }
 
 function addTotpField(): void {
   if (itemDraft.type !== "login") return;
-  if (itemDraft.fields.some((field) => field.kind === "totp")) return;
+  itemDraft.fields = appendExtraDraftField(t, itemDraft.fields, "totp");
+}
 
-  itemDraft.fields = [...itemDraft.fields, makeField(t, "totp", "", true)];
+function addDraftExtra(kind: "totp" | "note" | "attachment"): void {
+  if (kind === "totp") {
+    addTotpField();
+    return;
+  }
+  if (kind === "note") {
+    itemDraft.fields = appendExtraDraftField(t, itemDraft.fields, "note");
+    return;
+  }
+  addDraftAttachmentBlock();
 }
 
 function openPasswordGenerator(target: VaultItemField): void {
@@ -783,9 +854,9 @@ async function saveItem(): Promise<void> {
     type: itemDraft.type,
     vaultId: itemDraft.vaultId,
     title: itemDraft.title,
-    notes: itemDraft.notes,
-    fields: itemDraft.fields,
-    attachments: itemDraft.attachments,
+    notes: itemDraft.type === "secure-note" ? itemDraft.notes : "",
+    fields: normalizeDraftFieldsForSave(itemDraft.fields),
+    attachments: flattenAttachmentDraftBlocks(itemDraft.attachmentBlocks),
   });
 
   activeModal.value = null;
@@ -834,7 +905,8 @@ async function saveVault(): Promise<void> {
   showToast(t("toast.vaultCreated", { name: vault.name }));
 }
 
-async function onFilesSelected(event: Event): Promise<void> {
+async function onFilesSelected(payload: { blockId: string; event: Event }): Promise<void> {
+  const { blockId, event } = payload;
   const input = event.target as HTMLInputElement;
   const files = Array.from(input.files ?? []);
   if (files.length === 0) return;
@@ -867,7 +939,14 @@ async function onFilesSelected(event: Event): Promise<void> {
       }),
     );
 
-    itemDraft.attachments = [...itemDraft.attachments, ...drafts];
+    itemDraft.attachmentBlocks = itemDraft.attachmentBlocks.map((block) =>
+      block.id === blockId
+        ? { ...block, attachments: [...block.attachments, ...drafts] }
+        : block,
+    );
+    itemDraft.attachments = flattenAttachmentDraftBlocks(
+      itemDraft.attachmentBlocks,
+    );
     showToast(t("toast.filesSelected", { count: drafts.length }));
   } finally {
     input.value = "";
@@ -1068,8 +1147,12 @@ function importFieldLabels(): ImportFieldLabelMap {
 }
 
 function removeDraftAttachment(id: string): void {
-  itemDraft.attachments = itemDraft.attachments.filter(
-    (attachment) => attachment.id !== id,
+  itemDraft.attachmentBlocks = itemDraft.attachmentBlocks.map((block) => ({
+    ...block,
+    attachments: block.attachments.filter((attachment) => attachment.id !== id),
+  }));
+  itemDraft.attachments = flattenAttachmentDraftBlocks(
+    itemDraft.attachmentBlocks,
   );
 }
 
@@ -1332,6 +1415,10 @@ function cancelAutoSync(): void {
 
 function handleAutoSyncWake(): void {
   scheduleAutoSync("wake");
+}
+
+function updateOnlineStatus(): void {
+  isOnline.value = typeof navigator === "undefined" ? true : navigator.onLine;
 }
 
 function promptServerSignInIfNeeded(): void {
@@ -1774,6 +1861,7 @@ function cancelAutoLock(): void {
         <VaultSidebar
           :active-user-name="activeUserName"
           :active-user-initials="activeUserInitials"
+          :connection-status="connectionStatus"
           @create-vault="openNewVault"
           @delete-vault="requestDeleteVault"
           @manage-users="openUserManagement"
@@ -1798,6 +1886,7 @@ function cancelAutoLock(): void {
           @select-item="selectItem"
           @create-item="openNewItem()"
           @import-csv="openManagement('backup')"
+          @quick-search="openQuickSearch"
         />
 
         <ResizeHandle
@@ -1841,20 +1930,24 @@ function cancelAutoLock(): void {
     <ItemEditorModal
       v-if="activeModal === 'item'"
       :editing-item-id="editingItemId"
+      :picking-type="pickingItemType"
       :draft="itemDraft"
-      :writable-vaults="writableVaults"
       :uploading-files="uploadingFiles"
       :error="itemError"
       :vault-key="vaultStore.vaultKey"
       :key-id="vaultStore.activeKeyId"
       @close="activeModal = null"
       @save="saveItem"
-      @change-type="changeDraftType"
+      @pick-type="startNewItem"
+      @import-choice="openImportFromItemPicker"
+      @back-to-types="backToItemTypePicker"
       @files-selected="onFilesSelected"
       @remove-attachment="removeDraftAttachment"
+      @remove-attachment-block="removeDraftAttachmentBlock"
       @remove-field="removeDraftField"
       @generate-field="openPasswordGenerator"
-      @add-totp="addTotpField"
+      @add-website="addWebsiteField"
+      @add-extra="addDraftExtra"
     />
 
     <VaultModal
