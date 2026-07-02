@@ -14,6 +14,16 @@ assert.match(
   /class="fixed z-\[1000\]/,
   "AddMoreMenu panel should use viewport positioning above the modal",
 );
+assert.match(
+  source,
+  /context\?: "main" \| "group"/,
+  "AddMoreMenu should expose a non-visual context so nested and main menus can be targeted reliably",
+);
+assert.match(
+  source,
+  /:data-add-more-context="context"/,
+  "AddMoreMenu should mark both trigger and panel with their menu context",
+);
 assert.doesNotMatch(
   source,
   /class="absolute bottom-10 left-0/,
@@ -23,6 +33,11 @@ assert.match(
   source,
   /calculateAddMoreMenuPosition/,
   "AddMoreMenu should use the shared viewport positioning helper",
+);
+assert.match(
+  source,
+  /panel\.offsetHeight\s*-\s*panel\.clientHeight/,
+  "AddMoreMenu should include panel borders when calculating max height",
 );
 
 const belowPosition = calculateAddMoreMenuPosition({

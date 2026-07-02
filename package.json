@@ -10,6 +10,7 @@
   "scripts": {
     "dev:web": "npm run -w @lockpass/web dev",
     "dev:desktop": "npm run -w @lockpass/desktop dev",
+    "dev:desktop:debug": "npm run -w @lockpass/desktop dev:debug",
     "dev:landing": "npm run -w @lockpass/landing dev",
     "dev:mobile": "npm run -w @lockpass/mobile dev",
     "dev:server": "npm run -w @lockpass/server dev",

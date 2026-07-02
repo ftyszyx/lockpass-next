@@ -199,6 +199,30 @@ function syncErrorMessageKey(error: unknown): string {
   }
   return 'sync.syncFailed'
 }
+
+function regenerateAfterSymbolToggle(): void {
+  if (props.passwordOptions.symbols && props.passwordOptions.symbolCount < 1) {
+    props.passwordOptions.symbolCount = 1
+  }
+  emit('regenerate')
+}
+
+function updateSymbolCount(): void {
+  const maxCount = Math.max(1, props.passwordOptions.length)
+  const nextCount = Math.trunc(Number(props.passwordOptions.symbolCount) || 1)
+  props.passwordOptions.symbolCount = Math.min(Math.max(1, nextCount), maxCount)
+  emit('regenerate')
+}
+
+function updatePasswordLength(): void {
+  if (props.passwordOptions.symbols) {
+    props.passwordOptions.symbolCount = Math.min(
+      props.passwordOptions.symbolCount,
+      props.passwordOptions.length
+    )
+  }
+  emit('regenerate')
+}
 </script>
 
 <template>
@@ -224,14 +248,29 @@ function syncErrorMessageKey(error: unknown): string {
         <label class="grid gap-2 text-sm font-bold text-slate-500">
           {{ t('drawer.length') }}
           <div class="grid grid-cols-[1fr_42px] items-center gap-2">
-            <input v-model.number="passwordOptions.length" type="range" min="8" max="32" @input="emit('regenerate')" />
+            <input v-model.number="passwordOptions.length" type="range" min="8" max="32" @input="updatePasswordLength" />
             <strong class="text-slate-950">{{ passwordOptions.length }}</strong>
           </div>
         </label>
         <div class="grid grid-cols-2 gap-2">
           <label class="check"><input v-model="passwordOptions.uppercase" type="checkbox" @change="emit('regenerate')" />{{ t('drawer.uppercase') }}</label>
           <label class="check"><input v-model="passwordOptions.numbers" type="checkbox" @change="emit('regenerate')" />{{ t('drawer.numbers') }}</label>
-          <label class="check"><input v-model="passwordOptions.symbols" type="checkbox" @change="emit('regenerate')" />{{ t('drawer.symbols') }}</label>
+          <label class="grid min-h-9 grid-cols-[minmax(0,1fr)_64px] items-center gap-2 rounded-lg border border-slate-200 px-2 text-sm">
+            <span class="inline-flex items-center gap-2">
+              <input v-model="passwordOptions.symbols" type="checkbox" @change="regenerateAfterSymbolToggle" />
+              {{ t('drawer.symbols') }}
+            </span>
+            <input
+              v-model.number="passwordOptions.symbolCount"
+              class="h-7 rounded-md border border-slate-200 bg-white px-2 text-right text-sm font-bold text-slate-900 outline-none focus:border-sky-300"
+              type="number"
+              min="1"
+              :max="passwordOptions.length"
+              :aria-label="t('drawer.symbolCount')"
+              :disabled="!passwordOptions.symbols"
+              @change="updateSymbolCount"
+            />
+          </label>
           <label class="check"><input v-model="passwordOptions.avoidAmbiguous" type="checkbox" @change="emit('regenerate')" />{{ t('drawer.readable') }}</label>
         </div>
         <button class="primary-button" @click="emit('regenerate')">

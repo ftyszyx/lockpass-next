@@ -3,6 +3,25 @@
 ## tauri 配置
 https://v2.tauri.app/reference/config/
 
+## WebView 调试
+
+普通开发启动：
+
+```bash
+npm run dev:desktop
+```
+
+如果需要检查 Tauri WebView 里的 DOM、控制台或事件流，使用带调试端口的启动方式：
+
+```bash
+npm run dev:desktop:debug
+```
+
+默认调试地址：
+
+```text
+http://127.0.0.1:9222/json
+```
 
 ## 本地数据位置
 

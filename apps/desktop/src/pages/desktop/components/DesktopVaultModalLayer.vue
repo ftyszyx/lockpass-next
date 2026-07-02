@@ -55,11 +55,12 @@ const page = useDesktopPageContext();
     @remove-attachment="page.removeDraftAttachment"
     @remove-attachment-block="page.removeDraftAttachmentBlock"
     @remove-field="page.removeDraftField"
-    @move-field="page.moveDraftField"
+    @remove-group-child="page.removeDraftGroupChild"
     @toggle-group="page.toggleDraftGroup"
     @generate-field="page.openPasswordGenerator"
     @add-website="page.addWebsiteField"
     @add-extra="page.addDraftExtra"
+    @add-group-child="page.addDraftGroupChild"
   />
 
   <VaultModal

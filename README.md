@@ -56,6 +56,14 @@ npm install
 npm run dev:desktop
 ```
 
+需要调试 Tauri WebView 时使用：
+
+```bash
+npm run dev:desktop:debug
+```
+
+启动后可以访问 `http://127.0.0.1:9222/json`，用于连接 WebView2 调试端口。
+
 ### 服务器端
 
 ```bash
@@ -82,4 +90,3 @@ npm run dev:admin_web
 npm run dev:landing
 npm run build:landing
 ```
-

@@ -4,6 +4,7 @@ export interface PasswordGeneratorOptions {
   uppercase?: boolean;
   numbers?: boolean;
   symbols?: boolean;
+  symbolCount?: number;
   avoidAmbiguous?: boolean;
 }
 
@@ -15,6 +16,7 @@ export const DEFAULT_PASSWORD_OPTIONS = {
   uppercase: true,
   numbers: true,
   symbols: true,
+  symbolCount: 1,
   avoidAmbiguous: true
 } satisfies Required<PasswordGeneratorOptions>;
 
@@ -26,6 +28,7 @@ const AMBIGUOUS = new Set("Il1O0o|`'\"".split(""));
 
 interface CharacterGroup {
   enabled: boolean;
+  kind: "lowercase" | "uppercase" | "numbers" | "symbols";
   characters: string;
 }
 
@@ -40,12 +43,25 @@ export function generatePassword(
     throw new Error("At least one password character group must be enabled.");
   }
 
-  if (normalized.length < groups.length) {
-    throw new Error("Password length must be at least the number of enabled character groups.");
+  const nonSymbolGroups = groups.filter((group) => group.kind !== "symbols");
+  const symbolGroup = groups.find((group) => group.kind === "symbols");
+  const requiredSymbolCount = symbolGroup ? normalized.symbolCount : 0;
+  const requiredCharacterCount = nonSymbolGroups.length + requiredSymbolCount;
+
+  if (normalized.length < requiredCharacterCount) {
+    throw new Error("Password length must be at least the number of required characters.");
   }
 
-  const pool = groups.map((group) => group.characters).join("");
-  const requiredCharacters = groups.map((group) => pickCharacter(group.characters, randomBytes));
+  const pool =
+    nonSymbolGroups.map((group) => group.characters).join("") ||
+    symbolGroup?.characters ||
+    "";
+  const requiredCharacters = [
+    ...nonSymbolGroups.map((group) => pickCharacter(group.characters, randomBytes)),
+    ...Array.from({ length: requiredSymbolCount }, () =>
+      pickCharacter(symbolGroup?.characters ?? "", randomBytes)
+    )
+  ];
   const remainingLength = normalized.length - requiredCharacters.length;
   const characters = [
     ...requiredCharacters,
@@ -73,25 +89,42 @@ export function normalizePasswordOptions(
   options: PasswordGeneratorOptions = {}
 ): Required<PasswordGeneratorOptions> {
   const length = Math.trunc(options.length ?? DEFAULT_PASSWORD_OPTIONS.length);
+  const normalizedLength = Math.max(1, length);
+  const symbols = options.symbols ?? DEFAULT_PASSWORD_OPTIONS.symbols;
 
   return {
-    length: Math.max(1, length),
+    length: normalizedLength,
     lowercase: options.lowercase ?? DEFAULT_PASSWORD_OPTIONS.lowercase,
     uppercase: options.uppercase ?? DEFAULT_PASSWORD_OPTIONS.uppercase,
     numbers: options.numbers ?? DEFAULT_PASSWORD_OPTIONS.numbers,
-    symbols: options.symbols ?? DEFAULT_PASSWORD_OPTIONS.symbols,
+    symbols,
+    symbolCount: normalizeSymbolCount(
+      options.symbolCount ?? DEFAULT_PASSWORD_OPTIONS.symbolCount,
+      normalizedLength,
+      symbols
+    ),
     avoidAmbiguous: options.avoidAmbiguous ?? DEFAULT_PASSWORD_OPTIONS.avoidAmbiguous
   };
+}
+
+function normalizeSymbolCount(
+  symbolCount: number,
+  length: number,
+  symbolsEnabled: boolean
+): number {
+  if (!symbolsEnabled) return 0;
+  if (!Number.isFinite(symbolCount)) return DEFAULT_PASSWORD_OPTIONS.symbolCount;
+  return Math.min(Math.max(0, Math.trunc(symbolCount)), Math.max(0, length));
 }
 
 function getEnabledCharacterGroups(
   options: Required<PasswordGeneratorOptions>
 ): CharacterGroup[] {
   const groups: CharacterGroup[] = [
-    { enabled: options.lowercase, characters: LOWERCASE },
-    { enabled: options.uppercase, characters: UPPERCASE },
-    { enabled: options.numbers, characters: NUMBERS },
-    { enabled: options.symbols, characters: SYMBOLS }
+    { enabled: options.lowercase, kind: "lowercase", characters: LOWERCASE },
+    { enabled: options.uppercase, kind: "uppercase", characters: UPPERCASE },
+    { enabled: options.numbers, kind: "numbers", characters: NUMBERS },
+    { enabled: options.symbols, kind: "symbols", characters: SYMBOLS }
   ];
 
   return groups

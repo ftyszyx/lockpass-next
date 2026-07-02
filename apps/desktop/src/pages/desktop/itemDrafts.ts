@@ -8,24 +8,14 @@ import { fieldLabel, isSensitiveField } from "./formatters";
 import type { AddMoreMenuItem, AttachmentDraftBlock } from "./types";
 
 type Translate = (key: string) => string;
-type ExtraFieldKind = "password" | "date" | "totp" | "note";
+export type ExtraFieldKind =
+  | "text"
+  | "phone"
+  | "password"
+  | "date"
+  | "totp"
+  | "note";
 const ATTACHMENT_FIELD_ID_PREFIX = "optional-field-attachment-";
-
-export const CARD_CONTACT_FIELD_LABEL_KEYS = {
-  issuer: "editor.cardIssuer",
-  phoneLocal: "editor.cardPhoneLocal",
-  phoneTollFree: "editor.cardPhoneTollFree",
-  phoneInternational: "editor.cardPhoneInternational",
-  website: "editor.cardWebsite",
-} as const;
-
-export type CardContactFieldKey = keyof typeof CARD_CONTACT_FIELD_LABEL_KEYS;
-
-export const CARD_CONTACT_FIELD_KEYS = Object.keys(
-  CARD_CONTACT_FIELD_LABEL_KEYS,
-) as CardContactFieldKey[];
-
-const CARD_CONTACT_FIELD_KINDS = new Set<VaultItemFieldKind>(["phone", "text"]);
 
 export function buildDefaultDraftFields(
   t: Translate,
@@ -38,11 +28,6 @@ export function buildDefaultDraftFields(
       makeDraftField(t, "expiry"),
       makeDraftField(t, "cvv", "", true),
       makeDraftField(t, "secret", "", true),
-      makeCardContactField(t, "issuer"),
-      makeCardContactField(t, "phoneLocal"),
-      makeCardContactField(t, "phoneTollFree"),
-      makeCardContactField(t, "phoneInternational"),
-      makeCardContactField(t, "website"),
     ];
   }
 
@@ -71,22 +56,11 @@ export function makeDraftField(
   };
 }
 
-export function makeCardContactField(
-  t: Translate,
-  key: CardContactFieldKey,
-  value = "",
-): VaultItemField {
-  return makeDraftField(
-    t,
-    key.startsWith("phone") ? "phone" : "text",
-    value,
-    false,
-    t(CARD_CONTACT_FIELD_LABEL_KEYS[key]),
-  );
-}
-
-export function isCardContactDraftField(field: VaultItemField): boolean {
-  return CARD_CONTACT_FIELD_KINDS.has(field.kind) && !field.sensitive;
+export function makeExtraWebsiteDraftField(t: Translate): VaultItemField {
+  return {
+    ...makeDraftField(t, "url"),
+    id: `optional-field-url-${crypto.randomUUID()}`,
+  };
 }
 
 export function normalizeDraftFieldsForSave(
@@ -188,6 +162,8 @@ export function getAddMoreMenuItems(
 ): AddMoreMenuItem[] {
   return [
     { kind: "group", label: t("editor.addGroup") },
+    { kind: "text", label: t("fields.text") },
+    { kind: "phone", label: t("fields.phone") },
     { kind: "password", label: t("editor.addPassword") },
     { kind: "date", label: t("editor.addDate") },
     { kind: "totp", label: t("editor.addTotp") },
@@ -217,6 +193,72 @@ export function appendExtraDraftField(
   ];
 }
 
+export function appendDraftGroupChildField(
+  t: Translate,
+  fields: VaultItemField[],
+  groupId: string,
+  kind: ExtraFieldKind,
+): VaultItemField[] {
+  return fields.map((field) => {
+    if (field.id !== groupId || field.kind !== "group") return field;
+    return {
+      ...field,
+      collapsed: false,
+      children: [...(field.children ?? []), makeDraftGroupChildField(t, kind)],
+    };
+  });
+}
+
+export function removeDraftGroupChildField(
+  fields: VaultItemField[],
+  groupId: string,
+  childId: string,
+): VaultItemField[] {
+  return fields.map((field) => {
+    if (field.id !== groupId || field.kind !== "group") return field;
+    return {
+      ...field,
+      children: (field.children ?? []).filter((child) => child.id !== childId),
+    };
+  });
+}
+
+export function reorderDraftGroupChildrenByDrop(
+  fields: VaultItemField[],
+  groupId: string,
+  draggedChildId: string,
+  targetChildId: string,
+  placement: "before" | "after" = "before",
+): VaultItemField[] {
+  return fields.map((field) => {
+    if (field.id !== groupId || field.kind !== "group") return field;
+    return {
+      ...field,
+      children: reorderDraftFieldsByDrop(
+        field.children ?? [],
+        draggedChildId,
+        targetChildId,
+        placement,
+      ),
+    };
+  });
+}
+
+export function updateDraftFieldValueById(
+  fields: VaultItemField[],
+  fieldId: string,
+  value: string,
+): VaultItemField[] {
+  return fields.map((field) => {
+    if (field.id === fieldId) return { ...field, value };
+    if (!field.children?.length) return field;
+    return {
+      ...field,
+      children: updateDraftFieldValueById(field.children, fieldId, value),
+    };
+  });
+}
+
 export function isTotpField(field: VaultItemField): boolean {
   return field.kind === "totp";
 }
@@ -232,7 +274,6 @@ export function isAttachmentDraftField(field: VaultItemField): boolean {
 export function isUserEditableDraftField(field: VaultItemField): boolean {
   return (
     isOptionalDraftField(field) ||
-    isCardContactDraftField(field) ||
     isAttachmentDraftField(field)
   );
 }
@@ -251,6 +292,22 @@ export function makeDraftGroupField(t: Translate): VaultItemField {
         id: `optional-field-group-child-${crypto.randomUUID()}`,
       },
     ],
+  };
+}
+
+function makeDraftGroupChildField(
+  t: Translate,
+  kind: ExtraFieldKind,
+): VaultItemField {
+  const field = makeDraftField(
+    t,
+    kind,
+    kind === "date" ? todayDateValue() : "",
+    isSensitiveField(kind),
+  );
+  return {
+    ...field,
+    id: `optional-field-group-child-${kind}-${crypto.randomUUID()}`,
   };
 }
 
@@ -288,6 +345,18 @@ export function reorderDraftFieldsByDrop(
   return nextFields;
 }
 
+export function replaceDraftFieldSubset(
+  fields: VaultItemField[],
+  predicate: (field: VaultItemField) => boolean,
+  replacementSubset: VaultItemField[],
+): VaultItemField[] {
+  const remainingReplacement = [...replacementSubset];
+  return fields.map((field) => {
+    if (!predicate(field)) return field;
+    return remainingReplacement.shift() ?? field;
+  });
+}
+
 function todayDateValue(): string {
   const today = new Date();
   const year = today.getFullYear();
@@ -309,7 +378,12 @@ function normalizeDraftFieldForSave(
       parseAttachmentDraftFieldValue(field.value);
 
     return attachmentIds.length
-      ? [{ ...savedField, value: encodeAttachmentDraftFieldValue(attachmentIds) }]
+      ? [
+          {
+            ...savedField,
+            value: encodeAttachmentDraftFieldValue(attachmentIds),
+          },
+        ]
       : [];
   }
 

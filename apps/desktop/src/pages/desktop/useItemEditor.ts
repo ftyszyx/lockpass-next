@@ -9,6 +9,7 @@ import { reactive, ref, type Ref } from "vue";
 import { saveAttachmentFile } from "@/services/vaultRepository";
 import type { AttachmentDraft, SaveItemPayload } from "@/stores/vault/types";
 import {
+  appendDraftGroupChildField,
   appendExtraDraftField,
   buildDefaultDraftFields,
   flattenAttachmentDraftBlocks,
@@ -16,9 +17,12 @@ import {
   makeAttachmentDraftField,
   makeAttachmentDraftBlock,
   makeDraftField,
+  makeExtraWebsiteDraftField,
   normalizeDraftFieldsForSave,
-  reorderDraftFieldsByDrop,
+  removeDraftGroupChildField,
   toggleDraftGroupCollapsed,
+  updateDraftFieldValueById,
+  type ExtraFieldKind,
 } from "./itemDrafts";
 import type {
   AddMoreItemKind,
@@ -56,6 +60,7 @@ export function useItemEditor(input: UseItemEditorInput) {
     uppercase: true,
     numbers: true,
     symbols: true,
+    symbolCount: 1,
     avoidAmbiguous: false,
   });
   const generatedPassword = ref(generatePassword(passwordOptions));
@@ -125,10 +130,7 @@ export function useItemEditor(input: UseItemEditorInput) {
     const urlFields = item.urls.map((url) =>
       makeDraftField(input.t, "url", url, false, input.t("fields.url")),
     );
-    const draftFields = [
-      ...urlFields,
-      ...item.fields,
-    ].map((field) => ({
+    const draftFields = [...urlFields, ...item.fields].map((field) => ({
       ...field,
     }));
     const attachmentDrafts = input.selectedItemAttachments.value.map(
@@ -180,15 +182,14 @@ export function useItemEditor(input: UseItemEditorInput) {
 
   function addWebsiteField(): void {
     if (itemDraft.type !== "login") return;
-    itemDraft.fields = [...itemDraft.fields, makeDraftField(input.t, "url")];
+    itemDraft.fields = [
+      ...itemDraft.fields,
+      makeExtraWebsiteDraftField(input.t),
+    ];
   }
 
   function addTotpField(): void {
-    itemDraft.fields = appendExtraDraftField(
-      input.t,
-      itemDraft.fields,
-      "totp",
-    );
+    itemDraft.fields = appendExtraDraftField(input.t, itemDraft.fields, "totp");
   }
 
   function addDraftExtra(kind: AddMoreItemKind): void {
@@ -196,7 +197,20 @@ export function useItemEditor(input: UseItemEditorInput) {
       addDraftAttachmentBlock();
       return;
     }
+    if (kind === "group") {
+      itemDraft.fields = appendExtraDraftField(input.t, itemDraft.fields, kind);
+      return;
+    }
     itemDraft.fields = appendExtraDraftField(input.t, itemDraft.fields, kind);
+  }
+
+  function addDraftGroupChild(groupId: string, kind: ExtraFieldKind): void {
+    itemDraft.fields = appendDraftGroupChildField(
+      input.t,
+      itemDraft.fields,
+      groupId,
+      kind,
+    );
   }
 
   function openPasswordGenerator(target: VaultItemField): void {
@@ -218,8 +232,11 @@ export function useItemEditor(input: UseItemEditorInput) {
     const targetId = passwordTargetFieldId.value;
     if (!targetId) return;
 
-    const target = itemDraft.fields.find((field) => field.id === targetId);
-    if (target) target.value = generatedPassword.value;
+    itemDraft.fields = updateDraftFieldValueById(
+      itemDraft.fields,
+      targetId,
+      generatedPassword.value,
+    );
     input.activeDrawer.value = null;
     passwordTargetFieldId.value = null;
   }
@@ -234,16 +251,11 @@ export function useItemEditor(input: UseItemEditorInput) {
     itemDraft.fields = itemDraft.fields.filter((field) => field.id !== id);
   }
 
-  function moveDraftField(
-    draggedId: string,
-    targetId: string,
-    placement: "before" | "after",
-  ): void {
-    itemDraft.fields = reorderDraftFieldsByDrop(
+  function removeDraftGroupChild(groupId: string, childId: string): void {
+    itemDraft.fields = removeDraftGroupChildField(
       itemDraft.fields,
-      draggedId,
-      targetId,
-      placement,
+      groupId,
+      childId,
     );
   }
 
@@ -275,7 +287,9 @@ export function useItemEditor(input: UseItemEditorInput) {
     input.activeModal.value = null;
     editingItemId.value = null;
     itemError.value = "";
-    input.showToast(input.t(isEditing ? "toast.itemUpdated" : "toast.itemCreated"));
+    input.showToast(
+      input.t(isEditing ? "toast.itemUpdated" : "toast.itemCreated"),
+    );
     input.vaultStore.selectItem(saved.id);
   }
 
@@ -370,6 +384,7 @@ export function useItemEditor(input: UseItemEditorInput) {
 
   return {
     addDraftExtra,
+    addDraftGroupChild,
     addWebsiteField,
     backToItemTypePicker,
     clearPasswordTarget,
@@ -377,7 +392,6 @@ export function useItemEditor(input: UseItemEditorInput) {
     generatedPassword,
     itemDraft,
     itemError,
-    moveDraftField,
     onFilesSelected,
     openEditItem,
     openNewItem,
@@ -390,6 +404,7 @@ export function useItemEditor(input: UseItemEditorInput) {
     removeDraftAttachment,
     removeDraftAttachmentBlock,
     removeDraftField,
+    removeDraftGroupChild,
     resetItemDraft,
     saveItem,
     startNewItem,

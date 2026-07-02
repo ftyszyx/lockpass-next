@@ -4,16 +4,21 @@ import {
   buildDefaultDraftFields,
   flattenAttachmentDraftBlocks,
   getAddMoreMenuItems,
-  isCardContactDraftField,
   isAttachmentDraftField,
   isUserEditableDraftField,
   makeAttachmentDraftField,
   makeAttachmentDraftBlock,
   makeDraftField,
+  makeExtraWebsiteDraftField,
   makeDraftGroupField,
   normalizeDraftFieldsForSave,
+  appendDraftGroupChildField,
+  removeDraftGroupChildField,
+  reorderDraftGroupChildrenByDrop,
   reorderDraftFieldsByDrop,
+  replaceDraftFieldSubset,
   toggleDraftGroupCollapsed,
+  updateDraftFieldValueById,
 } from "./itemDrafts";
 
 const t = (key: string) =>
@@ -33,11 +38,6 @@ const t = (key: string) =>
     "fields.phone": "phone",
     "fields.group": "group",
     "fields.date": "date",
-    "editor.cardIssuer": "issuer",
-    "editor.cardPhoneLocal": "local phone",
-    "editor.cardPhoneTollFree": "toll-free phone",
-    "editor.cardPhoneInternational": "international phone",
-    "editor.cardWebsite": "website",
     "editor.addTotp": "one-time password",
     "editor.addGroup": "group",
     "editor.addPassword": "password",
@@ -50,54 +50,19 @@ const cardFields = buildDefaultDraftFields(t, "payment-card");
 
 assert.deepEqual(
   cardFields.map((field) => field.label),
-  [
-    "cardholder",
-    "card number",
-    "expiry",
-    "CVC",
-    "secret",
-    "issuer",
-    "local phone",
-    "toll-free phone",
-    "international phone",
-    "website",
-  ],
+  ["cardholder", "card number", "expiry", "CVC", "secret"],
 );
 
-assert.equal(cardFields.filter(isCardContactDraftField).length, 5);
-assert.equal(isUserEditableDraftField(cardFields[5]), true);
 assert.equal(isUserEditableDraftField(cardFields[0]), false);
 assert.equal(
-  isCardContactDraftField({
-    id: "custom-contact",
-    kind: "text",
-    label: "renamed contact field",
-    value: "",
-    sensitive: false,
-  }),
-  true,
-);
-assert.equal(
-  isCardContactDraftField({
-    id: "sensitive-secret",
-    kind: "secret",
-    label: "secret",
-    value: "",
-    sensitive: true,
-  }),
+  cardFields.some((field) => field.label === "issuer"),
   false,
+  "payment cards should not create the contact information block by default",
 );
-
-const removedIssuer = cardFields.filter((field) => field.label !== "issuer");
-const normalized = normalizeDraftFieldsForSave(removedIssuer);
-
 assert.equal(
-  normalized.some((field) => field.label === "issuer"),
+  cardFields.some((field) => field.kind === "phone"),
   false,
-);
-assert.equal(
-  normalized.some((field) => field.label === "website" && field.kind === "text"),
-  true,
+  "payment cards should let users add contact fields through Add more instead",
 );
 
 const loginFields = buildDefaultDraftFields(t, "login");
@@ -107,8 +72,17 @@ const withSecondWebsite = [
 ];
 
 assert.equal(
-  normalizeDraftFieldsForSave(withSecondWebsite).filter((field) => field.kind === "url").length,
+  normalizeDraftFieldsForSave(withSecondWebsite).filter(
+    (field) => field.kind === "url",
+  ).length,
   2,
+);
+
+const extraWebsiteField = makeExtraWebsiteDraftField(t);
+assert.equal(
+  isUserEditableDraftField(extraWebsiteField),
+  true,
+  "website fields added by the user should be draggable and removable",
 );
 
 const withRepeatedAddMoreFields = [
@@ -129,11 +103,13 @@ const normalizedRepeatedAddMoreFields = normalizeDraftFieldsForSave(
 );
 
 assert.equal(
-  normalizedRepeatedAddMoreFields.filter((field) => field.kind === "totp").length,
+  normalizedRepeatedAddMoreFields.filter((field) => field.kind === "totp")
+    .length,
   2,
 );
 assert.equal(
-  normalizedRepeatedAddMoreFields.filter((field) => field.kind === "note").length,
+  normalizedRepeatedAddMoreFields.filter((field) => field.kind === "note")
+    .length,
   2,
 );
 assert.equal(
@@ -143,11 +119,13 @@ assert.equal(
   2,
 );
 assert.equal(
-  normalizedRepeatedAddMoreFields.filter((field) => field.kind === "password").length,
+  normalizedRepeatedAddMoreFields.filter((field) => field.kind === "password")
+    .length,
   3,
 );
 assert.equal(
-  normalizedRepeatedAddMoreFields.filter((field) => field.kind === "date").length,
+  normalizedRepeatedAddMoreFields.filter((field) => field.kind === "date")
+    .length,
   2,
 );
 
@@ -162,22 +140,55 @@ repeatedExtraFields = appendExtraDraftField(t, repeatedExtraFields, "password");
 repeatedExtraFields = appendExtraDraftField(t, repeatedExtraFields, "password");
 repeatedExtraFields = appendExtraDraftField(t, repeatedExtraFields, "date");
 repeatedExtraFields = appendExtraDraftField(t, repeatedExtraFields, "date");
+repeatedExtraFields = appendExtraDraftField(t, repeatedExtraFields, "text");
+repeatedExtraFields = appendExtraDraftField(t, repeatedExtraFields, "phone");
 
-assert.equal(repeatedExtraFields.filter((field) => field.kind === "totp").length, 2);
-assert.equal(repeatedExtraFields.filter((field) => field.kind === "note").length, 2);
+assert.equal(
+  repeatedExtraFields.filter((field) => field.kind === "totp").length,
+  2,
+);
+assert.equal(
+  repeatedExtraFields.filter((field) => field.kind === "note").length,
+  2,
+);
 assert.equal(
   repeatedExtraFields.filter(
     (field) => field.kind === "group" && (field.children?.length ?? 0) > 0,
   ).length,
   2,
 );
-assert.equal(repeatedExtraFields.filter((field) => field.kind === "password").length, 3);
-assert.equal(repeatedExtraFields.filter((field) => field.kind === "date").length, 2);
+assert.equal(
+  repeatedExtraFields.filter((field) => field.kind === "password").length,
+  3,
+);
+assert.equal(
+  repeatedExtraFields.filter((field) => field.kind === "date").length,
+  2,
+);
 assert.equal(
   repeatedExtraFields.every(
     (field) => field.kind !== "date" || /^\d{4}-\d{2}-\d{2}$/.test(field.value),
   ),
   true,
+);
+assert.deepEqual(
+  repeatedExtraFields.slice(-6).map((field) => field.kind),
+  ["password", "password", "date", "date", "text", "phone"],
+  "new fields should be appended after existing fields in the order the user adds them",
+);
+
+let secureNoteExtraFields = buildDefaultDraftFields(t, "secure-note");
+secureNoteExtraFields = appendExtraDraftField(t, secureNoteExtraFields, "note");
+secureNoteExtraFields = appendExtraDraftField(t, secureNoteExtraFields, "date");
+secureNoteExtraFields = appendExtraDraftField(
+  t,
+  secureNoteExtraFields,
+  "password",
+);
+assert.deepEqual(
+  secureNoteExtraFields.map((field) => field.kind),
+  ["note", "date", "password"],
+  "secure note user-added fields should render after the existing note body and keep append order",
 );
 
 const editableExtraField = repeatedExtraFields.find((field) =>
@@ -211,7 +222,8 @@ const dropReorderedFields = reorderDraftFieldsByDrop(
 );
 assert.equal(
   dropReorderedFields.findIndex((field) => field.id === draggedExtraField.id),
-  dropReorderedFields.findIndex((field) => field.id === targetExtraField.id) - 1,
+  dropReorderedFields.findIndex((field) => field.id === targetExtraField.id) -
+    1,
 );
 assert.equal(dropReorderedFields.length, repeatedExtraFields.length);
 assert.deepEqual(
@@ -251,6 +263,59 @@ assert.equal(firstGroupField.collapsed, false);
 assert.equal(firstGroupField.children?.length, 1);
 assert.equal(firstGroupField.children?.[0]?.kind, "text");
 assert.equal(isUserEditableDraftField(firstGroupField), true);
+
+const groupWithChildren = appendDraftGroupChildField(
+  t,
+  appendDraftGroupChildField(
+    t,
+    [firstGroupField],
+    firstGroupField.id,
+    "password",
+  ),
+  firstGroupField.id,
+  "date",
+);
+const expandedGroup = groupWithChildren[0];
+assert.equal(expandedGroup?.children?.length, 3);
+assert.equal(expandedGroup?.children?.[1]?.kind, "password");
+assert.equal(expandedGroup?.children?.[2]?.kind, "date");
+
+const reorderedGroupChildren = reorderDraftGroupChildrenByDrop(
+  groupWithChildren,
+  firstGroupField.id,
+  expandedGroup.children?.[2]?.id ?? "",
+  expandedGroup.children?.[0]?.id ?? "",
+  "before",
+);
+assert.deepEqual(
+  reorderedGroupChildren[0]?.children?.map((child) => child.kind),
+  ["date", "text", "password"],
+);
+
+const removedGroupChild = removeDraftGroupChildField(
+  reorderedGroupChildren,
+  firstGroupField.id,
+  reorderedGroupChildren[0]?.children?.[1]?.id ?? "",
+);
+assert.deepEqual(
+  removedGroupChild[0]?.children?.map((child) => child.kind),
+  ["date", "password"],
+);
+
+const generatedGroupPasswordId =
+  groupWithChildren[0]?.children?.find((child) => child.kind === "password")
+    ?.id ?? "";
+const groupPasswordUpdated = updateDraftFieldValueById(
+  groupWithChildren,
+  generatedGroupPasswordId,
+  "generated-password",
+);
+assert.equal(
+  groupPasswordUpdated[0]?.children?.find(
+    (child) => child.id === generatedGroupPasswordId,
+  )?.value,
+  "generated-password",
+);
 
 const collapsedGroupFields = toggleDraftGroupCollapsed(
   repeatedExtraFields,
@@ -328,17 +393,49 @@ assert.deepEqual(
   [attachmentFieldTwo.id, loginFields[1].id, attachmentFieldOne.id],
 );
 
+const mixedDraftFields = [
+  loginFields[0],
+  loginFields[1],
+  loginFields[2],
+  attachmentFieldOne,
+  attachmentFieldTwo,
+];
+assert.deepEqual(
+  replaceDraftFieldSubset(
+    mixedDraftFields,
+    (field) => field.kind === "url",
+    [loginFields[0]],
+  ).map((field) => field.id),
+  mixedDraftFields.map((field) => field.id),
+  "replacing a one-item subset should keep the full field order unchanged",
+);
+assert.deepEqual(
+  replaceDraftFieldSubset(
+    mixedDraftFields,
+    (field) => field.kind === "attachment",
+    [attachmentFieldTwo, attachmentFieldOne],
+  ).map((field) => field.id),
+  [
+    loginFields[0].id,
+    loginFields[1].id,
+    loginFields[2].id,
+    attachmentFieldTwo.id,
+    attachmentFieldOne.id,
+  ],
+  "reordering a filtered subset should preserve all unrelated fields",
+);
+
 assert.deepEqual(
   getAddMoreMenuItems(t, "login").map((item) => item.kind),
-  ["group", "password", "date", "totp", "attachment", "note"],
+  ["group", "text", "phone", "password", "date", "totp", "attachment", "note"],
 );
 assert.deepEqual(
   getAddMoreMenuItems(t, "payment-card").map((item) => item.kind),
-  ["group", "password", "date", "totp", "attachment", "note"],
+  ["group", "text", "phone", "password", "date", "totp", "attachment", "note"],
 );
 assert.deepEqual(
   getAddMoreMenuItems(t, "secure-note").map((item) => item.kind),
-  ["group", "password", "date", "totp", "attachment", "note"],
+  ["group", "text", "phone", "password", "date", "totp", "attachment", "note"],
 );
 
 console.log("itemDrafts tests passed");

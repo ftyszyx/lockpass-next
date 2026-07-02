@@ -128,6 +128,7 @@ const connectionStatus = computed(() => {
 });
 const {
   addDraftExtra,
+  addDraftGroupChild,
   addWebsiteField,
   backToItemTypePicker,
   clearPasswordTarget,
@@ -135,7 +136,6 @@ const {
   generatedPassword,
   itemDraft,
   itemError,
-  moveDraftField,
   onFilesSelected,
   openEditItem,
   openNewItem,
@@ -148,9 +148,11 @@ const {
   removeDraftAttachment,
   removeDraftAttachmentBlock,
   removeDraftField,
+  removeDraftGroupChild,
   resetItemDraft,
   saveItem,
   startNewItem,
+  toggleDraftGroup,
   uploadingFiles,
   useGeneratedPassword,
 } = useItemEditor({
@@ -306,6 +308,7 @@ provide(
     visibleItems,
     visibleItemsCount: computed(() => visibleItems.value.length),
     addDraftExtra,
+    addDraftGroupChild,
     addWebsiteField,
     backToItemTypePicker,
     backToUserDraftFromRecoveryKey,
@@ -340,7 +343,6 @@ provide(
     importCsv,
     importLegacyBackup,
     lockApp,
-    moveDraftField,
     notReady: () => showToast(t("toast.notReady")),
     onFilesSelected,
     onResizeHandleKeydown,
@@ -361,6 +363,7 @@ provide(
     removeDraftAttachment,
     removeDraftAttachmentBlock,
     removeDraftField,
+    removeDraftGroupChild,
     requestDeleteVault,
     requestSwitchUser,
     resetShortcuts,
@@ -378,6 +381,7 @@ provide(
     signOutCurrentUser,
     startColumnResize,
     startNewItem,
+    toggleDraftGroup,
     updateActiveTab: (tab: DetailTab) => {
       activeTab.value = tab;
     },

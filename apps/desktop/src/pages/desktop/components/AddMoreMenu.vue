@@ -6,9 +6,12 @@ import { isEventOutsideElement } from "../domEvents";
 import type { AddMoreItemKind, AddMoreMenuItem } from "../types";
 import { calculateAddMoreMenuPosition } from "./addMoreMenuPosition";
 
-defineProps<{
+withDefaults(defineProps<{
   items: AddMoreMenuItem[];
-}>();
+  context?: "main" | "group";
+}>(), {
+  context: "main",
+});
 
 const emit = defineEmits<{
   select: [kind: AddMoreItemKind];
@@ -58,11 +61,12 @@ function positionMenuPanel(): void {
 
   const triggerRect = trigger.getBoundingClientRect();
   const panelRect = panel.getBoundingClientRect();
+  const panelBorderHeight = panel.offsetHeight - panel.clientHeight;
   const position = calculateAddMoreMenuPosition({
     triggerRect,
     panelRect: {
       width: panelRect.width,
-      height: panel.scrollHeight,
+      height: panel.scrollHeight + panelBorderHeight,
     },
     viewportWidth: window.innerWidth,
     viewportHeight: window.innerHeight,
@@ -96,6 +100,7 @@ onBeforeUnmount(() => {
       type="button"
       :aria-expanded="open"
       aria-haspopup="menu"
+      :data-add-more-context="context"
       ref="triggerButton"
       @click="toggleMenu"
     >
@@ -110,6 +115,7 @@ onBeforeUnmount(() => {
         ref="menuPanel"
         class="fixed z-[1000] w-52 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-xl"
         :style="panelStyle"
+        :data-add-more-context="context"
         role="menu"
       >
         <template v-for="(item, index) in items" :key="`${item.kind}-${index}`">

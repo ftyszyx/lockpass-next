@@ -24,7 +24,15 @@ export interface AttachmentDraftBlock {
   attachments: AttachmentDraft[]
 }
 
-export type AddMoreItemKind = 'group' | 'password' | 'date' | 'totp' | 'attachment' | 'note'
+export type AddMoreItemKind =
+  | 'group'
+  | 'text'
+  | 'phone'
+  | 'password'
+  | 'date'
+  | 'totp'
+  | 'attachment'
+  | 'note'
 
 export interface AddMoreMenuItem {
   kind: AddMoreItemKind
@@ -60,6 +68,7 @@ export interface PasswordOptions {
   uppercase: boolean
   numbers: boolean
   symbols: boolean
+  symbolCount: number
   avoidAmbiguous: boolean
 }
 
