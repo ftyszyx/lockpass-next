@@ -30,7 +30,7 @@ const emit = defineEmits<{
   deleteVault: [vaultId: string];
   manageUsers: [];
   openManagement: [];
-  showRecoveryKey: [];
+  showSecretKey: [];
   signOutCurrentUser: [];
   lock: [];
 }>();
@@ -70,9 +70,9 @@ function lock(): void {
   emit("lock");
 }
 
-function showRecoveryKey(): void {
+function showSecretKey(): void {
   closeUserMenu();
-  emit("showRecoveryKey");
+  emit("showSecretKey");
 }
 
 function requestDeleteVault(event: MouseEvent, vaultId: string): void {
@@ -134,7 +134,7 @@ function requestDeleteVault(event: MouseEvent, vaultId: string): void {
             </button>
             <button
               class="grid min-h-9 w-full grid-cols-[20px_minmax(0,1fr)] items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-teal-50"
-              @click="showRecoveryKey"
+              @click="showSecretKey"
             >
               <QrCode class="size-4" />
               <span class="truncate">{{

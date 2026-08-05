@@ -23,7 +23,7 @@ const props = defineProps<{
   attachments: VaultAttachment[]
   activeTab: DetailTab
   showSensitive: boolean
-  vaultKey: Uint8Array | null
+  vaultSessionId: string | null
   keyId: string | null
 }>()
 
@@ -58,7 +58,7 @@ function onFieldAction(field: VaultItemField): void {
 
 async function previewImage(attachment: VaultAttachment): Promise<void> {
   if (!isImageAttachment(attachment)) return
-  if (!props.vaultKey || !props.keyId) return
+  if (!props.vaultSessionId || !props.keyId) return
 
   revokePreviewUrl()
   preview.visible = true
@@ -67,7 +67,7 @@ async function previewImage(attachment: VaultAttachment): Promise<void> {
   preview.fileName = attachment.fileName
 
   try {
-    const blob = await loadAttachmentFile(attachment, props.vaultKey, props.keyId)
+    const blob = await loadAttachmentFile(attachment, props.vaultSessionId, props.keyId)
     preview.url = URL.createObjectURL(blob)
   } catch (error) {
     preview.error = error instanceof Error ? error.message : String(error)

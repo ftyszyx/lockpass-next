@@ -7,7 +7,7 @@ import { desktopMessages, localeLabels, setI18nLocale, supportedLocales, type Su
 import { configuredOfficialApiUrl } from '@/services/appConfig'
 import { createInitialServerVault } from '@/services/accountBootstrap'
 import { saveWebLocale } from '@/services/locale'
-import { generateRecoveryKey } from '@/services/masterPassword'
+import { generateSecretKey } from '@/services/masterPassword'
 import type { SyncDeviceBindCallbackPayload, SyncDeviceBindResponse, SyncMode } from '@/services/syncClient'
 import { useVaultStore } from '@/stores/vault'
 import { WebApiError } from '../api/client'
@@ -31,7 +31,7 @@ const challengeId = ref('')
 const accountSetupToken = ref('')
 const masterPassword = ref('')
 const confirmMasterPassword = ref('')
-const recoveryKey = ref('')
+const secretKey = ref('')
 const secretKeyGeneratedAt = ref('')
 const error = ref('')
 const busy = ref(false)
@@ -122,14 +122,14 @@ async function submit(): Promise<void> {
     }
 
     if (step.value === 'generateSecretKey') {
-      recoveryKey.value = generateRecoveryKey()
+      secretKey.value = generateSecretKey()
       secretKeyGeneratedAt.value = new Date().toISOString()
       step.value = 'backupSecretKey'
       return
     }
 
     if (step.value === 'backupSecretKey') {
-      if (!recoveryKey.value) {
+      if (!secretKey.value) {
         step.value = 'generateSecretKey'
         error.value = t('webAuth.secretKeyMissing')
         return
@@ -150,7 +150,7 @@ async function submit(): Promise<void> {
       const initialVault = await createInitialServerVault({
         binding,
         masterPassword: masterPassword.value,
-        recoveryKey: recoveryKey.value,
+        secretKey: secretKey.value,
         defaultVaultName: desktopMessages[locale.value as SupportedLocale].vault.defaultName,
         defaultVaultDescription: desktopMessages[locale.value as SupportedLocale].vault.defaultDescription
       })
@@ -161,7 +161,7 @@ async function submit(): Promise<void> {
         await vaultStore.createServerBackedUser({
           exchange: binding,
           password: masterPassword.value,
-          recoveryKey: recoveryKey.value,
+          secretKey: secretKey.value,
           initialVault
         })
       }
@@ -184,7 +184,7 @@ async function submit(): Promise<void> {
 
 function validateExistingVaultUnlock(): string {
   if (!masterPassword.value) return t('webAuth.masterPasswordRequired')
-  if (!recoveryKey.value.trim()) return t('unlock.recoveryKeyRequired')
+  if (!secretKey.value.trim()) return t('unlock.secretKeyRequired')
   return ''
 }
 
@@ -212,7 +212,7 @@ function switchMode(nextMode: AuthMode): void {
 function clearSecretInputs(options: { keepFinalizing?: boolean } = {}): void {
   masterPassword.value = ''
   confirmMasterPassword.value = ''
-  recoveryKey.value = ''
+  secretKey.value = ''
   secretKeyGeneratedAt.value = ''
   if (!options.keepFinalizing) {
     finalizingSetup.value = false
@@ -264,7 +264,7 @@ async function completeWebVaultUnlock(): Promise<void> {
   await vaultStore.restoreServerAccount({
     exchange: binding,
     password: masterPassword.value,
-    recoveryKey: recoveryKey.value.trim()
+    secretKey: secretKey.value.trim()
   })
   pendingWebBinding.value = null
   await router.replace(String(route.query.redirect || '/vault'))
@@ -345,7 +345,7 @@ function changeLocale(event: Event): void {
       <div class="grid max-w-3xl grid-cols-1 gap-3 sm:grid-cols-3">
         <div class="rounded-lg border border-slate-200 bg-white p-4">
           <ShieldCheck class="mb-3 size-5 text-teal-700" />
-          <strong class="block text-sm">{{ t('sync.recoveryKeyNotice') }}</strong>
+          <strong class="block text-sm">{{ t('sync.secretKeyNotice') }}</strong>
         </div>
         <div class="rounded-lg border border-slate-200 bg-white p-4">
           <Cloud class="mb-3 size-5 text-teal-700" />
@@ -419,8 +419,8 @@ function changeLocale(event: Event): void {
               <input v-model="masterPassword" class="form-input" autocomplete="current-password" required type="password" />
             </label>
             <label class="form-label">
-              {{ t('user.recoveryKey') }}
-              <input v-model="recoveryKey" class="form-input font-mono" autocomplete="off" required />
+              {{ t('user.secretKey') }}
+              <input v-model="secretKey" class="form-input font-mono" autocomplete="off" required />
             </label>
           </template>
 
@@ -449,8 +449,8 @@ function changeLocale(event: Event): void {
             </p>
             <template v-else>
               <div class="grid gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4">
-                <span class="text-xs font-black uppercase tracking-wide text-slate-500">{{ t('user.recoveryKey') }}</span>
-                <strong class="break-all font-mono text-lg leading-8 text-slate-950">{{ recoveryKey }}</strong>
+                <span class="text-xs font-black uppercase tracking-wide text-slate-500">{{ t('user.secretKey') }}</span>
+                <strong class="break-all font-mono text-lg leading-8 text-slate-950">{{ secretKey }}</strong>
               </div>
               <button class="primary-button justify-center" type="button" :disabled="submitting" @click="saveSecretKeyPdf">
                 <Download class="size-4" />
@@ -493,7 +493,7 @@ function changeLocale(event: Event): void {
       </div>
     </aside>
 
-    <section v-if="recoveryKey && !finalizingSetup" class="secret-key-print" aria-hidden="true">
+    <section v-if="secretKey && !finalizingSetup" class="secret-key-print" aria-hidden="true">
       <div class="print-sheet">
         <p class="print-brand">LockPass</p>
         <h1>{{ t('webAuth.secretKeyPdfTitle') }}</h1>
@@ -508,8 +508,8 @@ function changeLocale(event: Event): void {
           </div>
         </dl>
         <div class="print-secret">
-          <span>{{ t('user.recoveryKey') }}</span>
-          <strong>{{ recoveryKey }}</strong>
+          <span>{{ t('user.secretKey') }}</span>
+          <strong>{{ secretKey }}</strong>
         </div>
         <p>{{ t('webAuth.secretKeyPdfNotice') }}</p>
       </div>

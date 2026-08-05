@@ -1,34 +1,22 @@
 use std::fs::{self, File, OpenOptions};
 use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-#[cfg(target_os = "windows")]
-use std::ptr;
 use std::sync::Mutex;
 #[cfg(debug_assertions)]
 use std::time::Instant;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use argon2::{Algorithm, Argon2, Params, Version};
-use base64::{
-    engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD},
-    Engine as _,
-};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use keyring::{Entry, Error as KeyringError};
 use rusqlite::{params, types::Type, Connection, OpenFlags, OptionalExtension};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_deep_link::DeepLinkExt;
-use unicode_normalization::UnicodeNormalization;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Foundation::NTE_BAD_KEYSET;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Security::Cryptography::{
-    NCryptCreatePersistedKey, NCryptDecrypt, NCryptDeleteKey, NCryptEncrypt, NCryptFinalizeKey,
-    NCryptFreeObject, NCryptOpenKey, NCryptOpenStorageProvider, NCryptSetProperty,
-    BCRYPT_OAEP_PADDING_INFO, BCRYPT_SHA256_ALGORITHM, MS_KEY_STORAGE_PROVIDER,
-    NCRYPT_ALLOW_DECRYPT_FLAG, NCRYPT_KEY_HANDLE, NCRYPT_KEY_USAGE_PROPERTY,
-    NCRYPT_LENGTH_PROPERTY, NCRYPT_OVERWRITE_KEY_FLAG, NCRYPT_PAD_OAEP_FLAG, NCRYPT_PROV_HANDLE,
-    NCRYPT_RSA_ALGORITHM, NCRYPT_UI_FORCE_HIGH_PROTECTION_FLAG, NCRYPT_UI_POLICY,
-    NCRYPT_UI_POLICY_PROPERTY, NCRYPT_UI_PROTECT_KEY_FLAG,
+    NCryptDeleteKey, NCryptFreeObject, NCryptOpenKey, NCryptOpenStorageProvider,
+    MS_KEY_STORAGE_PROVIDER, NCRYPT_KEY_HANDLE, NCRYPT_PROV_HANDLE,
 };
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::System::Registry::{
@@ -54,19 +42,9 @@ mod user_vault_migrations {
     embed_migrations!("./migrations/user_vault");
 }
 
-const RECOVERY_KEY_SERVICE: &str = "lockpass-next";
+const SECRET_KEY_SERVICE: &str = "lockpass-next-secret-key";
 const DEVICE_UNLOCK_KEY_SERVICE: &str = "lockpass-next-fast-unlock";
 const SYNC_DEVICE_TOKEN_SERVICE: &str = "lockpass-next-sync-device-token";
-#[cfg(target_os = "windows")]
-const WINDOWS_CNG_DEVICE_UNLOCK_PREFIX: &str = "win-cng-v1:";
-const UNLOCK_PURPOSE: &str = "lockpass unlock v1";
-const KEY_BYTES: usize = 32;
-const ARGON2_MAXMEM_BYTES: u64 = 256 * 1024 * 1024;
-const ARGON2_MEMORY_KIB: u32 = 32_768;
-const ARGON2_ITERATIONS: u32 = 2;
-const ARGON2_PARALLELISM: u32 = 1;
-const RECOVERY_KEY_BYTES: usize = 32;
-const RECOVERY_KEY_ALPHABET: &str = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const DEEP_LINK_SCHEME: &str = "lockpass://";
 const DEEP_LINK_EVENT: &str = "lockpass-deep-link";
 const DESKTOP_STORE_SCHEMA_VERSION: i64 = 2;
@@ -83,31 +61,6 @@ struct DesktopStatus {
     app_name: &'static str,
     vault_locked: bool,
     sync_connected: bool,
-}
-
-#[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct DeviceUnlockCapability {
-    supports_passwordless: bool,
-    requires_user_presence: bool,
-    provider: &'static str,
-    reason: &'static str,
-}
-
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct KdfParams {
-    version: u32,
-    name: String,
-    #[serde(rename = "memoryKiB", alias = "memoryKib")]
-    memory_kib: u32,
-    iterations: u32,
-    parallelism: u32,
-    salt: String,
-    key_length_bytes: u32,
-    input_encoding: String,
-    password_normalization: String,
-    purpose: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -359,7 +312,7 @@ fn check_global_shortcut(shortcut: String) -> Result<&'static str, String> {
         unsafe {
             UnregisterHotKey(std::ptr::null_mut(), hotkey_id);
         }
-        return Ok("available");
+        Ok("available")
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -373,7 +326,7 @@ fn check_global_shortcut(shortcut: String) -> Result<&'static str, String> {
 fn load_start_on_login() -> Result<Option<bool>, String> {
     #[cfg(target_os = "windows")]
     {
-        return windows_start_on_login_enabled().map(Some);
+        windows_start_on_login_enabled().map(Some)
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -387,7 +340,7 @@ fn set_start_on_login(enabled: bool) -> Result<Option<bool>, String> {
     #[cfg(target_os = "windows")]
     {
         windows_set_start_on_login(enabled)?;
-        return Ok(Some(windows_start_on_login_enabled()?));
+        Ok(Some(windows_start_on_login_enabled()?))
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -630,11 +583,11 @@ fn open_system_target(target: &str, label: &str) -> Result<(), String> {
         let target = wide_null(target);
         let result = unsafe {
             ShellExecuteW(
-                ptr::null_mut(),
+                std::ptr::null_mut(),
                 operation.as_ptr(),
                 target.as_ptr(),
-                ptr::null(),
-                ptr::null(),
+                std::ptr::null(),
+                std::ptr::null(),
                 SW_SHOWNORMAL,
             )
         };
@@ -687,97 +640,24 @@ fn take_pending_deep_links(app: AppHandle) -> Vec<String> {
 }
 
 #[tauri::command]
-fn device_unlock_capability() -> DeviceUnlockCapability {
-    #[cfg(target_os = "windows")]
-    {
-        return DeviceUnlockCapability {
-            supports_passwordless: true,
-            requires_user_presence: true,
-            provider: "windows-cng-user-presence",
-            reason: "available",
-        };
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    DeviceUnlockCapability {
-        supports_passwordless: false,
-        requires_user_presence: false,
-        provider: "unsupported",
-        reason: "platform_user_presence_unavailable",
-    }
-}
-
-#[tauri::command]
-async fn derive_unlock_key_argon2id(
-    password: String,
-    recovery_key: String,
-    params: KdfParams,
-) -> Result<String, String> {
-    #[cfg(debug_assertions)]
-    let perf_start = Instant::now();
-
-    tauri::async_runtime::spawn_blocking(move || {
-        derive_unlock_key_argon2id_inner(password, recovery_key, params)
-    })
-    .await
-    .map_err(|error| format!("failed to join Argon2id KDF task: {error}"))?
-    .map(|derived| {
-        #[cfg(debug_assertions)]
-        eprintln!(
-            "[perf-rust-json] {{\"name\":\"derive_unlock_key_argon2id\",\"totalMs\":{:.1}}}",
-            perf_start.elapsed().as_secs_f64() * 1000.0
-        );
-
-        derived
-    })
-}
-
-fn derive_unlock_key_argon2id_inner(
-    password: String,
-    recovery_key: String,
-    params: KdfParams,
-) -> Result<String, String> {
-    assert_supported_kdf(&params)?;
-
-    let input = encode_unlock_input(&password, &recovery_key)?;
-    let salt = base64url_to_bytes(&params.salt)?;
-    validate_argon2_runtime_params(&params, &salt)?;
-    let argon_params = Params::new(
-        params.memory_kib,
-        params.iterations,
-        params.parallelism,
-        Some(KEY_BYTES),
-    )
-    .map_err(|error| format!("failed to configure Argon2id KDF: {error}"))?;
-    let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, argon_params);
-    let mut output = [0u8; KEY_BYTES];
-
-    argon2
-        .hash_password_into(&input, &salt, &mut output)
-        .map_err(|error| format!("failed to derive unlock key: {error}"))?;
-
-    Ok(bytes_to_base64url(&output))
-}
-
-#[tauri::command]
-fn save_recovery_key(user_id: String, recovery_key: String) -> Result<(), String> {
+fn save_secret_key(user_id: String, secret_key: String) -> Result<(), String> {
     #[cfg(debug_assertions)]
     let perf_start = Instant::now();
 
     if user_id.trim().is_empty() {
         return Err("user_id is required".to_string());
     }
-    if recovery_key.trim().is_empty() {
-        return Err("recovery_key is required".to_string());
+    if secret_key.trim().is_empty() {
+        return Err("secret_key is required".to_string());
     }
 
-    let result = recovery_key_entry(&user_id)?
-        .set_password(&recovery_key)
-        .map_err(|error| format!("failed to save recovery key: {error}"));
+    let result = secret_key_entry(&user_id)?
+        .set_password(&secret_key)
+        .map_err(|error| format!("failed to save Secret Key: {error}"));
 
     #[cfg(debug_assertions)]
     eprintln!(
-        "[perf-rust-json] {{\"name\":\"save_recovery_key\",\"totalMs\":{:.1},\"ok\":{}}}",
+        "[perf-rust-json] {{\"name\":\"save_secret_key\",\"totalMs\":{:.1},\"ok\":{}}}",
         perf_start.elapsed().as_secs_f64() * 1000.0,
         result.is_ok()
     );
@@ -786,7 +666,7 @@ fn save_recovery_key(user_id: String, recovery_key: String) -> Result<(), String
 }
 
 #[tauri::command]
-fn load_recovery_key(user_id: String) -> Result<Option<String>, String> {
+fn load_secret_key(user_id: String) -> Result<Option<String>, String> {
     #[cfg(debug_assertions)]
     let perf_start = Instant::now();
 
@@ -794,15 +674,15 @@ fn load_recovery_key(user_id: String) -> Result<Option<String>, String> {
         return Err("user_id is required".to_string());
     }
 
-    let result = match recovery_key_entry(&user_id)?.get_password() {
-        Ok(recovery_key) => Ok(Some(recovery_key)),
+    let result = match secret_key_entry(&user_id)?.get_password() {
+        Ok(secret_key) => Ok(Some(secret_key)),
         Err(KeyringError::NoEntry) => Ok(None),
-        Err(error) => Err(format!("failed to load recovery key: {error}")),
+        Err(error) => Err(format!("failed to load Secret Key: {error}")),
     };
 
     #[cfg(debug_assertions)]
     eprintln!(
-        "[perf-rust-json] {{\"name\":\"load_recovery_key\",\"totalMs\":{:.1},\"ok\":{},\"status\":\"{}\"}}",
+        "[perf-rust-json] {{\"name\":\"load_secret_key\",\"totalMs\":{:.1},\"ok\":{},\"status\":\"{}\"}}",
         perf_start.elapsed().as_secs_f64() * 1000.0,
         result.is_ok(),
         match &result {
@@ -816,89 +696,14 @@ fn load_recovery_key(user_id: String) -> Result<Option<String>, String> {
 }
 
 #[tauri::command]
-fn delete_recovery_key(user_id: String) -> Result<(), String> {
+fn delete_secret_key(user_id: String) -> Result<(), String> {
     if user_id.trim().is_empty() {
         return Err("user_id is required".to_string());
     }
 
-    match recovery_key_entry(&user_id)?.delete_credential() {
+    match secret_key_entry(&user_id)?.delete_credential() {
         Ok(()) | Err(KeyringError::NoEntry) => Ok(()),
-        Err(error) => Err(format!("failed to delete recovery key: {error}")),
-    }
-}
-
-#[tauri::command]
-fn save_device_unlock_key(
-    account_id: String,
-    user_id: String,
-    device_id: String,
-    device_key_id: String,
-    device_unlock_key: String,
-) -> Result<(), String> {
-    if account_id.trim().is_empty() {
-        return Err("account_id is required".to_string());
-    }
-    if user_id.trim().is_empty() {
-        return Err("user_id is required".to_string());
-    }
-    if device_id.trim().is_empty() {
-        return Err("device_id is required".to_string());
-    }
-    if device_key_id.trim().is_empty() {
-        return Err("device_key_id is required".to_string());
-    }
-    if device_unlock_key.trim().is_empty() {
-        return Err("device_unlock_key is required".to_string());
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        return save_device_unlock_key_windows(
-            &account_id,
-            &user_id,
-            &device_id,
-            &device_key_id,
-            &device_unlock_key,
-        );
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    device_unlock_key_entry(&account_id, &user_id, &device_id, &device_key_id)?
-        .set_password(&device_unlock_key)
-        .map_err(|error| format!("failed to save device unlock key: {error}"))
-}
-
-#[tauri::command]
-fn load_device_unlock_key(
-    account_id: String,
-    user_id: String,
-    device_id: String,
-    device_key_id: String,
-) -> Result<Option<String>, String> {
-    if account_id.trim().is_empty() {
-        return Err("account_id is required".to_string());
-    }
-    if user_id.trim().is_empty() {
-        return Err("user_id is required".to_string());
-    }
-    if device_id.trim().is_empty() {
-        return Err("device_id is required".to_string());
-    }
-    if device_key_id.trim().is_empty() {
-        return Err("device_key_id is required".to_string());
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        return load_device_unlock_key_windows(&account_id, &user_id, &device_id, &device_key_id);
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    match device_unlock_key_entry(&account_id, &user_id, &device_id, &device_key_id)?.get_password()
-    {
-        Ok(device_unlock_key) => Ok(Some(device_unlock_key)),
-        Err(KeyringError::NoEntry) => Ok(None),
-        Err(error) => Err(format!("failed to load device unlock key: {error}")),
+        Err(error) => Err(format!("failed to delete Secret Key: {error}")),
     }
 }
 
@@ -924,7 +729,7 @@ fn delete_device_unlock_key(
 
     #[cfg(target_os = "windows")]
     {
-        return delete_device_unlock_key_windows(&account_id, &user_id, &device_id, &device_key_id);
+        delete_device_unlock_key_windows(&account_id, &user_id, &device_id, &device_key_id)
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -2135,7 +1940,7 @@ fn cleanup_removed_user_dirs(app: &AppHandle, user_ids: &[String]) -> Result<(),
 }
 
 fn cleanup_user_secure_storage(app: &AppHandle, user_id: &str) {
-    let _ = delete_recovery_key(user_id.to_string());
+    let _ = delete_secret_key(user_id.to_string());
     let _ = delete_sync_device_token(user_id.to_string());
 
     let Ok(crypto) = load_user_crypto(app, user_id) else {
@@ -2211,7 +2016,7 @@ fn cleanup_legacy_secure_storage(legacy_store_path: &Path) {
         if validate_path_segment(user_id, "user id").is_err() {
             continue;
         }
-        let _ = delete_recovery_key(user_id.to_string());
+        let _ = delete_secret_key(user_id.to_string());
         let _ = delete_sync_device_token(user_id.to_string());
 
         let Some(fast_unlock) = user
@@ -2368,8 +2173,8 @@ fn validate_file_name(value: &str, label: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn recovery_key_entry(user_id: &str) -> Result<Entry, String> {
-    Entry::new(RECOVERY_KEY_SERVICE, user_id)
+fn secret_key_entry(user_id: &str) -> Result<Entry, String> {
+    Entry::new(SECRET_KEY_SERVICE, user_id)
         .map_err(|error| format!("failed to open system secure storage: {error}"))
 }
 
@@ -2384,74 +2189,6 @@ fn device_unlock_key_entry(
         &format!("{account_id}:{user_id}:{device_id}:{device_key_id}"),
     )
     .map_err(|error| format!("failed to open system secure storage: {error}"))
-}
-
-#[cfg(target_os = "windows")]
-fn save_device_unlock_key_windows(
-    account_id: &str,
-    user_id: &str,
-    device_id: &str,
-    device_key_id: &str,
-    device_unlock_key: &str,
-) -> Result<(), String> {
-    let encrypted = windows_cng_encrypt_device_unlock_key(
-        account_id,
-        user_id,
-        device_id,
-        device_key_id,
-        device_unlock_key.as_bytes(),
-    )?;
-    let stored_value = format!(
-        "{WINDOWS_CNG_DEVICE_UNLOCK_PREFIX}{}",
-        bytes_to_base64url(&encrypted)
-    );
-
-    device_unlock_key_entry(account_id, user_id, device_id, device_key_id)?
-        .set_password(&stored_value)
-        .map_err(|error| format!("failed to save protected device unlock key: {error}"))
-}
-
-#[cfg(target_os = "windows")]
-fn load_device_unlock_key_windows(
-    account_id: &str,
-    user_id: &str,
-    device_id: &str,
-    device_key_id: &str,
-) -> Result<Option<String>, String> {
-    let stored_value = match device_unlock_key_entry(account_id, user_id, device_id, device_key_id)?
-        .get_password()
-    {
-        Ok(value) => value,
-        Err(KeyringError::NoEntry) => return Ok(None),
-        Err(error) => {
-            return Err(format!(
-                "failed to load protected device unlock key: {error}"
-            ))
-        }
-    };
-
-    let Some(ciphertext) = stored_value.strip_prefix(WINDOWS_CNG_DEVICE_UNLOCK_PREFIX) else {
-        save_device_unlock_key_windows(
-            account_id,
-            user_id,
-            device_id,
-            device_key_id,
-            &stored_value,
-        )?;
-        return Ok(Some(stored_value));
-    };
-
-    let ciphertext = base64url_to_bytes(ciphertext)?;
-    let plaintext = windows_cng_decrypt_device_unlock_key(
-        account_id,
-        user_id,
-        device_id,
-        device_key_id,
-        &ciphertext,
-    )?;
-    String::from_utf8(plaintext)
-        .map(Some)
-        .map_err(|error| format!("protected device unlock key is not valid utf-8: {error}"))
 }
 
 #[cfg(target_os = "windows")]
@@ -2506,81 +2243,6 @@ impl Drop for NCryptObject {
             }
         }
     }
-}
-
-#[cfg(target_os = "windows")]
-fn windows_cng_encrypt_device_unlock_key(
-    account_id: &str,
-    user_id: &str,
-    device_id: &str,
-    device_key_id: &str,
-    plaintext: &[u8],
-) -> Result<Vec<u8>, String> {
-    let key = create_windows_cng_device_unlock_key(account_id, user_id, device_id, device_key_id)?;
-    ncrypt_encrypt_oaep_sha256(key.handle() as NCRYPT_KEY_HANDLE, plaintext)
-}
-
-#[cfg(target_os = "windows")]
-fn windows_cng_decrypt_device_unlock_key(
-    account_id: &str,
-    user_id: &str,
-    device_id: &str,
-    device_key_id: &str,
-    ciphertext: &[u8],
-) -> Result<Vec<u8>, String> {
-    let key = open_windows_cng_device_unlock_key(account_id, user_id, device_id, device_key_id)?;
-    ncrypt_decrypt_oaep_sha256(key.handle() as NCRYPT_KEY_HANDLE, ciphertext)
-}
-
-#[cfg(target_os = "windows")]
-fn create_windows_cng_device_unlock_key(
-    account_id: &str,
-    user_id: &str,
-    device_id: &str,
-    device_key_id: &str,
-) -> Result<NCryptObject, String> {
-    let provider = open_windows_cng_provider()?;
-    let key_name = wide_null(&windows_cng_key_name(
-        account_id,
-        user_id,
-        device_id,
-        device_key_id,
-    ));
-    let mut key_handle: NCRYPT_KEY_HANDLE = 0;
-    ncrypt_result(
-        unsafe {
-            NCryptCreatePersistedKey(
-                provider.handle() as NCRYPT_PROV_HANDLE,
-                &mut key_handle,
-                NCRYPT_RSA_ALGORITHM,
-                key_name.as_ptr(),
-                0,
-                NCRYPT_OVERWRITE_KEY_FLAG,
-            )
-        },
-        "create Windows protected device unlock key",
-    )?;
-    let key = NCryptObject::new(key_handle);
-
-    ncrypt_set_u32_property(
-        key.handle(),
-        NCRYPT_LENGTH_PROPERTY,
-        2048,
-        "set device unlock key length",
-    )?;
-    ncrypt_set_u32_property(
-        key.handle(),
-        NCRYPT_KEY_USAGE_PROPERTY,
-        NCRYPT_ALLOW_DECRYPT_FLAG,
-        "set device unlock key usage",
-    )?;
-    ncrypt_set_ui_policy(key.handle())?;
-    ncrypt_result(
-        unsafe { NCryptFinalizeKey(key.handle() as NCRYPT_KEY_HANDLE, 0) },
-        "finalize Windows protected device unlock key",
-    )?;
-
-    Ok(key)
 }
 
 #[cfg(target_os = "windows")]
@@ -2645,133 +2307,6 @@ fn open_windows_cng_provider() -> Result<NCryptObject, String> {
 }
 
 #[cfg(target_os = "windows")]
-fn ncrypt_set_u32_property(
-    handle: usize,
-    property: windows_sys::core::PCWSTR,
-    value: u32,
-    action: &str,
-) -> Result<(), String> {
-    ncrypt_result(
-        unsafe {
-            NCryptSetProperty(
-                handle,
-                property,
-                (&value as *const u32).cast::<u8>(),
-                std::mem::size_of::<u32>() as u32,
-                0,
-            )
-        },
-        action,
-    )
-}
-
-#[cfg(target_os = "windows")]
-fn ncrypt_set_ui_policy(handle: usize) -> Result<(), String> {
-    let creation_title = wide_null("LockPass trusted device");
-    let friendly_name = wide_null("LockPass device unlock key");
-    let description = wide_null("Confirm with Windows to unlock this trusted device.");
-    let policy = NCRYPT_UI_POLICY {
-        dwVersion: 1,
-        dwFlags: NCRYPT_UI_PROTECT_KEY_FLAG | NCRYPT_UI_FORCE_HIGH_PROTECTION_FLAG,
-        pszCreationTitle: creation_title.as_ptr(),
-        pszFriendlyName: friendly_name.as_ptr(),
-        pszDescription: description.as_ptr(),
-    };
-
-    ncrypt_result(
-        unsafe {
-            NCryptSetProperty(
-                handle,
-                NCRYPT_UI_POLICY_PROPERTY,
-                (&policy as *const NCRYPT_UI_POLICY).cast::<u8>(),
-                std::mem::size_of::<NCRYPT_UI_POLICY>() as u32,
-                0,
-            )
-        },
-        "set Windows user presence policy for device unlock key",
-    )
-}
-
-#[cfg(target_os = "windows")]
-fn ncrypt_encrypt_oaep_sha256(key: NCRYPT_KEY_HANDLE, plaintext: &[u8]) -> Result<Vec<u8>, String> {
-    let mut padding = BCRYPT_OAEP_PADDING_INFO {
-        pszAlgId: BCRYPT_SHA256_ALGORITHM,
-        pbLabel: ptr::null_mut(),
-        cbLabel: 0,
-    };
-    let mut output_len = 0u32;
-    ncrypt_result(
-        unsafe {
-            NCryptEncrypt(
-                key,
-                plaintext.as_ptr(),
-                u32::try_from(plaintext.len())
-                    .map_err(|_| "device unlock key plaintext is too large".to_string())?,
-                (&mut padding as *mut BCRYPT_OAEP_PADDING_INFO).cast(),
-                ptr::null_mut(),
-                0,
-                &mut output_len,
-                NCRYPT_PAD_OAEP_FLAG,
-            )
-        },
-        "measure Windows protected device unlock key ciphertext",
-    )?;
-
-    let mut output = vec![0u8; output_len as usize];
-    ncrypt_result(
-        unsafe {
-            NCryptEncrypt(
-                key,
-                plaintext.as_ptr(),
-                u32::try_from(plaintext.len())
-                    .map_err(|_| "device unlock key plaintext is too large".to_string())?,
-                (&mut padding as *mut BCRYPT_OAEP_PADDING_INFO).cast(),
-                output.as_mut_ptr(),
-                output_len,
-                &mut output_len,
-                NCRYPT_PAD_OAEP_FLAG,
-            )
-        },
-        "encrypt device unlock key with Windows protected key",
-    )?;
-    output.truncate(output_len as usize);
-    Ok(output)
-}
-
-#[cfg(target_os = "windows")]
-fn ncrypt_decrypt_oaep_sha256(
-    key: NCRYPT_KEY_HANDLE,
-    ciphertext: &[u8],
-) -> Result<Vec<u8>, String> {
-    let mut padding = BCRYPT_OAEP_PADDING_INFO {
-        pszAlgId: BCRYPT_SHA256_ALGORITHM,
-        pbLabel: ptr::null_mut(),
-        cbLabel: 0,
-    };
-    let ciphertext_len = u32::try_from(ciphertext.len())
-        .map_err(|_| "device unlock key ciphertext is too large".to_string())?;
-    let mut output_len = ciphertext_len;
-    let mut output = vec![0u8; ciphertext.len()];
-    ncrypt_result(
-        unsafe {
-            NCryptDecrypt(
-                key,
-                ciphertext.as_ptr(),
-                ciphertext_len,
-                (&mut padding as *mut BCRYPT_OAEP_PADDING_INFO).cast(),
-                output.as_mut_ptr(),
-                output_len,
-                &mut output_len,
-                NCRYPT_PAD_OAEP_FLAG,
-            )
-        },
-        "decrypt device unlock key with Windows protected key",
-    )?;
-    output.truncate(output_len as usize);
-    Ok(output)
-}
-
-#[cfg(target_os = "windows")]
 fn ncrypt_result(status: windows_sys::core::HRESULT, action: &str) -> Result<(), String> {
     if status >= 0 {
         Ok(())
@@ -2802,155 +2337,14 @@ fn sync_device_token_entry(user_id: &str) -> Result<Entry, String> {
         .map_err(|error| format!("failed to open system secure storage: {error}"))
 }
 
-fn assert_supported_kdf(params: &KdfParams) -> Result<(), String> {
-    if params.version != 1
-        || params.name != "argon2id"
-        || params.memory_kib != ARGON2_MEMORY_KIB
-        || params.iterations != ARGON2_ITERATIONS
-        || params.parallelism != ARGON2_PARALLELISM
-        || params.key_length_bytes != KEY_BYTES as u32
-        || params.input_encoding != "domain-tagged-length-prefixed-utf8"
-        || params.password_normalization != "NFKC"
-        || params.purpose != UNLOCK_PURPOSE
-    {
-        return Err("Unsupported or weak KDF parameters".to_string());
-    }
-
-    Ok(())
-}
-
-fn validate_argon2_runtime_params(params: &KdfParams, salt: &[u8]) -> Result<(), String> {
-    if salt.len() < 8 {
-        return Err("\"salt\" must be of length 8..4Gb".to_string());
-    }
-
-    let parallelism = u64::from(params.parallelism);
-    let rounded_memory_blocks =
-        4 * parallelism * (u64::from(params.memory_kib) / (4 * parallelism));
-    if rounded_memory_blocks * 1024 > ARGON2_MAXMEM_BYTES {
-        return Err(format!(
-            "\"maxmem\" limit was hit: memUsed(mP*1024)={}, maxmem={ARGON2_MAXMEM_BYTES}",
-            rounded_memory_blocks * 1024
-        ));
-    }
-
-    Ok(())
-}
-
-fn encode_unlock_input(password: &str, recovery_key: &str) -> Result<Vec<u8>, String> {
-    let domain = UNLOCK_PURPOSE.as_bytes();
-    let normalized_password = password.nfkc().collect::<String>();
-    let password_bytes = normalized_password.as_bytes();
-    let recovery_key_bytes = decode_recovery_key(recovery_key)?;
-
-    let mut input =
-        Vec::with_capacity(domain.len() + 4 + password_bytes.len() + 4 + recovery_key_bytes.len());
-    input.extend_from_slice(domain);
-    input.extend_from_slice(&length_prefix(password_bytes)?);
-    input.extend_from_slice(password_bytes);
-    input.extend_from_slice(&length_prefix(&recovery_key_bytes)?);
-    input.extend_from_slice(&recovery_key_bytes);
-    Ok(input)
-}
-
-fn decode_recovery_key(value: &str) -> Result<Vec<u8>, String> {
-    let normalized = normalize_recovery_key_text(value);
-    if normalized.is_empty() {
-        return Err("Recovery key is required".to_string());
-    }
-
-    if normalized.len() == 52
-        && normalized
-            .chars()
-            .all(|character| is_recovery_key_character(character))
-    {
-        return recovery_key_text_to_bytes(&normalized);
-    }
-
-    base64url_to_bytes(&normalized)
-}
-
-fn normalize_recovery_key_text(value: &str) -> String {
-    let trimmed = value.trim();
-    let raw = if trimmed.len() >= 3 && trimmed.as_bytes()[..3].eq_ignore_ascii_case(b"LP-") {
-        &trimmed[3..]
-    } else {
-        trimmed
-    };
-    let mut normalized = String::new();
-    let mut group_length = 0;
-
-    for character in raw.chars().filter(|character| !character.is_whitespace()) {
-        if character == '-' && group_length == 4 {
-            group_length = 0;
-            continue;
-        }
-
-        normalized.push(character);
-        group_length += 1;
-    }
-
-    normalized
-}
-
-fn is_recovery_key_character(character: char) -> bool {
-    matches!(character.to_ascii_uppercase(), 'A'..='H' | 'J'..='N' | 'P'..='Z' | '2'..='9')
-}
-
-fn recovery_key_text_to_bytes(value: &str) -> Result<Vec<u8>, String> {
-    let mut output = Vec::with_capacity(RECOVERY_KEY_BYTES);
-    let mut buffer = 0u32;
-    let mut bits = 0u32;
-
-    for character in value
-        .chars()
-        .map(|character| character.to_ascii_uppercase())
-    {
-        let index = RECOVERY_KEY_ALPHABET
-            .find(character)
-            .ok_or_else(|| "Invalid recovery key".to_string())? as u32;
-
-        buffer = (buffer << 5) | index;
-        bits += 5;
-        while bits >= 8 {
-            bits -= 8;
-            output.push(((buffer >> bits) & 255) as u8);
-            buffer &= (1 << bits) - 1;
-        }
-    }
-
-    if output.len() != RECOVERY_KEY_BYTES {
-        return Err("Invalid recovery key length".to_string());
-    }
-
-    Ok(output)
-}
-
-fn length_prefix(bytes: &[u8]) -> Result<[u8; 4], String> {
-    let length = u32::try_from(bytes.len()).map_err(|_| "unlock input is too large".to_string())?;
-    Ok(length.to_be_bytes())
-}
-
 fn bytes_to_base64url(bytes: &[u8]) -> String {
     URL_SAFE_NO_PAD.encode(bytes)
-}
-
-fn base64url_to_bytes(value: &str) -> Result<Vec<u8>, String> {
-    let normalized = value.replace('-', "+").replace('_', "/");
-    let padding_length = (4 - normalized.len() % 4) % 4;
-    let mut padded = String::with_capacity(normalized.len() + padding_length);
-    padded.push_str(&normalized);
-    padded.extend(std::iter::repeat('=').take(padding_length));
-
-    STANDARD
-        .decode(padded)
-        .map_err(|error| format!("invalid base64url value: {error}"))
 }
 
 fn validate_vault_store(data: &serde_json::Value) -> Result<(), String> {
     if contains_forbidden_plaintext_key(data) {
         return Err(
-            "vault store must not contain recoveryKey or deviceUnlockKey plaintext".to_string(),
+            "vault store must not contain secretKey or deviceUnlockKey plaintext".to_string(),
         );
     }
 
@@ -3034,7 +2428,7 @@ fn validate_vault_store(data: &serde_json::Value) -> Result<(), String> {
 fn contains_forbidden_plaintext_key(value: &serde_json::Value) -> bool {
     match value {
         serde_json::Value::Object(map) => map.iter().any(|(key, child)| {
-            key.eq_ignore_ascii_case("recoveryKey")
+            key.eq_ignore_ascii_case("secretKey")
                 || key.eq_ignore_ascii_case("deviceUnlockKey")
                 || contains_forbidden_plaintext_key(child)
         }),
@@ -3121,17 +2515,13 @@ pub fn run() {
             load_start_on_login,
             set_start_on_login,
             take_pending_deep_links,
-            save_recovery_key,
-            load_recovery_key,
-            delete_recovery_key,
-            device_unlock_capability,
-            save_device_unlock_key,
-            load_device_unlock_key,
+            save_secret_key,
+            load_secret_key,
+            delete_secret_key,
             delete_device_unlock_key,
             save_sync_device_token,
             load_sync_device_token,
             delete_sync_device_token,
-            derive_unlock_key_argon2id,
             load_vault_store,
             save_vault_store,
             load_encrypted_objects,
@@ -3293,90 +2683,20 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "touches OS secure storage; run manually when validating recovery key persistence"]
-    fn recovery_key_round_trips_through_os_secure_storage() {
+    #[ignore = "touches OS secure storage; run manually when validating Secret Key persistence"]
+    fn secret_key_round_trips_through_os_secure_storage() {
         let user_id = format!("lockpass-test-{}", std::process::id());
-        let recovery_key = "LP-TEST-KEY-2345-6789-ABCD-EFGH-JKLM-NPQR-STUV-WXYZ";
+        let secret_key = "LP-TEST-KEY-2345-6789-ABCD-EFGH-JKLM-NPQR-STUV-WXYZ";
 
-        save_recovery_key(user_id.clone(), recovery_key.to_string())
-            .expect("recovery key should save");
+        save_secret_key(user_id.clone(), secret_key.to_string()).expect("Secret Key should save");
 
-        let loaded = load_recovery_key(user_id.clone()).expect("recovery key should load");
-        delete_recovery_key(user_id.clone()).expect("recovery key should delete");
-        assert_eq!(loaded.as_deref(), Some(recovery_key));
+        let loaded = load_secret_key(user_id.clone()).expect("Secret Key should load");
+        delete_secret_key(user_id.clone()).expect("Secret Key should delete");
+        assert_eq!(loaded.as_deref(), Some(secret_key));
 
         let loaded_after_delete =
-            load_recovery_key(user_id).expect("recovery key lookup after delete should succeed");
+            load_secret_key(user_id).expect("Secret Key lookup after delete should succeed");
         assert_eq!(loaded_after_delete, None);
-    }
-
-    #[test]
-    #[ignore = "touches OS secure storage; run manually when validating trusted device fast unlock persistence"]
-    fn device_unlock_key_round_trips_through_os_secure_storage() {
-        let user_id = format!("lockpass-test-{}", std::process::id());
-        let account_id = user_id.clone();
-        let device_id = "device-test";
-        let device_key_id = "device-key-test";
-        let device_unlock_key = "test-device-unlock-key";
-
-        save_device_unlock_key(
-            account_id.clone(),
-            user_id.clone(),
-            device_id.to_string(),
-            device_key_id.to_string(),
-            device_unlock_key.to_string(),
-        )
-        .expect("device unlock key should save");
-
-        let loaded = load_device_unlock_key(
-            account_id.clone(),
-            user_id.clone(),
-            device_id.to_string(),
-            device_key_id.to_string(),
-        )
-        .expect("device unlock key should load");
-        delete_device_unlock_key(
-            account_id.clone(),
-            user_id.clone(),
-            device_id.to_string(),
-            device_key_id.to_string(),
-        )
-        .expect("device unlock key should delete");
-        assert_eq!(loaded.as_deref(), Some(device_unlock_key));
-
-        let loaded_after_delete = load_device_unlock_key(
-            account_id,
-            user_id,
-            device_id.to_string(),
-            device_key_id.to_string(),
-        )
-        .expect("device unlock key lookup after delete should succeed");
-        assert_eq!(loaded_after_delete, None);
-    }
-
-    #[test]
-    fn rust_argon2id_unlock_key_matches_frontend_encoding() {
-        let params = KdfParams {
-            version: 1,
-            name: "argon2id".to_string(),
-            memory_kib: 32_768,
-            iterations: 2,
-            parallelism: 1,
-            salt: "AQIDBAUGBwgJCgsMDQ4PEA".to_string(),
-            key_length_bytes: 32,
-            input_encoding: "domain-tagged-length-prefixed-utf8".to_string(),
-            password_normalization: "NFKC".to_string(),
-            purpose: "lockpass unlock v1".to_string(),
-        };
-
-        let derived = derive_unlock_key_argon2id_inner(
-            "p\u{e4}ssword-\u{6d4b}\u{8bd5}".to_string(),
-            "LP-ABCD-EFGH-JKLM-NPQR-STUV-WXYZ-2345-6789-ABCD-EFGH-JKLM-NPQR-STUV".to_string(),
-            params,
-        )
-        .expect("unlock key should derive");
-
-        assert_eq!(derived, "gMxV5ElgDK2gIkGmdue7IP0xmPJag2wc57pOIjFh6LA");
     }
 
     #[test]

@@ -1,4 +1,4 @@
-﻿# 网站创建账号流程
+# 网站创建账号流程
 
 ## 目标
 
@@ -92,7 +92,7 @@
 
 ### 4. 生成 Secret Key
 
-主密码通过本地校验后，客户端生成 256-bit 随机 Secret Key，也就是代码中的 `recoveryKey`。
+主密码通过本地校验后，客户端生成 256-bit 随机 Secret Key，也就是代码中的 `secretKey`。
 
 页面可分成两步：
 
@@ -139,9 +139,9 @@ email = 已验证邮箱
 displayName = 用户输入姓名
 
 主密码 = 用户输入，只在本地内存中短暂存在
-recoveryKey = random(32 bytes)  # 用户可见为 Secret Key
+secretKey = random(32 bytes)  # 用户可见为 Secret Key
 kdfParams = 当前客户端 KDF profile
-unlockKey = Argon2id(domain("lockpass unlock v1") || encoded(主密码) || encoded(recoveryKey), kdfParams)
+unlockKey = Argon2id(domain("lockpass unlock v1") || encoded(主密码) || encoded(secretKey), kdfParams)
 
 vaultKey = random(32 bytes)
 wrappedVaultKey = AEAD_Encrypt(
@@ -329,7 +329,7 @@ PC 客户端首次启动时，如果本机没有账号，只展示“登录”�
 中文：
 
 1. master password：主密码。
-2. Secret Key / recoveryKey：安全密钥 / Secret Key。
+2. Secret Key / secretKey：安全密钥 / Secret Key。
 3. vault：保险库。
 4. trusted device：受信任设备。
 5. OS secure storage：系统安全存储。

@@ -44,7 +44,27 @@ The script always rebuilds the desktop installer before collecting artifacts. Re
 
 Uploads overwrite existing OSS objects by default.
 
-Advanced settings such as signing key path, OSS app directory, bucket, endpoint, and public URL live in `tools/pc_release.env`. To use another env file, set:
+Set the release version in `tools/pc_release.env` with a semantic version tag:
+
+```text
+RELEASE_TAG=v0.1.3
+```
+
+The script also accepts Git tag references such as `refs/tags/v0.1.3`. Before building, it synchronizes the version without the leading `v` to the desktop `package.json`, Rust `Cargo.toml`, Tauri config, and generated `latest.json`.
+
+Signing configuration distinguishes private and public keys explicitly:
+
+```text
+TAURI_SIGNING_PRIVATE_KEY_PASSWORD=
+TAURI_SIGNING_PRIVATE_KEY=
+TAURI_SIGNING_PUBLIC_KEY=
+LOCKPASS_SIGNING_PRIVATE_KEY_PATH=tools/keys/lockpass.key
+LOCKPASS_SIGNING_PUBLIC_KEY_PATH=tools/keys/lockpass.key.pub
+```
+
+CI can provide the key contents through the `TAURI_*` variables. Local releases normally use the two `LOCKPASS_*_PATH` variables. The public key must match `plugins.updater.pubkey` in the Tauri config.
+
+Advanced settings such as signing key paths, OSS app directory, bucket, endpoint, and public URL live in `tools/pc_release.env`. To use another env file, set:
 
 ```powershell
 $env:LOCKPASS_RELEASE_ENV = "tools\pc_release.prod.env"

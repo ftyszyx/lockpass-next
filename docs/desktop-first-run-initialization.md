@@ -1,4 +1,4 @@
-﻿# PC 客户端首次初始化流程
+# PC 客户端首次初始化流程
 
 ## 目标
 
@@ -79,12 +79,12 @@ PC 客户端启动后先读取本机 meta 信息：
 1. 主密码。
 2. 安全密钥 / Secret Key。
 
-用户可见文案必须使用“安全密钥 / Secret Key”，不要写“恢复密码”。代码和协议中仍可以使用 `recoveryKey` 字段名。
+用户可见文案必须使用“安全密钥 / Secret Key”，不要写“恢复密码”。代码和协议中仍可以使用 `secretKey` 字段名。
 
 这一页的目标是本地解锁服务端密文：
 
 ```text
-unlockKey = Argon2id(domain("lockpass unlock v1") || encoded(主密码) || encoded(recoveryKey), kdfParams)
+unlockKey = Argon2id(domain("lockpass unlock v1") || encoded(主密码) || encoded(secretKey), kdfParams)
 vaultKey = AEAD_Decrypt(key = unlockKey, ciphertext = wrappedVaultKey, aad = vaultKeyAAD)
 ```
 
@@ -163,6 +163,8 @@ PC 客户端职责：
 
 如果本机保存了多个账号，启动时默认进入当前账号的解锁页；用户可以进入账号选择，切换到其他本机账号。切换账号必须先锁定当前会话并清理当前账号的会话密钥。
 
+用户主动锁定或应用自动锁定时，客户端必须销毁当前 provider 会话并清理 `vaultKey`、`unlockKey` 和界面明文。下一次解锁仍执行主密码 + 系统安全存储中的安全密钥 + Argon2id 的完整流程，不复用进程内旧会话。
+
 ## 本机保存内容
 
 可以保存：
@@ -171,7 +173,7 @@ PC 客户端职责：
 | --- | --- |
 | 本机 meta | 账号 id、邮箱、显示名、服务器模式、服务器地址、当前设备 id、保存游标、加密参数、`wrappedVaultKey`、本机账号列表 |
 | 本机加密对象库 | 保险库、条目、附件索引和附件密文 |
-| 系统安全存储 | 安全密钥；受信任设备快速解锁材料 |
+| 系统安全存储 | 安全密钥；Windows 当前不保存免主密码快速解锁材料 |
 | 服务器 | 账号、邮箱验证状态、设备、设备 token hash、密文对象、版本元数据 |
 
 禁止保存或上传：

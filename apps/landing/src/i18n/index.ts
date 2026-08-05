@@ -183,7 +183,7 @@ export const messages = {
       eyebrow: 'Desktop password manager',
       title: 'LockPass',
       subtitle:
-        'Keep vault data local first, protect items with a master password and recovery key, and sync trusted devices through end-to-end encryption.',
+        'Keep vault data local first, protect items with a master password and Secret Key, and sync trusted devices through end-to-end encryption.',
       primaryCta: 'Download for Windows',
       secondaryCta: 'Read the guide',
       versionPrefix: 'Current version',
@@ -202,9 +202,9 @@ export const messages = {
             'Vaults, items, and attachments are stored in a local database by default. You can work offline and sync after reconnecting.'
         },
         {
-          title: 'Master password and recovery key',
+          title: 'Master password and Secret Key',
           body:
-            'The master password unlocks day-to-day access. The recovery key supports new-device recovery and long-term backup. Trusted devices can store it in OS secure storage.'
+            'The master password unlocks day-to-day access. The Secret Key supports new-device recovery and long-term backup. Trusted devices can store it in OS secure storage.'
         },
         {
           title: 'End-to-end encrypted sync',
@@ -259,7 +259,7 @@ export const messages = {
         {
           title: 'Create a local identity',
           body:
-            'Set a master password and generate a recovery key. Store the recovery key safely; it is important for new-device recovery.'
+            'Set a master password and generate a Secret Key. Store the Secret Key safely; it is important for new-device recovery.'
         },
         {
           title: 'Create vaults and items',
@@ -283,7 +283,7 @@ export const messages = {
       title: 'A good first operating habit',
       items: [
         'Use the master password only for local vault unlock, not as your server login password.',
-        'Keep one offline copy of the recovery key; trusted devices can also store it in OS secure storage.',
+        'Keep one offline copy of the Secret Key; trusted devices can also store it in OS secure storage.',
         'After binding a server account, the device list shows the local device ID, last activity time, and recent IP.',
         'If sync fails after a server reset, check the server connection state before rebinding the device.',
         'Before importing backups or manual sync, watch the progress dialog and the file path shown after completion.'
@@ -310,9 +310,9 @@ export const messages = {
             'Yes. LockPass is local-first, so you can manage vaults offline. Sync is an enhancement for multi-device use.'
         },
         {
-          question: 'How is a recovery key different from the master password?',
+          question: 'How is a Secret Key different from the master password?',
           answer:
-            'The master password unlocks daily access. The recovery key is a high-entropy credential used to recover vaults or establish trust on a new device.'
+            'The master password unlocks daily access. The Secret Key is a high-entropy credential used to recover vaults or establish trust on a new device.'
         }
       ]
     },

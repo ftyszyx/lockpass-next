@@ -20,8 +20,10 @@ from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[1]
 DESKTOP_DIR = ROOT / "apps" / "desktop"
+DESKTOP_PACKAGE_JSON = DESKTOP_DIR / "package.json"
 TAURI_DIR = DESKTOP_DIR / "src-tauri"
 TAURI_CONFIG = TAURI_DIR / "tauri.conf.json5"
+TAURI_CARGO_TOML = TAURI_DIR / "Cargo.toml"
 NSIS_DIR = TAURI_DIR / "target" / "release" / "bundle" / "nsis"
 DEFAULT_DIST_DIR = ROOT / "tools" / "dist" / "pc_release"
 DEFAULT_KEY_PATH = Path.home() / ".tauri" / "lockpass.key"
@@ -30,6 +32,13 @@ DEFAULT_LATEST_NAME = "latest.json"
 DEFAULT_OSS_APPS_DIR = "apps"
 IMMUTABLE_ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable"
 LATEST_JSON_CACHE_CONTROL = "no-cache"
+VERSION_TAG_PATTERN = re.compile(
+    r"(0|[1-9]\d*)\."
+    r"(0|[1-9]\d*)\."
+    r"(0|[1-9]\d*)"
+    r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
+    r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
+)
 
 
 @dataclass(frozen=True)
@@ -49,14 +58,21 @@ def main() -> int:
     env = {**os.environ, **file_env}
 
     config = read_tauri_config()
-    version = config_string(config, "version")
+    config_version = config_string(config, "version")
+    version = release_version_for_build(config_version, env)
+    sync_desktop_release_versions(version)
+    if version != config_version:
+        config = merge_dicts(config, {"version": version})
     app_id = config_string(config, "identifier")
     platform = args.platform
     channel = normalize_channel(args.channel)
     latest_name = DEFAULT_LATEST_NAME
 
-    signing_key = resolve_signing_key(None, env)
-    build_release(signing_key, env, release_tauri_config(config, app_id, channel, platform, latest_name, env))
+    signing_private_key = resolve_signing_private_key(None, env)
+    signing_public_key = resolve_signing_public_key(signing_private_key, env)
+    release_config = release_tauri_config(config, app_id, channel, platform, latest_name, env)
+    validate_updater_public_key(release_config, signing_public_key)
+    build_release(signing_private_key, env, release_config)
 
     dist_dir = resolve_dist_dir()
     artifact = collect_artifact(version, app_id, channel, dist_dir, args.notes, platform, env, latest_name)
@@ -108,6 +124,79 @@ def normalize_channel(value: str) -> str:
     return normalized
 
 
+def release_version_for_build(config_version: str, env: dict[str, str]) -> str:
+    release_tag = env.get("RELEASE_TAG", "").strip()
+    if not release_tag:
+        return config_version
+    return version_from_release_tag(release_tag)
+
+
+def version_from_release_tag(release_tag: str) -> str:
+    tag = release_tag.strip()
+    if tag.startswith("refs/tags/"):
+        tag = tag.removeprefix("refs/tags/")
+    if tag[:1].lower() == "v":
+        tag = tag[1:]
+    if not VERSION_TAG_PATTERN.fullmatch(tag):
+        raise SystemExit(
+            f"Invalid release tag {release_tag!r}. Expected a semantic version tag like v1.2.3."
+        )
+    return tag
+
+
+def sync_desktop_release_versions(version: str) -> None:
+    sync_package_json_version(DESKTOP_PACKAGE_JSON, version)
+    sync_cargo_toml_version(TAURI_CARGO_TOML, version)
+    sync_tauri_config_version(TAURI_CONFIG, version)
+
+
+def sync_package_json_version(path: Path, version: str) -> None:
+    package = json.loads(path.read_text(encoding="utf-8-sig"))
+    if not isinstance(package, dict):
+        raise SystemExit(f"Invalid JSON object in {path}")
+    if package.get("version") == version:
+        return
+    package["version"] = version
+    write_text_utf8_lf(path, json.dumps(package, ensure_ascii=False, indent=2) + "\n")
+
+
+def sync_cargo_toml_version(path: Path, version: str) -> None:
+    text = path.read_text(encoding="utf-8-sig")
+    match = re.search(r'(?m)^(version\s*=\s*)"([^"]+)"', text)
+    if match is None:
+        raise SystemExit(f"Could not find package version in {path}")
+    if match.group(2) == version:
+        return
+    updated = re.sub(
+        r'(?m)^(version\s*=\s*)"[^"]+"',
+        rf'\1"{version}"',
+        text,
+        count=1,
+    )
+    write_text_utf8_lf(path, updated)
+
+
+def sync_tauri_config_version(path: Path, version: str) -> None:
+    text = path.read_text(encoding="utf-8-sig")
+    pattern = re.compile(r"(?m)^(\s*version\s*:\s*)(['\"])([^'\"]+)\2")
+    match = pattern.search(text)
+    if match is None:
+        raise SystemExit(f"Could not find Tauri config version in {path}")
+    if match.group(3) == version:
+        return
+    updated = pattern.sub(
+        lambda value: f"{value.group(1)}{value.group(2)}{version}{value.group(2)}",
+        text,
+        count=1,
+    )
+    write_text_utf8_lf(path, updated)
+
+
+def write_text_utf8_lf(path: Path, value: str) -> None:
+    with path.open("w", encoding="utf-8", newline="\n") as file:
+        file.write(value)
+
+
 def resolve_latest_name() -> str:
     return DEFAULT_LATEST_NAME
 
@@ -118,29 +207,80 @@ def strip_env_quotes(value: str) -> str:
     return value
 
 
-def resolve_signing_key(argument: str | None, env: dict[str, str]) -> Path | None:
+def expand_config_path(value: str) -> Path:
+    path = Path(os.path.expandvars(os.path.expanduser(value)))
+    if not path.is_absolute():
+        path = ROOT / path
+    return path
+
+
+def resolve_signing_private_key(argument: str | None, env: dict[str, str]) -> Path | None:
     if env.get("TAURI_SIGNING_PRIVATE_KEY"):
         return None
 
-    key_text = argument or env.get("TAURI_SIGNING_PRIVATE_KEY_PATH") or env.get("LOCKPASS_SIGNING_KEY_PATH")
-    key_path = Path(os.path.expandvars(os.path.expanduser(key_text))) if key_text else DEFAULT_KEY_PATH
+    key_text = (
+        argument
+        or env.get("TAURI_SIGNING_PRIVATE_KEY_PATH")
+        or env.get("LOCKPASS_SIGNING_PRIVATE_KEY_PATH")
+    )
+    key_path = expand_config_path(key_text) if key_text else DEFAULT_KEY_PATH
     if not key_path.exists():
         raise SystemExit(
-            f"Updater signing key not found: {key_path}\n"
+            f"Updater signing private key not found: {key_path}\n"
             "Generate one with:\n"
             "  npm exec -w @lockpass/desktop tauri signer generate -- --write-keys \"%USERPROFILE%\\.tauri\\lockpass.key\" --ci --force"
         )
     return key_path
 
 
-def build_release(signing_key: Path | None, base_env: dict[str, str], config: dict[str, object]) -> None:
+def resolve_signing_public_key(signing_private_key: Path | None, env: dict[str, str]) -> str:
+    value = env.get("TAURI_SIGNING_PUBLIC_KEY")
+    if value:
+        return value.strip()
+
+    public_key_text = env.get("TAURI_SIGNING_PUBLIC_KEY_PATH") or env.get(
+        "LOCKPASS_SIGNING_PUBLIC_KEY_PATH"
+    )
+    if public_key_text:
+        public_key_path = expand_config_path(public_key_text)
+    else:
+        private_key_path = signing_private_key or DEFAULT_KEY_PATH
+        public_key_path = Path(f"{private_key_path}.pub")
+
+    if not public_key_path.exists():
+        raise SystemExit(
+            f"Updater signing public key not found: {public_key_path}\n"
+            "Set TAURI_SIGNING_PUBLIC_KEY or LOCKPASS_SIGNING_PUBLIC_KEY_PATH, "
+            "or generate a key pair with:\n"
+            "  npm exec -w @lockpass/desktop tauri signer generate -- --write-keys \"%USERPROFILE%\\.tauri\\lockpass.key\" --ci --force"
+        )
+
+    value = public_key_path.read_text(encoding="utf-8").strip()
+    if not value:
+        raise SystemExit(f"Updater signing public key is empty: {public_key_path}")
+    return value
+
+
+def validate_updater_public_key(config: dict[str, object], expected_public_key: str) -> None:
+    plugins = config.get("plugins")
+    updater = plugins.get("updater") if isinstance(plugins, dict) else None
+    configured_public_key = updater.get("pubkey") if isinstance(updater, dict) else None
+    if not isinstance(configured_public_key, str) or not configured_public_key.strip():
+        raise SystemExit(f"plugins.updater.pubkey must be set in {TAURI_CONFIG}")
+    if configured_public_key.strip() != expected_public_key:
+        raise SystemExit(
+            "plugins.updater.pubkey does not match the configured updater signing public key."
+        )
+
+
+def build_release(signing_private_key: Path | None, base_env: dict[str, str], config: dict[str, object]) -> None:
     if NSIS_DIR.exists():
         shutil.rmtree(NSIS_DIR)
 
     env = os.environ.copy()
     env.update(base_env)
-    if signing_key is not None:
-        env["TAURI_SIGNING_PRIVATE_KEY"] = signing_key.read_text(encoding="utf-8")
+    if signing_private_key is not None:
+        env["TAURI_SIGNING_PRIVATE_KEY"] = signing_private_key.read_text(encoding="utf-8")
         env.setdefault("TAURI_SIGNING_PRIVATE_KEY_PASSWORD", "")
 
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as config_file:

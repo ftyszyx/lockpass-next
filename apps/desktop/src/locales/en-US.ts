@@ -93,26 +93,7 @@ const enUS: LocaleMessages = {
   user: {
     firstRunTitle: "Set up LockPass",
     addUserTitle: "Add user",
-    setupChoiceTitle: "Are you a new user or an existing user?",
-    setupChoiceBody:
-      "Choose whether this is a new vault or a device joining an existing account.",
-    firstDeviceTitle: "I am a new user",
-    firstDeviceBody: "Create a new user and generate a Secret Key.",
-    restoreDeviceTitle: "I have an existing vault",
-    restoreDeviceBody:
-      "Enter the master password and Secret Key to unlock an existing vault on this device.",
-    restoreDeviceStepsTitle: "New-device unlock flow",
-    restoreDeviceStepOld:
-      "Old device: Settings -> show Secret Key / export QR.",
-    restoreDeviceStepNew:
-      "New device: fetch encrypted server data, then enter master password + Secret Key.",
-    restoreDeviceUnavailable:
-      "Enter the master password and Secret Key to unlock the vault saved on the server.",
-    restoreQrUnavailable:
-      "QR scanning will be added later. Enter the Secret Key manually for now.",
-    backToChoice: "Back",
     backToPrevious: "Back",
-    startNewVault: "Create a new vault instead",
     newUserCreateTitle: "Create new user",
     firstRunBody:
       "Create a username and master password before the encrypted local vault is created. The master password is never stored as plain text.",
@@ -127,10 +108,10 @@ const enUS: LocaleMessages = {
     showPassword: "Show password",
     hidePassword: "Hide password",
     create: "Create user",
-    createAndGenerateRecoveryKey: "Create and generate Secret Key",
+    createAndGenerateSecretKey: "Create and generate Secret Key",
     add: "Add user",
     addAccount: "Add account",
-    manageUsers: "Manage users",
+    manageUsers: "Manage accounts",
     switchUser: "Switch user",
     currentUser: "Current user",
     switchUserConfirmTitle: "Switch user?",
@@ -147,32 +128,28 @@ const enUS: LocaleMessages = {
       "No vault key package was found on the server for this account. Make sure the account setup was completed.",
     multiUserHint:
       "Each user has a separate local profile, vaults, and attachment set.",
-    recoveryKeySaveTitle: "Save your Secret Key",
-    recoveryKeySaveBody:
+    secretKeySaveTitle: "Save your Secret Key",
+    secretKeySaveBody:
       "This Secret Key is required with the master password to unlock {name}. Save it offline before continuing.",
-    recoveryKeyWarning:
+    secretKeyWarning:
       "LockPass does not store this Secret Key in the vault store. Encrypted backups will not include it.",
-    recoveryKeySavedToDevice:
+    secretKeySavedToDevice:
       "Saved to this trusted device using OS secure storage.",
-    recoveryKeyBrowserPreview:
+    secretKeyBrowserPreview:
       "Browser preview will not save the Secret Key. Save it offline before continuing.",
-    recoveryKeySaveFailed:
+    secretKeySaveFailed:
       "Could not save to OS secure storage. Save it offline before continuing.",
-    savedRecoveryKey: "I saved it offline",
-    savedRecoveryKeyConfirm: "I saved the Secret Key offline",
+    savedSecretKey: "I saved it offline",
+    savedSecretKeyConfirm: "I saved the Secret Key offline",
     enterVault: "Enter vault",
-    existingRecoveryTitle: "Unlock existing vault",
-    recoveryKey: "Secret Key",
-    recoveryKeyInputPlaceholder:
-      "Enter the Secret Key, or scan the old device QR code to fill it in",
-    scanRecoveryQr: "Scan QR code",
-    recoverAndUnlock: "Unlock existing vault",
+    existingVaultTitle: "Restore vault",
+    secretKey: "Secret Key",
+    secretKeyInputPlaceholder: "Enter Secret Key",
+    recoverAndUnlock: "Restore and enter",
     serverAccountTitle: "Sign in to a server account",
     serverLoginAction: "Sign in",
     createServerAccountAction: "Create new account",
-    serverConnectedBody: "Server account signed in: {account}",
-    serverConnectedToast:
-      "Server account signed in. Continue creating or unlocking the local vault.",
+    serverConnectedToast: "Server account signed in. Restore this device.",
   },
   layout: {
     resizeSidebar: "Resize vault sidebar",
@@ -327,7 +304,7 @@ const enUS: LocaleMessages = {
       "The browser blocked the sign-in popup. Allow popups and try again.",
     syncFailed:
       "Could not save to the server. Check the server URL, token, or network status.",
-    recoveryKeyNotice: "Secret Keys are not uploaded to the server.",
+    secretKeyNotice: "Secret Keys are not uploaded to the server.",
   },
   filters: {
     all: "All",
@@ -593,21 +570,21 @@ const enUS: LocaleMessages = {
     openLocalStorageBrowserPreview:
       "Browser preview does not have a local storage folder.",
     openLocalStorageFailed: "Could not open the local storage folder.",
-    recoveryKeyTitle: "Set up another device",
-    recoveryKeyBody: "Show the QR code for setting up another device.",
-    recoveryKeyReveal: "Continue",
-    recoveryKeyLocked: "Unlock the vault before showing the Secret Key.",
-    recoveryKeyPasswordRequired: "Enter the master password first.",
-    recoveryKeyUnsupported:
+    secretKeyTitle: "Set up another device",
+    secretKeyBody: "Show the QR code for setting up another device.",
+    secretKeyReveal: "Continue",
+    secretKeyLocked: "Unlock the vault before showing the Secret Key.",
+    secretKeyPasswordRequired: "Enter the master password first.",
+    secretKeyUnsupported:
       "Browser preview does not save Secret Keys. Use the offline Secret Key.",
-    recoveryKeyMissing: "No Secret Key is saved on this device.",
-    recoveryKeyBindPlaceholder: "Enter the Secret Key you saved offline",
-    recoveryKeyBindRequired: "Enter the Secret Key saved offline.",
-    recoveryKeySaveToDevice: "Save to this device and show",
-    recoveryKeySaveFailed:
+    secretKeyMissing: "No Secret Key is saved on this device.",
+    secretKeyBindPlaceholder: "Enter the Secret Key you saved offline",
+    secretKeyBindRequired: "Enter the Secret Key saved offline.",
+    secretKeySaveToDevice: "Save to this device and show",
+    secretKeySaveFailed:
       "Could not save the Secret Key to OS secure storage.",
-    recoveryKeyQrHint: "Choose Scan QR code when signing in on another device.",
-    recoveryKeyQrAlt: "Secret Key QR code",
+    secretKeyQrHint: "Choose Scan QR code when signing in on another device.",
+    secretKeyQrAlt: "Secret Key QR code",
     setupAnotherDeviceTitle: "Set up another device",
     setupAnotherDeviceVerifyTitle: "Load Secret Key",
     setupAnotherDeviceVerifyBody:
@@ -669,45 +646,23 @@ const enUS: LocaleMessages = {
   lock: {
     title: "Unlock vault",
     accountPickerTitle: "Choose local account",
-    accountPickerBody:
-      "Choose a server account already saved on this device, then unlock its local vault.",
     accountSelectLabel: "Account",
-    createNewAccount: "Create new account",
     backToAccounts: "Back to accounts",
     body: "Enter your master password. Trusted devices read the Secret Key from OS secure storage.",
     fastUnlockBody:
-      "Unlock quickly after system authentication, without entering the master password again.",
+      "Enter the master password to unlock quickly with the Secret Key saved on this device.",
     passwordPlaceholder: "Master password",
-    recoveryKeyPlaceholder: "Enter Secret Key",
-    recoveryKeyTitle: "Use Secret Key",
-    recoveryKeyBody:
-      "Use this only on a new or untrusted device, or when this device has no saved Secret Key.",
-    useRecoveryKey: "New user / existing vault",
-    recoveryChoiceTitle: "Are you a new user or an existing user?",
-    recoveryChoiceBody:
-      "New users create a local vault and get a generated Secret Key. Existing users enter a Secret Key saved offline or exported from an old device.",
-    newUserTitle: "I am a new user",
-    newUserBody: "Create a new user and generate a Secret Key.",
-    existingUserTitle: "I am an existing user",
-    existingUserBody:
-      "I already have a vault or old device and need to enter a Secret Key.",
-    existingRecoveryTitle: "Unlock existing vault",
-    backToUnlock: "Back to unlock",
-    backToChoice: "Back",
+    secretKeyPlaceholder: "Enter Secret Key",
+    secretKeyTitle: "Restore this device",
+    existingVaultTitle: "Unlock existing vault",
     unlocking: "Unlocking vault...",
-    fastUnlock: "Quick unlock",
-    unlockWithRecoveryKey: "Unlock with Secret Key",
-    useSavedRecoveryKey: "Use Secret Key saved on this device",
+    fastUnlock: "Master password quick unlock",
+    unlockWithSecretKey: "Unlock with Secret Key",
+    useSavedSecretKey: "Use Secret Key saved on this device",
     masterPasswordRequiredForSavedKey:
       "Enter the master password before using the Secret Key saved on this device.",
-    recoveryKeyRequired: "Enter the Secret Key.",
-    fastUnlockUnavailable:
-      "System-authenticated quick unlock is unavailable. Unlock with the master password and Secret Key.",
-    fastUnlockUnsupported:
-      "This environment does not support system-authenticated quick unlock. Unlock with the master password and Secret Key.",
-    savedRecoveryKeyUnsupported:
-      "Browser preview will not save Secret Keys. Enter the offline Secret Key.",
-    savedRecoveryKeyMissing: "No Secret Key is saved on this device.",
+    secretKeyRequired: "Enter the Secret Key.",
+    unlockUnavailable: "The selected account could not be opened. Try again.",
   },
   attachment: {
     image: "Image",
@@ -728,13 +683,13 @@ const enUS: LocaleMessages = {
     copiedFileName: "File name copied",
     filesSelected: "Added {count} attachments",
     userCreated: "Created user: {name}",
-    recoveryKeySaved:
+    secretKeySaved:
       "Secret Key saved to this trusted device. Also save a copy offline.",
-    recoveryKeyBrowserPreview:
+    secretKeyBrowserPreview:
       "Browser preview will not save the Secret Key. Save it offline.",
-    recoveryKeySaveFailed:
+    secretKeySaveFailed:
       "Could not save the Secret Key to OS secure storage.",
-    recoveryKeyLoaded: "Secret Key loaded from this device",
+    secretKeyLoaded: "Secret Key loaded from this device",
     userSignedOut: "Signed out of {name}",
     userRemovedFromDevice: "Removed {name} from this device",
     vaultDeleted: "Deleted vault: {name}, including {count} items",

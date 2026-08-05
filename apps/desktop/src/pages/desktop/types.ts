@@ -3,7 +3,7 @@ import type { AttachmentDraft, SelectedType } from '@/stores/vault/types'
 
 export type DrawerName = 'generator' | 'sync' | null
 export type ManagementPageName = 'backup' | 'settings' | 'shortcuts' | 'logs' | 'system'
-export type ModalName = 'item' | 'vault' | 'quick' | 'lock' | 'user' | 'userManagement' | 'recoveryKey' | 'removeUser' | 'switchUserConfirm' | 'deleteVaultConfirm' | null
+export type ModalName = 'item' | 'vault' | 'quick' | 'lock' | 'user' | 'userManagement' | 'secretKey' | 'removeUser' | 'switchUserConfirm' | 'deleteVaultConfirm' | null
 export type ResizeTarget = 'sidebar' | 'itemList'
 export type DetailTab = 'details' | 'history' | 'security'
 export type ConnectionStatus = 'online' | 'offline' | 'serverUnavailable'

@@ -10,7 +10,7 @@ import ItemEditorModal from "./ItemEditorModal.vue";
 import LockOverlay from "./LockOverlay.vue";
 import ProgressModal from "./ProgressModal.vue";
 import QuickSearchModal from "./QuickSearchModal.vue";
-import RecoveryKeyModal from "./RecoveryKeyModal.vue";
+import SecretKeyModal from "./SecretKeyModal.vue";
 import RemoveUserModal from "./RemoveUserModal.vue";
 import SwitchUserConfirmModal from "./SwitchUserConfirmModal.vue";
 import ToastNotice from "./ToastNotice.vue";
@@ -44,7 +44,7 @@ const page = useDesktopPageContext();
     :draft="page.itemDraft"
     :uploading-files="page.uploadingFiles"
     :error="page.itemError"
-    :vault-key="page.vaultKey"
+    :vault-session-id="page.vaultSessionId"
     :key-id="page.activeKeyId"
     @close="page.closeActiveModal"
     @save="page.saveItem"
@@ -74,16 +74,15 @@ const page = useDesktopPageContext();
     v-if="
       (page.vaultHydrated && page.vaultNeedsUserSetup) ||
       page.activeModal === 'user' ||
-      page.generatedRecoveryKey
+      page.generatedSecretKey
     "
     :draft="page.userDraft"
     :auth-error="page.authError"
     :creating="page.creatingUser"
     :is-adding="page.activeModal === 'user'"
     :is-legacy-import="page.hasLegacyImport"
-    :recovery-key="page.generatedRecoveryKey"
-    :created-user-name="page.recoveryUserName"
-    :initial-mode="page.userSetupInitialMode"
+    :secret-key="page.generatedSecretKey"
+    :created-user-name="page.createdUserName"
     :server-first="page.serverFirst"
     :server-connected="page.serverConnected"
     :server-account-label="page.serverAccountLabel"
@@ -91,10 +90,9 @@ const page = useDesktopPageContext();
     :server-url="page.serverUrl"
     :server-busy="page.serverBusy"
     @close="page.closeActiveModal"
-    @generate-recovery-key="page.prepareUserRecoveryKey"
-    @back-to-new-user="page.backToUserDraftFromRecoveryKey"
+    @generate-secret-key="page.prepareUserSecretKey"
+    @back-to-new-user="page.backToUserDraftFromSecretKey"
     @restore-existing="page.restoreExistingServerAccount"
-    @scan-recovery-qr="page.showUnavailableRecoveryQr"
     @submit="page.createUser"
     @update-server-mode="page.updateSetupServerMode"
     @update-server-url="page.updateSetupServerUrl"
@@ -118,15 +116,15 @@ const page = useDesktopPageContext();
     @add-user="page.openAddUserFromManagement"
   />
 
-  <RecoveryKeyModal
-    v-if="page.activeModal === 'recoveryKey'"
-    :revealed-recovery-key="page.revealedRecoveryKey"
+  <SecretKeyModal
+    v-if="page.activeModal === 'secretKey'"
+    :revealed-secret-key="page.revealedSecretKey"
     :reveal-error="page.revealError"
-    :reveal-issue="page.revealRecoveryKeyIssue"
-    :saving-to-device="page.savingRecoveryKeyToDevice"
-    @close="page.closeRecoveryKeyModal"
+    :reveal-issue="page.revealSecretKeyIssue"
+    :saving-to-device="page.savingSecretKeyToDevice"
+    @close="page.closeSecretKeyModal"
     @copy-value="page.copyValue"
-    @save-recovery-key-to-device="page.saveRecoveryKeyToDevice"
+    @save-secret-key-to-device="page.saveSecretKeyToDevice"
   />
 
   <RemoveUserModal
@@ -164,18 +162,19 @@ const page = useDesktopPageContext();
         !page.vaultUnlocked)
     "
     :password="page.unlockPassword"
-    :recovery-key="page.unlockRecoveryKey"
+    :secret-key="page.unlockSecretKey"
+    :secret-key-required="page.unlockRequiresSecretKey"
+    :full-unlock-required="page.fullUnlockRequired"
     :active-user-name="page.activeUserName"
     :active-user-initials="page.activeUserInitials"
     :auth-error="page.authError"
     :unlocking="page.unlockingVault"
     @update:password="page.updateUnlockPassword"
-    @update:recoveryKey="page.updateUnlockRecoveryKey"
+    @update:secretKey="page.updateUnlockSecretKey"
     @unlock="page.unlockApp"
-    @use-saved-recovery-key="page.useSavedRecoveryKey"
-    @create-new-user="page.createNewUserFromLock"
+    @use-saved-secret-key="page.useSavedSecretKey"
+    @unlock-selected-user="page.unlockSelectedUser"
     @clear-auth-error="page.clearAuthError"
-    @switch-user="page.requestSwitchUser"
   />
 
   <ProgressModal

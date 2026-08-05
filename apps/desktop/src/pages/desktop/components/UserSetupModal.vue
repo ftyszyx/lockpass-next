@@ -3,13 +3,11 @@ import {
   ArrowLeft,
   Check,
   CircleHelp,
-  Cloud,
   Eye,
   EyeOff,
   KeyRound,
   LogIn,
   Save,
-  ScanLine,
   Unlock,
   UserPlus,
   X,
@@ -25,9 +23,8 @@ const props = defineProps<{
   creating: boolean;
   isAdding: boolean;
   isLegacyImport: boolean;
-  recoveryKey: string;
+  secretKey: string;
   createdUserName: string;
-  initialMode: "choice" | "new" | "restore";
   serverFirst: boolean;
   serverConnected: boolean;
   serverAccountLabel: string;
@@ -38,23 +35,21 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: [];
-  generateRecoveryKey: [];
+  generateSecretKey: [];
   submit: [];
   backToNewUser: [];
-  restoreExisting: [payload: { password: string; recoveryKey: string }];
-  scanRecoveryQr: [];
+  restoreExisting: [payload: { password: string; secretKey: string }];
   updateServerMode: [mode: SyncMode];
   updateServerUrl: [serverUrl: string];
   openServerLogin: [mode: "login" | "register"];
 }>();
 
 const { t } = useI18n();
-const setupMode = ref<"choice" | "new" | "restore">("choice");
 const savedOfflineConfirmed = ref(false);
 const savedOfflineConfirmInput = ref<HTMLInputElement | null>(null);
 const savedOfflineConfirmAttention = ref(false);
 const restorePassword = ref("");
-const restoreRecoveryKey = ref("");
+const restoreSecretKey = ref("");
 const masterPasswordVisible = ref(false);
 const confirmPasswordVisible = ref(false);
 const showSelfhostDialog = ref(false);
@@ -64,37 +59,36 @@ const selfhostUrlError = ref(false);
 const serverSetupDone = computed(
   () => !props.serverFirst || props.serverConnected,
 );
-const showSetupChoice = computed(
-  () => !props.recoveryKey && !props.isLegacyImport,
-);
 const canRestoreExisting = computed(
   () =>
     restorePassword.value.length > 0 &&
-    restoreRecoveryKey.value.trim().length > 0,
+    restoreSecretKey.value.trim().length > 0,
 );
 const showServerStep = computed(
   () =>
     props.serverFirst &&
-    !props.recoveryKey &&
+    !props.secretKey &&
     !props.isLegacyImport &&
     !serverSetupDone.value,
 );
-
-watch(
-  () => [props.recoveryKey, props.isLegacyImport, props.initialMode] as const,
-  () => {
-    setupMode.value =
-      props.recoveryKey || props.isLegacyImport ? "new" : props.initialMode;
-    if (setupMode.value !== "restore") {
-      restorePassword.value = "";
-      restoreRecoveryKey.value = "";
-    }
-  },
-  { immediate: true },
+const showRestoreStep = computed(
+  () =>
+    props.serverFirst &&
+    props.serverConnected &&
+    !props.secretKey &&
+    !props.isLegacyImport,
 );
 
 watch(
-  () => props.recoveryKey,
+  () => props.serverAccountLabel,
+  () => {
+    restorePassword.value = "";
+    restoreSecretKey.value = "";
+  },
+);
+
+watch(
+  () => props.secretKey,
   () => {
     savedOfflineConfirmed.value = false;
     savedOfflineConfirmAttention.value = false;
@@ -105,19 +99,13 @@ watch(savedOfflineConfirmed, (confirmed) => {
   if (confirmed) savedOfflineConfirmAttention.value = false;
 });
 
-function showChoice(): void {
-  setupMode.value = "choice";
-  restorePassword.value = "";
-  restoreRecoveryKey.value = "";
-}
-
 function handleSubmit(): void {
   if (showServerStep.value) {
     openServerLogin("login");
     return;
   }
 
-  if (props.recoveryKey) {
+  if (props.secretKey) {
     if (savedOfflineConfirmed.value) {
       emit("submit");
       return;
@@ -127,14 +115,12 @@ function handleSubmit(): void {
     return;
   }
 
-  if (setupMode.value === "restore") {
+  if (showRestoreStep.value) {
     submitRestoreExisting();
     return;
   }
 
-  if (!showSetupChoice.value || setupMode.value === "new") {
-    emit("generateRecoveryKey");
-  }
+  emit("generateSecretKey");
 }
 
 function openServerLogin(mode: "login" | "register"): void {
@@ -154,7 +140,7 @@ function requestSavedOfflineConfirmation(): void {
   });
 }
 
-function handleBackFromRecoveryKey(): void {
+function handleBackFromSecretKey(): void {
   savedOfflineConfirmed.value = false;
   savedOfflineConfirmAttention.value = false;
   emit("backToNewUser");
@@ -164,7 +150,7 @@ function submitRestoreExisting(): void {
   if (!canRestoreExisting.value) return;
   emit("restoreExisting", {
     password: restorePassword.value,
-    recoveryKey: restoreRecoveryKey.value.trim(),
+    secretKey: restoreSecretKey.value.trim(),
   });
 }
 
@@ -275,60 +261,11 @@ function saveSelfhostUrl(): void {
       </div>
 
       <div
-        v-else-if="!recoveryKey && showSetupChoice && setupMode === 'choice'"
+        v-else-if="showRestoreStep"
         class="grid gap-3"
       >
-        <div
-          v-if="serverFirst"
-          class="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-900"
-        >
-          {{
-            t("user.serverConnectedBody", {
-              account: serverAccountLabel || t("sync.connected"),
-            })
-          }}
-        </div>
-        <h2 class="text-2xl font-black">{{ t("user.setupChoiceTitle") }}</h2>
-        <button
-          class="grid min-h-20 gap-1 rounded-lg border border-teal-200 bg-teal-50 p-4 text-left hover:border-teal-400"
-          type="button"
-          @click="setupMode = 'new'"
-        >
-          <span class="flex items-center gap-2 font-bold text-teal-950"
-            ><UserPlus class="size-4" />{{ t("user.firstDeviceTitle") }}</span
-          >
-          <span class="text-sm text-teal-800">{{
-            t("user.firstDeviceBody")
-          }}</span>
-        </button>
-        <button
-          class="grid min-h-20 gap-1 rounded-lg border border-slate-200 bg-white p-4 text-left hover:border-slate-400"
-          type="button"
-          @click="setupMode = 'restore'"
-        >
-          <span class="flex items-center gap-2 font-bold"
-            ><Cloud class="size-4" />{{ t("user.restoreDeviceTitle") }}</span
-          >
-          <span class="text-sm text-slate-500">{{
-            t("user.restoreDeviceBody")
-          }}</span>
-        </button>
-      </div>
-
-      <div
-        v-else-if="!recoveryKey && showSetupChoice && setupMode === 'restore'"
-        class="grid gap-3"
-      >
-        <button
-          class="plain-button justify-self-start"
-          type="button"
-          @click="showChoice"
-        >
-          <ArrowLeft class="size-4" />
-          {{ t("user.backToPrevious") }}
-        </button>
         <h2 class="text-2xl font-black">
-          {{ t("user.existingRecoveryTitle") }}
+          {{ t("user.existingVaultTitle") }}
         </h2>
         <label class="form-label">
           {{ t("user.masterPassword") }}
@@ -341,13 +278,13 @@ function saveSelfhostUrl(): void {
           />
         </label>
         <label class="form-label">
-          {{ t("user.recoveryKey") }}
+          {{ t("user.secretKey") }}
           <textarea
-            v-model="restoreRecoveryKey"
+            v-model="restoreSecretKey"
             class="form-input min-h-24 font-mono text-sm"
             autocomplete="off"
             spellcheck="false"
-            :placeholder="t('user.recoveryKeyInputPlaceholder')"
+            :placeholder="t('user.secretKeyInputPlaceholder')"
           ></textarea>
         </label>
         <p
@@ -356,15 +293,7 @@ function saveSelfhostUrl(): void {
         >
           {{ authError }}
         </p>
-        <div class="flex justify-end gap-2">
-          <button
-            class="plain-button"
-            type="button"
-            @click="emit('scanRecoveryQr')"
-          >
-            <ScanLine class="size-4" />
-            {{ t("user.scanRecoveryQr") }}
-          </button>
+        <div class="flex justify-end">
           <button
             class="primary-button"
             type="submit"
@@ -376,16 +305,7 @@ function saveSelfhostUrl(): void {
         </div>
       </div>
 
-      <div v-else-if="!recoveryKey" class="grid gap-3">
-        <button
-          v-if="showSetupChoice"
-          class="plain-button justify-self-start"
-          type="button"
-          @click="showChoice"
-        >
-          <ArrowLeft class="size-4" />
-          {{ t("user.backToPrevious") }}
-        </button>
+      <div v-else-if="!secretKey" class="grid gap-3">
         <h2 class="text-2xl font-black">
           {{
             isLegacyImport
@@ -396,7 +316,7 @@ function saveSelfhostUrl(): void {
         <p v-if="isLegacyImport" class="text-sm text-slate-500">
           {{ t("user.legacyImportBody") }}
         </p>
-        <label v-if="!serverFirst" class="form-label">
+        <label v-if="isLegacyImport || !serverFirst" class="form-label">
           {{ t("user.username") }}
           <input
             v-model="draft.username"
@@ -475,7 +395,7 @@ function saveSelfhostUrl(): void {
             {{
               creating
                 ? t("app.loading")
-                : t("user.createAndGenerateRecoveryKey")
+                : t("user.createAndGenerateSecretKey")
             }}
           </button>
         </div>
@@ -485,7 +405,7 @@ function saveSelfhostUrl(): void {
         <button
           class="plain-button justify-self-start"
           type="button"
-          @click="handleBackFromRecoveryKey"
+          @click="handleBackFromSecretKey"
         >
           <ArrowLeft class="size-4" />
           {{ t("user.backToPrevious") }}
@@ -496,16 +416,16 @@ function saveSelfhostUrl(): void {
         /></span>
         <div class="grid gap-1">
           <h2 class="text-2xl font-black">
-            {{ t("user.recoveryKeySaveTitle") }}
+            {{ t("user.secretKeySaveTitle") }}
           </h2>
           <p class="text-sm text-slate-500">
-            {{ t("user.recoveryKeySaveBody", { name: createdUserName }) }}
+            {{ t("user.secretKeySaveBody", { name: createdUserName }) }}
           </p>
         </div>
         <textarea
           class="form-input min-h-24 font-mono text-sm leading-6"
           readonly
-          :value="recoveryKey"
+          :value="secretKey"
         ></textarea>
         <label
           class="saved-confirm-check flex items-center gap-2 rounded-md border border-transparent px-2 py-1 text-sm font-semibold text-slate-700"
@@ -519,7 +439,7 @@ function saveSelfhostUrl(): void {
             class="size-4 accent-teal-700"
             type="checkbox"
           />
-          {{ t("user.savedRecoveryKeyConfirm") }}
+          {{ t("user.savedSecretKeyConfirm") }}
         </label>
         <p
           v-if="authError"

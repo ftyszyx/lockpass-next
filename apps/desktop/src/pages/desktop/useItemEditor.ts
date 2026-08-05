@@ -37,7 +37,7 @@ type Translate = (key: string, params?: Record<string, unknown>) => string;
 interface ItemEditorStore {
   activeUserId: string | null;
   selectedVaultId: "all" | string;
-  requireVaultKey(): { vaultKey: Uint8Array; keyId: string };
+  requireVaultSession(): { sessionId: string; keyId: string };
   saveItem(input: SaveItemPayload): Promise<VaultItem>;
   selectItem(itemId: string): void;
 }
@@ -304,7 +304,7 @@ export function useItemEditor(input: UseItemEditorInput) {
 
     uploadingFiles.value = true;
     try {
-      const sessionKey = input.vaultStore.requireVaultKey();
+      const vaultSession = input.vaultStore.requireVaultSession();
       const activeUserId = input.vaultStore.activeUserId;
       if (!activeUserId) throw new Error("active-user-required");
       const drafts = await Promise.all(
@@ -314,8 +314,8 @@ export function useItemEditor(input: UseItemEditorInput) {
             activeUserId,
             id,
             file,
-            sessionKey.vaultKey,
-            sessionKey.keyId,
+            vaultSession.sessionId,
+            vaultSession.keyId,
           );
           return {
             id,

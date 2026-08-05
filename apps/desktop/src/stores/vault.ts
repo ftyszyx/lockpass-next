@@ -12,10 +12,11 @@ import { configuredOfficialApiUrl, configuredOfficialServerUrl } from '@/service
 import { configureLogger, logDebug, logError, logInfo } from '@/services/logger'
 import { normalizeShortcut, normalizeShortcutSettings } from '@/services/shortcuts'
 import {
-  createDeviceFastUnlock,
+  closeAllVaultSessions,
+  closeVaultSession,
   createUserCrypto,
   unlockUserCrypto,
-  unlockUserCryptoWithDeviceUnlockKey,
+  verifyUserCryptoCredentials,
   type DesktopVaultPayload,
   type DesktopUserCrypto
 } from '@/services/masterPassword'
@@ -27,16 +28,12 @@ import {
 import {
   clearAttachmentBlobCache,
   countEncryptedObjectsByVault,
-  deleteDeviceUnlockKey,
   deleteAttachmentBlobRef,
   deleteSyncDeviceToken,
-  loadDeviceUnlockCapability,
-  loadDeviceUnlockKey,
   loadAttachmentBlobBytes,
-  loadRecoveryKey,
+  loadSecretKey,
   loadSyncDeviceToken,
   loadVaultStore,
-  saveDeviceUnlockKey,
   saveEncryptedAttachmentBlob,
   saveEncryptedObjects,
   saveSyncDeviceToken,
@@ -51,7 +48,7 @@ import {
   type ShortcutScope,
   type DesktopUserProfile,
   type DesktopVaultStoreData,
-  type SecureRecoveryKeyResult
+  type SecureSecretKeyResult
 } from '@/services/vaultRepository'
 import type { ExternalImportItem, ExternalImportVault, LockPassBackupPackageV1 } from '@/services/backup'
 import { base64ToBytes, bytesToBase64, exportItemsToCsv } from '@/services/backup'
@@ -86,7 +83,7 @@ import {
 import {
   cleanupLocalSecretsForUser,
   deleteFastUnlockSecretsForUsers,
-  saveAndVerifyRecoveryKey
+  saveAndVerifySecretKey
 } from './vault/localSecrets'
 import type {
   AttachmentDraft,
@@ -98,7 +95,7 @@ import type {
   ImportVaultsResult,
   OfficialSyncAuthorization,
   PendingSyncDeviceBindExchange,
-  RecoveryKeyStorageStatus,
+  SecretKeyStorageStatus,
   RestoreServerAccountPayload,
   SaveItemPayload,
   SyncConnectPayload,
@@ -133,14 +130,6 @@ import {
   shouldResetLocalObjectsForInitialSync,
   toServerUuid
 } from './vault/syncObjects'
-import {
-  copyBytes,
-  randomHex,
-  sessionPasswordVerifier,
-  verifySessionUnlockCache
-} from './vault/sessionUnlock'
-type SessionUnlockResult = 'unlocked' | 'invalid' | 'unavailable'
-
 export const useVaultStore = defineStore('vault', {
   state: createVaultStoreState,
   getters: vaultGetters,
@@ -149,25 +138,17 @@ export const useVaultStore = defineStore('vault', {
       this.hydrated = false
       this.storageError = ''
       try {
+        await closeAllVaultSessions().catch(() => undefined)
         await logDebug('vault hydrate started')
-        const [loaded, systemLocale, deviceUnlockCapability] = await Promise.all([
+        const [loaded, systemLocale] = await Promise.all([
           loadVaultStore(),
-          loadSystemLocale(),
-          loadDeviceUnlockCapability().catch(() => ({
-            supportsPasswordless: false,
-            requiresUserPresence: false,
-            provider: 'unavailable',
-            reason: 'capability-check-failed'
-          }))
+          loadSystemLocale()
         ])
         this.storageBackend = loaded.backend
-        this.passwordlessUnlockSupported = deviceUnlockCapability.supportsPasswordless && deviceUnlockCapability.requiresUserPresence
         const normalized = normalizeLoadedData(loaded.data, systemLocale)
         const data = normalized.data
-        if (!this.passwordlessUnlockSupported) {
-          await deleteFastUnlockSecretsForUsers(data.users)
-          data.users = data.users.map(stripFastUnlockFromUser)
-        }
+        await deleteFastUnlockSecretsForUsers(data.users)
+        data.users = data.users.map(stripFastUnlockFromUser)
         if (loaded.data && !normalized.hasLegacyPlaintext) {
           await saveVaultStore(data)
         }
@@ -184,15 +165,13 @@ export const useVaultStore = defineStore('vault', {
         await logInfo('vault hydrate completed', {
           backend: loaded.backend,
           users: data.users.length,
-          activeUser: Boolean(data.activeUserId),
-          passwordlessUnlockSupported: this.passwordlessUnlockSupported
+          activeUser: Boolean(data.activeUserId)
         })
       } catch (error) {
         this.storageError = error instanceof Error ? error.message : String(error)
         await logError('vault hydrate failed', { error: this.storageError })
         const fallback = normalizeLoadedData(null, detectBrowserLocale()).data
         configureLogger(fallback.settings.logging.level)
-        this.passwordlessUnlockSupported = false
         this.legacyPayloads = {}
         this.users = []
         this.activeUserId = null
@@ -208,11 +187,11 @@ export const useVaultStore = defineStore('vault', {
         const users = snapshotActiveUser(this.users, this.activeUserId, this.settings.sync)
         this.users = users
 
-        if (this.activeUserId && this.vaultKey && this.activeKeyId) {
+        if (this.activeUserId && this.vaultSessionId && this.activeKeyId) {
           await upsertEncryptedObjects(
             this.activeUserId,
             await buildLocalEncryptedObjectRecords({
-              vaultKey: this.vaultKey,
+              sessionId: this.vaultSessionId,
               keyId: this.activeKeyId,
               vaults: this.vaults,
               items: this.items,
@@ -303,7 +282,7 @@ export const useVaultStore = defineStore('vault', {
     async startOfficialSyncAuthorization(): Promise<OfficialSyncAuthorization> {
       const user = this.activeUser
       if (!user?.crypto) throw new Error('syncLocked')
-      this.requireVaultKey()
+      this.requireVaultSession()
 
       const mode = this.settings.sync.mode
       const apiUrl = syncServerUrlForSettings(this.settings.sync)
@@ -337,7 +316,7 @@ export const useVaultStore = defineStore('vault', {
     async completeOfficialSyncAuthorization(callbackOrCode: string): Promise<void> {
       const user = this.activeUser
       if (!user?.crypto) throw new Error('syncLocked')
-      this.requireVaultKey()
+      this.requireVaultSession()
 
       const exchange = parseSyncDeviceBindCallback(callbackOrCode)
       await this.applySyncExchange(exchange.mode, exchange.serverUrl, exchange)
@@ -381,33 +360,33 @@ export const useVaultStore = defineStore('vault', {
       this.users = existing
         ? this.users.map((candidate) => (candidate.id === existing.id ? user : candidate))
         : [...this.users, user]
+      await this.closeCurrentVaultSession()
       this.activeUserId = user.id
       this.settings.sync = sync
       this.unlocked = true
-      this.vaultKey = input.initialVault.vaultKey
+      this.vaultSessionId = input.initialVault.sessionId
       this.activeKeyId = input.initialVault.crypto.keyId
       this.loadActiveUserData(input.initialVault.payload)
       await upsertEncryptedObjects(
         user.id,
         await buildLocalEncryptedObjectRecords({
-          vaultKey: input.initialVault.vaultKey,
+          sessionId: input.initialVault.sessionId,
           keyId: input.initialVault.crypto.keyId,
           vaults: input.initialVault.payload.vaults,
           items: input.initialVault.payload.items,
           attachments: input.initialVault.payload.attachments
         })
       )
-      await this.rememberSessionUnlock(user.id, input.initialVault.crypto.keyId, input.password, input.initialVault.vaultKey)
-      const recoveryKeyStorage = await saveAndVerifyRecoveryKey(user.id, input.recoveryKey)
-      if (recoveryKeyStorage === 'failed') {
-        this.storageError = 'recovery-key-save-verification-failed'
+      const secretKeyStorage = await saveAndVerifySecretKey(user.id, input.secretKey)
+      if (secretKeyStorage === 'failed') {
+        this.storageError = 'secret-key-save-verification-failed'
       }
       this.clearOfficialLoginState()
       await this.persist()
       return {
         user,
-        recoveryKey: input.recoveryKey,
-        recoveryKeyStorage
+        secretKey: input.secretKey,
+        secretKeyStorage
       }
     },
     async restoreServerAccount(input: RestoreServerAccountPayload): Promise<void> {
@@ -441,10 +420,10 @@ export const useVaultStore = defineStore('vault', {
         kdfParams: wrappedVaultKey.kdfParams,
         wrappedVaultKey: wrappedVaultKey.wrappedVaultKey
       }
-      const unlocked = await unlockUserCrypto(userId, input.password, input.recoveryKey, userCrypto)
+      const unlocked = await unlockUserCrypto(userId, input.password, input.secretKey, userCrypto)
       const remotePayload: DesktopVaultPayload = { vaults: [], items: [], attachments: [] }
       for (const object of snapshot.objects) {
-        await applyRemoteSyncObject(remotePayload, object, unlocked.vaultKey)
+        await applyRemoteSyncObject(remotePayload, object, unlocked.sessionId)
       }
       const payload = ensurePayloadHasVault(remotePayload, input.exchange.device.id, this.settings.locale)
       const now = new Date().toISOString()
@@ -469,28 +448,32 @@ export const useVaultStore = defineStore('vault', {
         crypto: userCrypto
       }
 
+      const secretKeyStorage = await saveAndVerifySecretKey(user.id, input.secretKey)
+      if (input.requireSecretKeyStorage && secretKeyStorage !== 'saved') {
+        throw new Error('secretKeyStorageRequired')
+      }
+
       await saveSyncDeviceToken(user.id, input.exchange.deviceToken)
       this.users = existing
         ? this.users.map((candidate) => (candidate.id === existing.id ? user : candidate))
         : [...this.users, user]
+      await this.closeCurrentVaultSession()
       this.activeUserId = user.id
       this.settings.sync = sync
       this.unlocked = true
-      this.vaultKey = unlocked.vaultKey
+      this.vaultSessionId = unlocked.sessionId
       this.activeKeyId = userCrypto.keyId
       this.loadActiveUserData(payload)
       await upsertEncryptedObjects(
         user.id,
         await buildLocalEncryptedObjectRecords({
-          vaultKey: unlocked.vaultKey,
+          sessionId: unlocked.sessionId,
           keyId: userCrypto.keyId,
           vaults: payload.vaults,
           items: payload.items,
           attachments: payload.attachments
         })
       )
-      await this.rememberSessionUnlock(user.id, userCrypto.keyId, input.password, unlocked.vaultKey)
-      await saveAndVerifyRecoveryKey(user.id, input.recoveryKey)
       this.clearOfficialLoginState()
       await this.persist()
     },
@@ -599,7 +582,7 @@ export const useVaultStore = defineStore('vault', {
     },
     async runSyncWithCurrentConnection(): Promise<SyncRunResult> {
       const user = this.activeUser
-      const { vaultKey, keyId } = this.requireVaultKey()
+      const { sessionId, keyId } = this.requireVaultSession()
       if (!user?.crypto) throw new Error('syncLocked')
       await logInfo('sync started', {
         mode: this.settings.sync.mode,
@@ -634,7 +617,7 @@ export const useVaultStore = defineStore('vault', {
           client,
           deviceToken,
           syncSpaceId: syncSpace.id,
-          vaultKey
+          sessionId
         })
         await client.ackSync(deviceToken, repairResult.cursor)
         this.settings.sync.cursor = repairResult.cursor
@@ -657,7 +640,7 @@ export const useVaultStore = defineStore('vault', {
 
       const pushObjects = await buildSyncPushObjects({
         syncSpaceId: syncSpace.id,
-        vaultKey,
+        sessionId,
         keyId,
         vaults: this.vaults,
         items: this.items,
@@ -695,7 +678,7 @@ export const useVaultStore = defineStore('vault', {
             continue
           }
           try {
-            await applyRemoteSyncObject(this, event.objectSnapshot, vaultKey)
+            await applyRemoteSyncObject(this, event.objectSnapshot, sessionId)
           } catch (error) {
             await logError('sync remote object failed', {
               ...syncErrorLogMetadata(error),
@@ -765,9 +748,9 @@ export const useVaultStore = defineStore('vault', {
         this.settings.deviceId,
         this.settings.locale
       )
-      const created = await createUserCrypto(userId, input.password, payload, input.recoveryKey)
+      const created = await createUserCrypto(userId, input.password, payload, input.secretKey)
       const migrated = legacyPayload
-        ? await migrateLegacyPayload(userId, payload, created.vaultKey, created.crypto.keyId)
+        ? await migrateLegacyPayload(userId, payload, created.sessionId, created.crypto.keyId)
         : { payload, cleanupRefs: [] }
       const user: DesktopUserProfile = setupUser
         ? {
@@ -791,19 +774,19 @@ export const useVaultStore = defineStore('vault', {
       this.users = setupUser
         ? this.users.map((candidate) => (candidate.id === user.id ? user : candidate))
         : [...this.users, user]
+      await this.closeCurrentVaultSession()
       this.activeUserId = user.id
       this.settings.sync = syncSettingsForUser(user)
       this.unlocked = true
-      this.vaultKey = created.vaultKey
+      this.vaultSessionId = created.sessionId
       this.activeKeyId = created.crypto.keyId
       this.loadActiveUserData(migrated.payload)
-      await this.rememberSessionUnlock(user.id, created.crypto.keyId, input.password, created.vaultKey)
       delete this.legacyPayloads[user.id]
-      let recoveryKeyStorage: RecoveryKeyStorageStatus = 'failed'
+      let secretKeyStorage: SecretKeyStorageStatus = 'failed'
       try {
-        recoveryKeyStorage = await saveAndVerifyRecoveryKey(user.id, created.recoveryKey)
-        if (recoveryKeyStorage === 'failed') {
-          this.storageError = 'recovery-key-save-verification-failed'
+        secretKeyStorage = await saveAndVerifySecretKey(user.id, created.secretKey)
+        if (secretKeyStorage === 'failed') {
+          this.storageError = 'secret-key-save-verification-failed'
         }
       } catch (error) {
         this.storageError = error instanceof Error ? error.message : String(error)
@@ -814,42 +797,41 @@ export const useVaultStore = defineStore('vault', {
       }
       await logInfo('local user created', {
         hasLegacyPayload: Boolean(legacyPayload),
-        recoveryKeyStorage,
-        passwordlessUnlockSupported: this.passwordlessUnlockSupported
+        secretKeyStorage
       })
-      return { user, recoveryKey: created.recoveryKey, recoveryKeyStorage }
+      return { user, secretKey: created.secretKey, secretKeyStorage }
     },
-    async loadSavedRecoveryKeyForActiveUser(): Promise<SecureRecoveryKeyResult> {
+    async loadSavedSecretKeyForActiveUser(): Promise<SecureSecretKeyResult> {
       const user = this.activeUser
       if (!user?.crypto) return { status: 'missing' }
-      return loadRecoveryKey(user.id)
+      return loadSecretKey(user.id)
     },
-    async revealRecoveryKey(password: string): Promise<SecureRecoveryKeyResult> {
+    async revealSecretKey(password: string): Promise<SecureSecretKeyResult> {
       const user = this.activeUser
       if (!this.unlocked || !user?.crypto) return { status: 'missing' }
 
-      const savedRecoveryKey = await loadRecoveryKey(user.id)
-      if (savedRecoveryKey.status !== 'loaded') return savedRecoveryKey
+      const savedSecretKey = await loadSecretKey(user.id)
+      if (savedSecretKey.status !== 'loaded') return savedSecretKey
 
-      await unlockUserCrypto(user.id, password, savedRecoveryKey.recoveryKey, user.crypto)
-      return savedRecoveryKey
+      await verifyUserCryptoCredentials(user.id, password, savedSecretKey.secretKey, user.crypto)
+      return savedSecretKey
     },
-    async saveRecoveryKeyForActiveUser(password: string, recoveryKey: string): Promise<RecoveryKeyStorageStatus> {
+    async saveSecretKeyForActiveUser(password: string, secretKey: string): Promise<SecretKeyStorageStatus> {
       const user = this.activeUser
       if (!this.unlocked || !user?.crypto) return 'failed'
 
-      await unlockUserCrypto(user.id, password, recoveryKey, user.crypto)
+      await verifyUserCryptoCredentials(user.id, password, secretKey, user.crypto)
 
-      return this.saveVerifiedRecoveryKeyForActiveUser(recoveryKey)
+      return this.saveVerifiedSecretKeyForActiveUser(secretKey)
     },
-    async saveVerifiedRecoveryKeyForActiveUser(recoveryKey: string): Promise<RecoveryKeyStorageStatus> {
+    async saveVerifiedSecretKeyForActiveUser(secretKey: string): Promise<SecretKeyStorageStatus> {
       const user = this.activeUser
       if (!this.unlocked || !user?.crypto) return 'failed'
 
       try {
-        const storageStatus = await saveAndVerifyRecoveryKey(user.id, recoveryKey)
+        const storageStatus = await saveAndVerifySecretKey(user.id, secretKey)
         if (storageStatus === 'failed') {
-          this.storageError = 'recovery-key-save-verification-failed'
+          this.storageError = 'secret-key-save-verification-failed'
         }
         return storageStatus
       } catch (error) {
@@ -857,22 +839,22 @@ export const useVaultStore = defineStore('vault', {
         return 'failed'
       }
     },
-    async unlockActiveUser(password: string, recoveryKey: string): Promise<boolean> {
+    async unlockActiveUser(password: string, secretKey: string): Promise<boolean> {
       const user = this.activeUser
       if (!user?.crypto) return false
       const keyId = user.crypto.keyId
       const perf = createPerfTrace('unlockActiveUser')
 
       try {
-        const unlocked = await unlockUserCrypto(user.id, password, recoveryKey, user.crypto, perf)
+        const unlocked = await unlockUserCrypto(user.id, password, secretKey, user.crypto, perf)
         perf.mark('store.cryptoReady')
+        await this.closeCurrentVaultSession()
         this.unlocked = true
-        this.vaultKey = unlocked.vaultKey
+        this.vaultSessionId = unlocked.sessionId
         this.activeKeyId = keyId
         await perf.measure('storage.loadInitialVaultObjects', () =>
-          this.loadInitialUnlockedUserData(user.id, unlocked.vaultKey, keyId)
+          this.loadInitialUnlockedUserData(user.id, unlocked.sessionId, keyId)
         )
-        await this.rememberSessionUnlock(user.id, keyId, password, unlocked.vaultKey)
         perf.mark('store.sessionStateLoaded')
         await this.persist()
         perf.done({
@@ -882,208 +864,26 @@ export const useVaultStore = defineStore('vault', {
         })
         return true
       } catch (error) {
+        await this.closeCurrentVaultSession()
         perf.done({
           failed: true,
           error: error instanceof Error ? error.message : String(error)
         })
         this.unlocked = false
+        this.activeKeyId = null
         this.clearSessionData()
         return false
       }
     },
-    async unlockActiveUserWithSessionCache(password: string): Promise<SessionUnlockResult> {
-      const user = this.activeUser
-      const cache = this.sessionUnlockCache
-      if (!user?.crypto || !cache || cache.userId !== user.id || cache.keyId !== user.crypto.keyId) {
-        return 'unavailable'
-      }
-      const keyId = user.crypto.keyId
-
-      const validPassword = await verifySessionUnlockCache(cache, password)
-      if (!validPassword) return 'invalid'
-
-      try {
-        const vaultKey = copyBytes(cache.vaultKey)
-        this.unlocked = true
-        this.vaultKey = vaultKey
-        this.activeKeyId = keyId
-        await this.loadInitialUnlockedUserData(user.id, vaultKey, keyId)
-        this.sessionUnlockCache = {
-          ...cache,
-          vaultKey: copyBytes(cache.vaultKey),
-          lastUsedAt: new Date().toISOString()
-        }
-        return 'unlocked'
-      } catch {
-        this.clearSessionUnlockCache(user.id)
-        this.unlocked = false
-        this.clearSessionData()
-        return 'unavailable'
-      }
+    async closeCurrentVaultSession(): Promise<void> {
+      const sessionId = this.vaultSessionId
+      this.vaultSessionId = null
+      if (sessionId) await closeVaultSession(sessionId).catch(() => undefined)
     },
-    async rememberSessionUnlock(userId: string, keyId: string, password: string, vaultKey: Uint8Array): Promise<void> {
-      const now = new Date().toISOString()
-      const verifierSalt = randomHex(16)
-      this.sessionUnlockCache = {
-        userId,
-        keyId,
-        vaultKey: copyBytes(vaultKey),
-        verifierSalt,
-        verifierHash: await sessionPasswordVerifier(password, verifierSalt, userId, keyId),
-        createdAt: now,
-        lastUsedAt: now
-      }
-    },
-    clearSessionUnlockCache(userId?: string): void {
-      if (!userId || this.sessionUnlockCache?.userId === userId) {
-        this.sessionUnlockCache = null
-      }
-    },
-    async fastUnlockActiveUser(): Promise<boolean> {
-      const user = this.activeUser
-      const fastUnlock = user?.crypto?.fastUnlock
-      if (!this.passwordlessUnlockSupported || !user?.crypto || !fastUnlock) return false
-      const keyId = user.crypto.keyId
-      const perf = createPerfTrace('fastUnlockActiveUser')
-
-      try {
-        const loadedDeviceUnlockKey = await perf.measure('secureStorage.loadDeviceUnlockKey', () =>
-          loadDeviceUnlockKey(fastUnlock.accountId, user.id, fastUnlock.deviceId, fastUnlock.deviceKeyId)
-        )
-        if (loadedDeviceUnlockKey.status !== 'loaded') {
-          await this.clearTrustedDeviceFastUnlock(user.id)
-          await this.persist()
-          perf.done({ status: loadedDeviceUnlockKey.status })
-          return false
-        }
-
-        const unlocked = await unlockUserCryptoWithDeviceUnlockKey(
-          user.id,
-          this.settings.deviceId,
-          loadedDeviceUnlockKey.deviceUnlockKey,
-          user.crypto,
-          perf
-        )
-        perf.mark('store.cryptoReady')
-        this.unlocked = true
-        this.vaultKey = unlocked.vaultKey
-        this.activeKeyId = keyId
-        await perf.measure('storage.loadInitialVaultObjects', () =>
-          this.loadInitialUnlockedUserData(user.id, unlocked.vaultKey, keyId)
-        )
-        this.touchTrustedDeviceFastUnlock(user.id)
-        perf.mark('store.sessionStateLoaded')
-        perf.done({
-          vaults: this.vaults.length,
-          items: this.items.length,
-          attachments: this.attachments.length
-        })
-        return true
-      } catch (error) {
-        await this.clearTrustedDeviceFastUnlock(user.id)
-        await this.persist()
-        perf.done({
-          failed: true,
-          error: error instanceof Error ? error.message : String(error)
-        })
-        this.unlocked = false
-        this.clearSessionData()
-        return false
-      }
-    },
-    async setupTrustedDeviceFastUnlock(userId: string, vaultKey: Uint8Array): Promise<boolean> {
-      if (!this.passwordlessUnlockSupported) {
-        const user = this.users.find((candidate) => candidate.id === userId)
-        if (user?.crypto?.fastUnlock) await this.clearTrustedDeviceFastUnlock(userId)
-        return false
-      }
-      const user = this.users.find((candidate) => candidate.id === userId)
-      if (!user?.crypto) return false
-      const previousFastUnlock = user.crypto.fastUnlock ?? null
-
-      const vaultId = this.vaults[0]?.id ?? 'local-vault'
-      try {
-        const created = await createDeviceFastUnlock({
-          accountId: user.id,
-          userId: user.id,
-          deviceId: this.settings.deviceId,
-          vaultId,
-          keyId: user.crypto.keyId,
-          vaultKey
-        })
-        const saved = await saveDeviceUnlockKey(
-          created.fastUnlock.accountId,
-          user.id,
-          this.settings.deviceId,
-          created.fastUnlock.deviceKeyId,
-          created.deviceUnlockKey
-        )
-        if (saved.status !== 'saved') return false
-        if (previousFastUnlock && previousFastUnlock.deviceKeyId !== created.fastUnlock.deviceKeyId) {
-          await deleteDeviceUnlockKey(
-            previousFastUnlock.accountId,
-            previousFastUnlock.userId,
-            previousFastUnlock.deviceId,
-            previousFastUnlock.deviceKeyId
-          ).catch(() => ({ status: 'unsupported' as const }))
-        }
-
-        this.users = this.users.map((candidate) =>
-          candidate.id === user.id && candidate.crypto
-            ? {
-                ...candidate,
-                crypto: {
-                  ...candidate.crypto,
-                  fastUnlock: created.fastUnlock
-                },
-                updatedAt: created.fastUnlock.updatedAt
-              }
-            : candidate
-        )
-        return true
-      } catch (error) {
-        return false
-      }
-    },
-    async clearTrustedDeviceFastUnlock(userId: string): Promise<void> {
-      const user = this.users.find((candidate) => candidate.id === userId)
-      const fastUnlock = user?.crypto?.fastUnlock
-      if (fastUnlock) {
-        await deleteDeviceUnlockKey(fastUnlock.accountId, userId, fastUnlock.deviceId, fastUnlock.deviceKeyId).catch(() => ({ status: 'unsupported' as const }))
-      }
-      this.users = this.users.map((candidate) =>
-        candidate.id === userId && candidate.crypto
-          ? {
-              ...candidate,
-              crypto: {
-                ...candidate.crypto,
-                fastUnlock: null
-              }
-            }
-          : candidate
-      )
-    },
-    touchTrustedDeviceFastUnlock(userId: string): void {
-      const now = new Date().toISOString()
-      this.users = this.users.map((candidate) =>
-        candidate.id === userId && candidate.crypto?.fastUnlock
-          ? {
-              ...candidate,
-              crypto: {
-                ...candidate.crypto,
-                fastUnlock: {
-                  ...candidate.crypto.fastUnlock,
-                  updatedAt: now
-                }
-              },
-              updatedAt: now
-            }
-          : candidate
-      )
-    },
-    lock() {
+    async lock(): Promise<void> {
+      await this.closeCurrentVaultSession()
       this.unlocked = false
-      this.vaultKey = null
+      this.vaultSessionId = null
       this.activeKeyId = null
       this.clearSessionData()
     },
@@ -1092,12 +892,12 @@ export const useVaultStore = defineStore('vault', {
       if (!this.users.some((user) => user.id === userId)) return
 
       if (this.unlocked) await this.persist()
+      await this.closeCurrentVaultSession()
       this.activeUserId = userId
       this.unlocked = false
-      this.vaultKey = null
+      this.vaultSessionId = null
       this.activeKeyId = null
       this.query = ''
-      this.clearSessionUnlockCache()
       this.settings.sync = syncSettingsForUser(this.users.find((user) => user.id === userId) ?? null)
       this.selectedVaultId = 'all'
       this.selectedType = 'all'
@@ -1119,13 +919,13 @@ export const useVaultStore = defineStore('vault', {
 
       await cleanupLocalSecretsForUser(user, this.storageBackend)
       await cleanupLocalAttachmentRefs(removedAttachmentRefs)
+      await this.closeCurrentVaultSession()
 
       this.users = remainingUsers
       this.activeUserId = nextUser?.id ?? null
       this.unlocked = false
-      this.vaultKey = null
+      this.vaultSessionId = null
       this.activeKeyId = null
-      this.clearSessionUnlockCache(user.id)
       this.query = ''
       this.selectedVaultId = 'all'
       this.selectedType = 'all'
@@ -1159,9 +959,9 @@ export const useVaultStore = defineStore('vault', {
         lastError: ''
       }
     },
-    async loadInitialUnlockedUserData(userId: string, vaultKey: Uint8Array, keyId: string): Promise<void> {
+    async loadInitialUnlockedUserData(userId: string, sessionId: string, keyId: string): Promise<void> {
       const [vaults, counts] = await Promise.all([
-        loadVaultMetadataFromLocalObjects(userId, vaultKey, keyId),
+        loadVaultMetadataFromLocalObjects(userId, sessionId, keyId),
         countEncryptedObjectsByVault(userId, 'vault_item')
       ])
       this.vaults = vaults
@@ -1194,11 +994,11 @@ export const useVaultStore = defineStore('vault', {
       this.selectedItemId = null
       clearAttachmentBlobCache()
     },
-    requireVaultKey(): { vaultKey: Uint8Array; keyId: string } {
-      if (!this.unlocked || !this.vaultKey || !this.activeKeyId) {
+    requireVaultSession(): { sessionId: string; keyId: string } {
+      if (!this.unlocked || !this.vaultSessionId || !this.activeKeyId) {
         throw new Error('syncLocked')
       }
-      return { vaultKey: this.vaultKey, keyId: this.activeKeyId }
+      return { sessionId: this.vaultSessionId, keyId: this.activeKeyId }
     },
     selectItem(itemId: string) {
       this.selectedItemId = itemId
@@ -1219,30 +1019,30 @@ export const useVaultStore = defineStore('vault', {
       await this.ensureVaultObjectsLoaded(this.selectedVaultId)
     },
     async ensureVaultObjectsLoaded(vaultId: string): Promise<void> {
-      const { vaultKey, keyId } = this.requireVaultKey()
+      const { sessionId, keyId } = this.requireVaultSession()
       const userId = this.activeUserId
       if (!userId || this.loadedVaultIds.includes(vaultId)) return
-      const payload = await loadVaultScopedPayloadFromLocalObjects(userId, vaultId, vaultKey, keyId)
+      const payload = await loadVaultScopedPayloadFromLocalObjects(userId, vaultId, sessionId, keyId)
       this.items = mergeById(this.items, payload.items)
       this.attachments = mergeById(this.attachments, payload.attachments)
       this.loadedVaultIds = [...new Set([...this.loadedVaultIds, vaultId])]
     },
     async ensureAllVaultObjectsLoaded(): Promise<void> {
-      const { vaultKey, keyId } = this.requireVaultKey()
+      const { sessionId, keyId } = this.requireVaultSession()
       const userId = this.activeUserId
       if (!userId) return
       const missingVaultIds = this.vaults
         .filter((vault) => !vault.sync.deletedAt && !this.loadedVaultIds.includes(vault.id))
         .map((vault) => vault.id)
       for (const vaultId of missingVaultIds) {
-        const payload = await loadVaultScopedPayloadFromLocalObjects(userId, vaultId, vaultKey, keyId)
+        const payload = await loadVaultScopedPayloadFromLocalObjects(userId, vaultId, sessionId, keyId)
         this.items = mergeById(this.items, payload.items)
         this.attachments = mergeById(this.attachments, payload.attachments)
       }
       this.loadedVaultIds = [...new Set([...this.loadedVaultIds, ...missingVaultIds])]
     },
     async createVault(input: CreateVaultPayload): Promise<Vault> {
-      this.requireVaultKey()
+      this.requireVaultSession()
       const now = new Date().toISOString()
       const vault: Vault = {
         id: `vault-${crypto.randomUUID()}`,
@@ -1268,7 +1068,7 @@ export const useVaultStore = defineStore('vault', {
       return vault
     },
     async deleteVault(vaultId: string): Promise<{ vaultName: string; itemCount: number }> {
-      this.requireVaultKey()
+      this.requireVaultSession()
       await this.ensureVaultObjectsLoaded(vaultId)
       const vault = this.vaults.find((candidate) => candidate.id === vaultId && !candidate.sync.deletedAt)
       if (!vault) throw new Error('vault-not-found')
@@ -1313,7 +1113,7 @@ export const useVaultStore = defineStore('vault', {
       return { vaultName: vault.name, itemCount }
     },
     async saveItem(input: SaveItemPayload): Promise<VaultItem> {
-      this.requireVaultKey()
+      this.requireVaultSession()
       const now = new Date().toISOString()
       const existing = input.editingItemId
         ? this.items.find((item) => item.id === input.editingItemId) ?? null
@@ -1389,7 +1189,7 @@ export const useVaultStore = defineStore('vault', {
     async exportBackupPackage(): Promise<LockPassBackupPackageV1> {
       const user = this.activeUser
       if (!user?.crypto || !this.activeUserId) throw new Error('syncLocked')
-      const { vaultKey, keyId } = this.requireVaultKey()
+      const { sessionId, keyId } = this.requireVaultSession()
       await this.ensureAllVaultObjectsLoaded()
       await logInfo('backup export started', {
         vaults: this.vaults.length,
@@ -1397,7 +1197,7 @@ export const useVaultStore = defineStore('vault', {
         attachments: this.attachments.length
       })
       const records = await buildLocalEncryptedObjectRecords({
-        vaultKey,
+        sessionId,
         keyId,
         vaults: this.vaults,
         items: this.items,
@@ -1446,9 +1246,9 @@ export const useVaultStore = defineStore('vault', {
       this.users = [user, ...remainingUsers]
       this.activeUserId = user.id
       this.unlocked = false
-      this.vaultKey = null
+      await this.closeCurrentVaultSession()
+      this.vaultSessionId = null
       this.activeKeyId = null
-      this.clearSessionUnlockCache(user.id)
       this.query = ''
       this.selectedVaultId = 'all'
       this.selectedType = 'all'
@@ -1468,7 +1268,7 @@ export const useVaultStore = defineStore('vault', {
       })
     },
     async exportCsvText(): Promise<string> {
-      this.requireVaultKey()
+      this.requireVaultSession()
       await this.ensureAllVaultObjectsLoaded()
       await logInfo('csv export started', { items: this.items.length })
       return exportItemsToCsv(
@@ -1482,7 +1282,7 @@ export const useVaultStore = defineStore('vault', {
       )
     },
     async importExternalItems(items: ExternalImportItem[], vaultName: string): Promise<ImportItemsResult> {
-      this.requireVaultKey()
+      this.requireVaultSession()
       const cleanItems = items.filter((item) => item.title.trim() || item.fields.some((field) => field.value.trim()) || item.notes.trim())
       if (cleanItems.length === 0) {
         return { imported: 0, skipped: items.length, vaultName }
@@ -1511,7 +1311,7 @@ export const useVaultStore = defineStore('vault', {
       }
     },
     async importExternalVaults(vaults: ExternalImportVault[], fallbackVaultName: string): Promise<ImportVaultsResult> {
-      this.requireVaultKey()
+      this.requireVaultSession()
       if (vaults.length === 0) {
         return { imported: 0, skipped: 0, vaults: 0 }
       }

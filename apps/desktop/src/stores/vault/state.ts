@@ -14,7 +14,6 @@ import {
   DEFAULT_SHORTCUTS,
   DEFAULT_SYNC_SETTINGS
 } from './model'
-import type { SessionUnlockCache } from './sessionUnlock'
 import type { SelectedType } from './types'
 
 export interface VaultStoreState {
@@ -22,13 +21,11 @@ export interface VaultStoreState {
   saving: boolean
   storageBackend: StorageBackend
   storageError: string
-  passwordlessUnlockSupported: boolean
   users: DesktopUserProfile[]
   activeUserId: string | null
   unlocked: boolean
-  vaultKey: Uint8Array | null
+  vaultSessionId: string | null
   activeKeyId: string | null
-  sessionUnlockCache: SessionUnlockCache | null
   vaults: Vault[]
   items: VaultItem[]
   attachments: VaultAttachment[]
@@ -58,13 +55,11 @@ export function createVaultStoreState(): VaultStoreState {
     saving: false,
     storageBackend: 'browser',
     storageError: '',
-    passwordlessUnlockSupported: false,
     users: [],
     activeUserId: null,
     unlocked: false,
-    vaultKey: null,
+    vaultSessionId: null,
     activeKeyId: null,
-    sessionUnlockCache: null,
     vaults: [],
     items: [],
     attachments: [],

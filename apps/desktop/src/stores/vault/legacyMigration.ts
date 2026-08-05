@@ -8,7 +8,7 @@ import {
 export async function migrateLegacyPayload(
   userId: string,
   payload: DesktopVaultPayload,
-  vaultKey: Uint8Array,
+  sessionId: string,
   keyId: string
 ): Promise<{ payload: DesktopVaultPayload; cleanupRefs: Array<{ ref: string; attachmentId: string }> }> {
   const attachments: VaultAttachment[] = []
@@ -27,7 +27,7 @@ export async function migrateLegacyPayload(
         attachment.id,
         attachment.fileName,
         attachment.encryptedBlobRef,
-        vaultKey,
+        sessionId,
         keyId
       )
       if (attachment.encryptedBlobRef !== migrated.encryptedBlobRef) {

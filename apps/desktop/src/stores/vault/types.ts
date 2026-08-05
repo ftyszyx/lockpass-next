@@ -41,27 +41,28 @@ export interface CreateVaultPayload {
 export interface CreateUserPayload {
   username: string
   password: string
-  recoveryKey?: string
+  secretKey?: string
   sync?: Pick<SyncConnectPayload, 'mode' | 'serverUrl'>
 }
 
 export interface RestoreServerAccountPayload {
   exchange: PendingSyncDeviceBindExchange
   password: string
-  recoveryKey: string
+  secretKey: string
+  requireSecretKeyStorage?: boolean
 }
 
 export interface CreateServerBackedUserPayload {
   exchange: PendingSyncDeviceBindExchange
   password: string
-  recoveryKey: string
+  secretKey: string
   initialVault: InitialServerVaultResult
 }
 
 export interface CreateUserResult {
   user: DesktopUserProfile
-  recoveryKey: string
-  recoveryKeyStorage: 'saved' | 'unsupported' | 'failed'
+  secretKey: string
+  secretKeyStorage: 'saved' | 'unsupported' | 'failed'
 }
 
 export interface SyncConnectPayload {
@@ -97,4 +98,4 @@ export interface ImportVaultsResult {
   vaults: number
 }
 
-export type RecoveryKeyStorageStatus = CreateUserResult['recoveryKeyStorage']
+export type SecretKeyStorageStatus = CreateUserResult['secretKeyStorage']

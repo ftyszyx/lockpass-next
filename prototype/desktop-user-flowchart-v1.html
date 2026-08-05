@@ -1,0 +1,1092 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LockPass 用户初始化流程原型</title>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f8fb;
+        --panel: #ffffff;
+        --line: #d7e0ea;
+        --line-strong: #b8c5d3;
+        --text: #151f2e;
+        --muted: #617087;
+        --faint: #8b98aa;
+        --primary: #1473e6;
+        --primary-dark: #0d5fc3;
+        --teal: #0f766e;
+        --teal-soft: #e6f5f2;
+        --blue-soft: #eaf2ff;
+        --amber: #9a5b00;
+        --amber-soft: #fff7e6;
+        --green: #16815d;
+        --green-soft: #e8f7ef;
+        --shadow: 0 20px 56px rgba(15, 23, 42, 0.09);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", "Microsoft YaHei", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top left, rgba(20, 115, 230, 0.08), transparent 34rem),
+          var(--bg);
+        color: var(--text);
+        font-size: 14px;
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      .page {
+        display: grid;
+        gap: 22px;
+        width: min(100%, 1480px);
+        margin: 0 auto;
+        padding: 28px;
+      }
+
+      .hero {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 20px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.82);
+        padding: 22px;
+        box-shadow: var(--shadow);
+      }
+
+      .hero-copy {
+        display: grid;
+        gap: 8px;
+      }
+
+      h1 {
+        font-size: 28px;
+        line-height: 1.16;
+        letter-spacing: 0;
+      }
+
+      .subtitle {
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        min-height: 30px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: #ffffff;
+        padding: 0 11px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 850;
+        white-space: nowrap;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--primary);
+      }
+
+      .dot.desktop {
+        background: var(--teal);
+      }
+
+      .dot.local {
+        background: var(--green);
+      }
+
+      .story {
+        display: grid;
+        gap: 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.78);
+        padding: 18px;
+        box-shadow: var(--shadow);
+      }
+
+      .story-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .story-title {
+        display: grid;
+        gap: 4px;
+      }
+
+      .story-title h2 {
+        font-size: 20px;
+        line-height: 1.25;
+        letter-spacing: 0;
+      }
+
+      .story-title p {
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .story-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        min-height: 32px;
+        border-radius: 999px;
+        background: var(--blue-soft);
+        padding: 0 12px;
+        color: #1d4ed8;
+        font-size: 12px;
+        font-weight: 900;
+        white-space: nowrap;
+      }
+
+      .screen-row {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .screen-row.old-device-flow {
+        width: min(100%, 820px);
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .screen-card {
+        position: relative;
+        display: grid;
+        min-width: 0;
+        gap: 8px;
+      }
+
+      .screen-card::after {
+        content: "";
+        position: absolute;
+        top: 135px;
+        right: -9px;
+        width: 14px;
+        height: 2px;
+        background: var(--line-strong);
+      }
+
+      .screen-card:last-child::after {
+        display: none;
+      }
+
+      .screen-label {
+        display: flex;
+        min-height: 28px;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .screen-number {
+        display: grid;
+        width: 22px;
+        height: 22px;
+        place-items: center;
+        border-radius: 999px;
+        background: #0f172a;
+        color: #ffffff;
+        font-size: 11px;
+      }
+
+      .frame {
+        overflow: hidden;
+        min-height: 252px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+      }
+
+      .frame-bar {
+        display: flex;
+        min-height: 34px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        border-bottom: 1px solid var(--line);
+        background: #f8fafc;
+        padding: 0 10px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 900;
+      }
+
+      .traffic {
+        display: flex;
+        gap: 5px;
+      }
+
+      .traffic span {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #cbd5e1;
+      }
+
+      .traffic span:first-child {
+        background: #f87171;
+      }
+
+      .traffic span:nth-child(2) {
+        background: #facc15;
+      }
+
+      .traffic span:nth-child(3) {
+        background: #34d399;
+      }
+
+      .frame-body {
+        display: grid;
+        align-content: start;
+        gap: 10px;
+        min-height: 218px;
+        padding: 14px;
+      }
+
+      .system-auth-frame {
+        display: grid;
+        min-height: 252px;
+        place-items: center;
+        background: #e9eef5;
+        padding: 14px;
+      }
+
+      .system-dialog {
+        display: grid;
+        width: 100%;
+        overflow: hidden;
+        border: 1px solid #aeb9c7;
+        border-radius: 5px;
+        background: #ffffff;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+      }
+
+      .system-dialog-bar {
+        display: flex;
+        min-height: 34px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        border-bottom: 1px solid #d4dbe4;
+        padding: 0 10px;
+        color: #243244;
+        font-size: 11px;
+        font-weight: 850;
+      }
+
+      .system-dialog-title,
+      .system-auth-status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .system-dialog-body {
+        display: grid;
+        justify-items: center;
+        gap: 8px;
+        padding: 14px;
+        text-align: center;
+      }
+
+      .system-auth-icon {
+        display: grid;
+        width: 42px;
+        height: 42px;
+        place-items: center;
+        border-radius: 50%;
+        background: #e8f1ff;
+        color: #075fc9;
+      }
+
+      .system-auth-status {
+        color: #334155;
+        font-size: 11px;
+        font-weight: 850;
+      }
+
+      .system-dialog-actions {
+        display: grid;
+        width: 100%;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        padding-top: 2px;
+      }
+
+      .system-button {
+        min-height: 32px;
+        border: 1px solid #b9c4d1;
+        border-radius: 4px;
+        background: #f7f9fb;
+        color: #172033;
+        font-size: 11px;
+        font-weight: 850;
+      }
+
+      .center-body {
+        align-content: center;
+      }
+
+      .mini-brand {
+        display: grid;
+        justify-items: center;
+        gap: 8px;
+        text-align: center;
+      }
+
+      .mini-logo {
+        display: grid;
+        width: 38px;
+        height: 38px;
+        place-items: center;
+        border-radius: 10px;
+        background: #0f172a;
+        color: #ffffff;
+      }
+
+      .mini-title {
+        font-size: 16px;
+        font-weight: 950;
+        line-height: 1.25;
+      }
+
+      .mini-copy {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .field {
+        display: grid;
+        gap: 5px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 900;
+      }
+
+      .input,
+      .select,
+      .textarea {
+        display: flex;
+        width: 100%;
+        min-height: 36px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        border: 1px solid #cdd7e4;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 8px 10px;
+        color: var(--text);
+        font-size: 12px;
+        font-weight: 750;
+      }
+
+      .textarea {
+        min-height: 64px;
+        align-items: start;
+        color: var(--muted);
+        line-height: 1.35;
+      }
+
+      .code {
+        justify-content: center;
+        min-height: 48px;
+        font-size: 22px;
+        letter-spacing: 4px;
+        font-weight: 950;
+      }
+
+      .button {
+        display: inline-flex;
+        min-height: 36px;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        border: 0;
+        border-radius: 8px;
+        background: #edf2f7;
+        padding: 0 12px;
+        color: var(--text);
+        font-size: 12px;
+        font-weight: 950;
+      }
+
+      .button.primary {
+        background: var(--primary);
+        color: #ffffff;
+      }
+
+      .button.secondary {
+        background: #eef6ff;
+        color: #1d4ed8;
+      }
+
+      .button.success {
+        background: var(--green);
+        color: #ffffff;
+      }
+
+      .button-row {
+        display: grid;
+        gap: 8px;
+      }
+
+      .notice {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid #b7ddcf;
+        border-radius: 8px;
+        background: var(--green-soft);
+        padding: 9px 10px;
+        color: #166044;
+        font-size: 12px;
+        font-weight: 850;
+        line-height: 1.35;
+      }
+
+      .notice.info {
+        border-color: #bfdbfe;
+        background: var(--blue-soft);
+        color: #1d4ed8;
+      }
+
+      .account-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        border: 1px solid #cdd7e4;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 10px;
+      }
+
+      .avatar {
+        display: grid;
+        width: 30px;
+        height: 30px;
+        flex: none;
+        place-items: center;
+        border-radius: 8px;
+        background: var(--teal-soft);
+        color: var(--teal);
+        font-weight: 950;
+      }
+
+      .account-meta {
+        min-width: 0;
+      }
+
+      .account-meta strong,
+      .account-meta span {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .account-meta strong {
+        font-size: 12px;
+      }
+
+      .account-meta span {
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .secret-box {
+        display: grid;
+        gap: 8px;
+        border: 1px dashed #a7b8ca;
+        border-radius: 8px;
+        background: #f8fafc;
+        padding: 12px;
+      }
+
+      .secret-key {
+        color: #0f172a;
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        font-size: 12px;
+        font-weight: 900;
+        line-height: 1.5;
+        word-break: break-all;
+      }
+
+      .qr-row {
+        display: grid;
+        grid-template-columns: 72px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+      }
+
+      .qr {
+        display: grid;
+        width: 72px;
+        height: 72px;
+        place-items: center;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background:
+          linear-gradient(90deg, #0f172a 8px, transparent 8px) 0 0 / 18px 18px,
+          linear-gradient(#0f172a 8px, transparent 8px) 0 0 / 18px 18px,
+          #ffffff;
+        color: #0f172a;
+        font-size: 10px;
+        font-weight: 950;
+      }
+
+      .vault-ui {
+        display: grid;
+        grid-template-columns: 76px minmax(0, 1fr);
+        min-height: 218px;
+      }
+
+      .vault-side {
+        display: grid;
+        align-content: start;
+        gap: 8px;
+        border-right: 1px solid var(--line);
+        background: #f8fafc;
+        padding: 12px 8px;
+      }
+
+      .nav-line {
+        height: 9px;
+        border-radius: 999px;
+        background: #cbd5e1;
+      }
+
+      .nav-line.active {
+        background: var(--primary);
+      }
+
+      .vault-main {
+        display: grid;
+        align-content: start;
+        gap: 9px;
+        padding: 12px;
+      }
+
+      .status-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .offline {
+        border-radius: 999px;
+        background: var(--amber-soft);
+        padding: 5px 8px;
+        color: var(--amber);
+        font-size: 11px;
+        font-weight: 950;
+        white-space: nowrap;
+      }
+
+      .item-row {
+        display: grid;
+        grid-template-columns: 24px minmax(0, 1fr);
+        gap: 8px;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 8px;
+      }
+
+      .item-icon {
+        display: grid;
+        width: 24px;
+        height: 24px;
+        place-items: center;
+        border-radius: 7px;
+        background: var(--blue-soft);
+        color: var(--primary);
+      }
+
+      .skeleton {
+        display: grid;
+        gap: 5px;
+      }
+
+      .skeleton span {
+        height: 8px;
+        border-radius: 999px;
+        background: #dbe4ee;
+      }
+
+      .skeleton span:last-child {
+        width: 64%;
+        background: #edf2f7;
+      }
+
+      .handoff {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 900;
+      }
+
+      @media (max-width: 1280px) {
+        .screen-row {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .screen-card::after {
+          display: none;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .page {
+          padding: 16px;
+        }
+
+        .hero,
+        .story-head {
+          align-items: start;
+          flex-direction: column;
+        }
+
+        .legend {
+          justify-content: flex-start;
+        }
+
+        .screen-row {
+          grid-template-columns: 1fr;
+        }
+
+        .screen-row.old-device-flow {
+          width: 100%;
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <div class="hero-copy">
+          <h1>LockPass 初始化流程原型</h1>
+          <p class="subtitle">用桌面端和网站端界面串起三种用户路径，便于检查页面层级和跳转关系。</p>
+        </div>
+        <div class="legend" aria-label="流程图例">
+          <span class="pill"><span class="dot desktop"></span>桌面端</span>
+          <span class="pill"><span class="dot"></span>网站端</span>
+          <span class="pill"><span class="dot local"></span>本地受信任设备</span>
+        </div>
+      </header>
+
+      <section class="story">
+        <div class="story-head">
+          <div class="story-title">
+            <h2>1. 新用户初始化</h2>
+            <p>本机没有账号，用户从桌面端进入网站创建账号，再通过设备绑定回到桌面端。</p>
+          </div>
+          <span class="story-tag"><i data-lucide="user-plus"></i>首次使用</span>
+        </div>
+
+        <div class="screen-row">
+          <article class="screen-card">
+            <div class="screen-label"><span class="screen-number">1</span>桌面端欢迎页</div>
+            <div class="frame">
+              <div class="frame-bar">
+                <div class="traffic"><span></span><span></span><span></span></div>
+                LockPass Desktop
+              </div>
+              <div class="frame-body center-body">
+                <div class="mini-brand">
+                  <div class="mini-logo"><i data-lucide="key-round"></i></div>
+                  <div class="mini-title">欢迎使用 LockPass</div>
+                </div>
+                <label class="field">
+                  服务器
+                  <div class="select">LockPass 官方托管 <i data-lucide="chevron-down"></i></div>
+                </label>
+                <div class="button-row">
+                  <button class="button primary"><i data-lucide="log-in"></i>登录</button>
+                  <button class="button secondary"><i data-lucide="user-plus"></i>创建新账号</button>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="screen-card">
+            <div class="screen-label"><span class="screen-number">2</span>网站创建账号</div>
+            <div class="frame">
+              <div class="frame-bar">
+                <div class="traffic"><span></span><span></span><span></span></div>
+                lockpass.app
+              </div>
+              <div class="frame-body center-body">
+                <div class="mini-title">创建账号</div>
+                <label class="field">
+                  姓名
+                  <div class="input">Zyx</div>
+                </label>
+                <label class="field">
+                  电子邮件地址
+                  <div class="input">whyzi@example.com</div>
+                </label>
+                <button class="button primary">下一步</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="screen-card">
+            <div class="screen-label"><span class="screen-number">3</span>邮箱验证码</div>
+            <div class="frame">
+              <div class="frame-bar">
+                <div class="traffic"><span></span><span></span><span></span></div>
+                lockpass.app
+              </div>
+              <div class="frame-body center-body">
+                <div>
+                  <div class="mini-title">验证电子邮件</div>
+                  <p class="mini-copy">输入邮件中的 6 位验证码。</p>
+                </div>
+                <label class="field">
+                  输入代码
+                  <div class="input code">169190</div>
+                </label>
+                <button class="button primary">下一步</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="screen-card">
+            <div class="screen-label"><span class="screen-number">4</span>设置主密码</div>
+            <div class="frame">
+              <div class="frame-bar">
+                <div class="traffic"><span></span><span></span><span></span></div>
+                lockpass.app
+              </div>
+              <div class="frame-body center-body">
+                <div>
+                  <div class="mini-title">设置主密码</div>
+                  <p class="mini-copy">这是用户需要记住的密码。</p>
+                </div>
+                <label class="field">
+                  主密码
+                  <div class="input">••••••••••••</div>
+                </label>
+                <label class="field">
+                  确认主密码
+                  <div class="input">••••••••••••</div>
+                </label>
+                <button class="button primary">创建账号</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="screen-card">
+            <div class="screen-label"><span class="screen-number">5</span>保存安全密钥</div>
+            <div class="frame">
+              <div class="frame-bar">
+                <div class="traffic"><span></span><span></span><span></span></div>
+                lockpass.app
+              </div>
+              <div class="frame-body">
+                <div class="mini-title">备份安全密钥</div>
+                <div class="qr-row">
+                  <div class="qr">QR</div>
+                  <div class="secret-box">
+                    <div class="secret-key">LP-A3Q9-XEMW-7V2K-9NHD-4P6R</div>
+                  </div>
+                </div>
+                <button class="button primary"><i data-lucide="download"></i>保存 PDF</button>
+                <button class="button success">我已保存</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="screen-card">
+            <div class="screen-label"><span class="screen-number">6</span>绑定设备并进入保险库</div>
+            <div class="frame">
+              <div class="frame-bar">
+                <div class="traffic"><span></span><span></span><span></span></div>
+                LockPass Desktop
+              </div>
+              <div class="vault-ui">
+                <aside class="vault-side">
+                  <div class="nav-line active"></div>
+                  <div class="nav-line"></div>
+                  <div class="nav-line"></div>
+                </aside>
+                <section class="vault-main">
+                  <div class="status-row">
+                    <strong>个人保险库</strong>
+                    <span class="handoff"><i data-lucide="cloud"></i>已保存到服务器</span>
+                  </div>
+                  <div class="item-row">
+                    <div class="item-icon"><i data-lucide="globe-2"></i></div>
+                    <div class="skeleton"><span></span><span></span></div>
+                  </div>
+                  <div class="item-row">
+                    <div class="item-icon"><i data-lucide="credit-card"></i></div>
+                    <div class="skeleton"><span></span><span></span></div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="story">
+        <div class="story-head">
+          <div class="story-title">
+            <h2>2. 老用户 · 新电脑</h2>
+            <p>本机没有可信信息。用户登录网站后，需要输入主密码和安全密钥来恢复此设备。</p>
+          </div>
+          <span class="story-tag"><i data-lucide="monitor-up"></i>新设备恢复</span>
+        </div>
+
+        <div class="screen-row">
+          <article class="screen-card">
+            <div class="screen-label"><span class="screen-number">1</span>选择服务器</div>
+            <div class="frame">
+              <div class="frame-bar">
+                <div class="traffic"><span></span><span></span><span></span></div>
+                LockPass Desktop
+              </div>
+              <div class="frame-body center-body">
+                <div class="mini-brand">
+                  <div class="mini-logo"><i data-lucide="key-round"></i></div>
+                  <div class="mini-title">欢迎使用 LockPass</div>
+                </div>
+                <label class="field">
+                  服务器
+                  <div class="select">自建服务器 <i data-lucide="chevron-down"></i></div>
+                </label>
+                <label class="field">
+                  地址
+                  <div class="input">https://lock.example.com</div>
+                </label>
+                <button class="button primary"><i data-lucide="log-in"></i>登录</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="screen-card">
+            <div class="screen-label"><span class="screen-number">2</span>网站登录</div>
+            <div class="frame">
+              <div class="frame-bar">
+                <div class="traffic"><span></span><span></span><span></span></div>
+                lock.example.com
+              </div>
+              <div class="frame-body center-body">
+                <div class="mini-title">登录 LockPass</div>
+                <label class="field">
+                  电子邮件地址
+                  <div class="input">whyzi@example.com</div>
+                </label>
+                <label class="field">
+                  验证码
+                  <div class="input code">482913</div>
+                </label>
+                <button class="button primary">登录</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="screen-card">
+            <div class="screen-label"><span class="screen-number">3</span>恢复此设备</div>
+            <div class="frame">
+              <div class="frame-bar">
+                <div class="traffic"><span></span><span></span><span></span></div>
+                LockPass Desktop
+              </div>
+              <div class="frame-body center-body">
+                <div class="mini-title">恢复保险库</div>
+                <label class="field">
+                  主密码
+                  <div class="input">••••••••••••</div>
+                </label>
+                <label class="field">
+                  安全密钥
+                  <div class="textarea">LP-A3Q9-XEMW-7V2K...</div>
+                </label>
+                <button class="button primary">恢复并进入</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="screen-card">
+            <div class="screen-label"><span class="screen-number">4</span>恢复完成</div>
+            <div class="frame">
+              <div class="frame-bar">
+                <div class="traffic"><span></span><span></span><span></span></div>
+                LockPass Desktop
+              </div>
+              <div class="vault-ui">
+                <aside class="vault-side">
+                  <div class="nav-line active"></div>
+                  <div class="nav-line"></div>
+                  <div class="nav-line"></div>
+                </aside>
+                <section class="vault-main">
+                  <div class="status-row">
+                    <strong>个人保险库</strong>
+                    <span class="handoff"><i data-lucide="badge-check"></i>受信任设备</span>
+                  </div>
+                  <div class="item-row">
+                    <div class="item-icon"><i data-lucide="globe-2"></i></div>
+                    <div class="skeleton"><span></span><span></span></div>
+                  </div>
+                  <div class="item-row">
+                    <div class="item-icon"><i data-lucide="file-lock-2"></i></div>
+                    <div class="skeleton"><span></span><span></span></div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="story">
+        <div class="story-head">
+          <div class="story-title">
+            <h2>3. 老用户 · 旧电脑</h2>
+            <p>本机已有登录信息和受信任设备快速解锁材料。选择账号后，由系统直接弹出 Windows Hello、PIN 或设备密码认证；快速解锁不可用时再进入主密码 + 安全密钥的完整解锁流程。</p>
+          </div>
+          <span class="story-tag"><i data-lucide="laptop-minimal-check"></i>日常解锁</span>
+        </div>
+
+        <div class="screen-row old-device-flow">
+          <article class="screen-card">
+            <div class="screen-label"><span class="screen-number">1</span>选择本地账号</div>
+            <div class="frame">
+              <div class="frame-bar">
+                <div class="traffic"><span></span><span></span><span></span></div>
+                LockPass Desktop
+              </div>
+              <div class="frame-body center-body">
+                <div class="mini-title">选择账号</div>
+                <div class="account-row">
+                  <div class="avatar">Z</div>
+                  <div class="account-meta">
+                    <strong>Zyx</strong>
+                    <span>whyzi@example.com</span>
+                  </div>
+                  <i data-lucide="chevron-down"></i>
+                </div>
+                <button class="button primary"><i data-lucide="unlock"></i>解锁</button>
+                <button class="button secondary"><i data-lucide="users"></i>管理账号</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="screen-card">
+            <div class="screen-label"><span class="screen-number">2</span>系统直接弹出认证</div>
+            <div class="frame system-auth-frame">
+              <div class="system-dialog" aria-label="Windows 系统认证弹窗">
+                <div class="system-dialog-bar">
+                  <span class="system-dialog-title"><i data-lucide="shield-check"></i>Windows 安全中心</span>
+                  <i data-lucide="x"></i>
+                </div>
+                <div class="system-dialog-body">
+                  <div class="system-auth-icon"><i data-lucide="scan-face"></i></div>
+                  <div class="mini-title">请确认是你本人</div>
+                  <p class="mini-copy">LockPass 正在请求解锁保险库。</p>
+                  <div class="system-auth-status"><i data-lucide="camera"></i>请看向摄像头</div>
+                  <div class="system-dialog-actions">
+                    <button class="system-button">使用 PIN</button>
+                    <button class="system-button">取消</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="screen-card">
+            <div class="screen-label"><span class="screen-number">3</span>进入保险库</div>
+            <div class="frame">
+              <div class="frame-bar">
+                <div class="traffic"><span></span><span></span><span></span></div>
+                LockPass Desktop
+              </div>
+              <div class="vault-ui">
+                <aside class="vault-side">
+                  <div class="nav-line active"></div>
+                  <div class="nav-line"></div>
+                  <div class="nav-line"></div>
+                </aside>
+                <section class="vault-main">
+                  <div class="status-row">
+                    <strong>个人保险库</strong>
+                    <span class="offline">账号离线</span>
+                  </div>
+                  <div class="item-row">
+                    <div class="item-icon"><i data-lucide="globe-2"></i></div>
+                    <div class="skeleton"><span></span><span></span></div>
+                  </div>
+                  <div class="item-row">
+                    <div class="item-icon"><i data-lucide="sticky-note"></i></div>
+                    <div class="skeleton"><span></span><span></span></div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </article>
+
+        </div>
+      </section>
+    </main>
+
+    <script>
+      if (window.lucide) {
+        window.lucide.createIcons()
+      }
+    </script>
+  </body>
+</html>

@@ -17,7 +17,7 @@ import {
 
 export interface SyncBuildInput {
   syncSpaceId: string
-  vaultKey: Uint8Array
+  sessionId: string
   keyId: string
   vaults: Vault[]
   items: VaultItem[]
@@ -56,7 +56,7 @@ export async function buildSyncPushObjects(input: SyncBuildInput): Promise<SyncP
 }
 
 export interface LocalObjectBuildInput {
-  vaultKey: Uint8Array
+  sessionId: string
   keyId: string
   vaults: Vault[]
   items: VaultItem[]
@@ -100,7 +100,7 @@ async function makeLocalEncryptedObjectRecord(
     updatedAt: payload.updatedAt,
     keyId: input.keyId,
     envelope: await encryptSyncObjectPayload(
-      input.vaultKey,
+      input.sessionId,
       input.keyId,
       {
         objectType,
@@ -115,31 +115,31 @@ async function makeLocalEncryptedObjectRecord(
 
 export async function loadVaultMetadataFromLocalObjects(
   userId: string,
-  vaultKey: Uint8Array,
+  sessionId: string,
   keyId: string
 ): Promise<Vault[]> {
   const records = await queryEncryptedObjects(userId, { objectType: 'vault_metadata' })
-  const payload = await decryptLocalObjectRecords(records, vaultKey, keyId)
+  const payload = await decryptLocalObjectRecords(records, sessionId, keyId)
   return payload.vaults
 }
 
 export async function loadVaultScopedPayloadFromLocalObjects(
   userId: string,
   vaultId: string,
-  vaultKey: Uint8Array,
+  sessionId: string,
   keyId: string
 ): Promise<DesktopVaultPayload> {
   const records = await queryEncryptedObjects(userId, { vaultId })
   return decryptLocalObjectRecords(
     records.filter((record) => record.objectType !== 'vault_metadata'),
-    vaultKey,
+    sessionId,
     keyId
   )
 }
 
 async function decryptLocalObjectRecords(
   records: EncryptedObjectRecord[],
-  vaultKey: Uint8Array,
+  sessionId: string,
   keyId: string
 ): Promise<DesktopVaultPayload> {
   const payload: DesktopVaultPayload = {
@@ -155,7 +155,7 @@ async function decryptLocalObjectRecords(
       vaultId: record.vaultId,
       revision: record.revision
     }
-    const decrypted = await decryptSyncObjectPayload<VaultObject>(vaultKey, record.keyId || keyId, metadata, record.envelope)
+    const decrypted = await decryptSyncObjectPayload<VaultObject>(sessionId, record.keyId || keyId, metadata, record.envelope)
     const sync: SyncMetadata = {
       revision: record.revision,
       baseRevision: record.baseRevision,
@@ -193,7 +193,7 @@ async function makeSyncPushObject(
     baseRevision: sync.baseRevision,
     revision: sync.revision,
     encryptedPayload: await encryptSyncObjectPayload(
-      input.vaultKey,
+      input.sessionId,
       input.keyId,
       {
         objectType,
@@ -306,7 +306,7 @@ function resetSyncForNewTarget(sync: SyncMetadata, deviceId: string): SyncMetada
 export async function applyRemoteSyncObject(
   store: SyncObjectContainer,
   object: SyncObjectView,
-  vaultKey: Uint8Array
+  sessionId: string
 ): Promise<void> {
   if (object.deletedAt) {
     removeRemoteObject(store, object)
@@ -320,7 +320,7 @@ export async function applyRemoteSyncObject(
     revision: object.revision
   }
   const payload = await decryptSyncObjectPayload<Vault | VaultItem | VaultAttachment>(
-    vaultKey,
+    sessionId,
     object.encryptedPayload.keyId,
     metadata,
     object.encryptedPayload as EncryptedSyncObjectPayload
@@ -381,7 +381,7 @@ export async function restoreFromSyncSnapshot(input: {
   client: SyncApiClient
   deviceToken: string
   syncSpaceId: string
-  vaultKey: Uint8Array
+  sessionId: string
 }): Promise<{ pulled: number; cursor: number }> {
   let pageToken: string | null = null
   let pulled = 0
@@ -395,7 +395,7 @@ export async function restoreFromSyncSnapshot(input: {
     cursor = snapshot.snapshotCursor
 
     for (const object of snapshot.objects) {
-      await applyRemoteSyncObject(input.store, object, input.vaultKey)
+      await applyRemoteSyncObject(input.store, object, input.sessionId)
       pulled += 1
     }
 

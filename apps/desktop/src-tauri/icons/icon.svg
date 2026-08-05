@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="LockPass">
+  <rect width="1024" height="1024" rx="216" fill="#111319" />
+
+  <path
+    d="M512 72C360 72 280 180 280 340V460H400V340C400 270 443 214 512 214C581 214 624 270 624 340V460H744V340C744 180 664 72 512 72Z"
+    fill="#18DCE5"
+  />
+  <rect x="160" y="390" width="704" height="540" rx="120" fill="#18DCE5" />
+
+  <circle cx="512" cy="600" r="88" fill="#FF5B57" />
+  <path d="M478 672H546L585 850H439L478 672Z" fill="#FF5B57" />
+</svg>

@@ -56,7 +56,7 @@ const props = defineProps<{
   draft: ItemDraft;
   uploadingFiles: boolean;
   error: string;
-  vaultKey: Uint8Array | null;
+  vaultSessionId: string | null;
   keyId: string | null;
 }>();
 
@@ -224,7 +224,7 @@ async function previewImage(
   attachment: ItemDraft["attachments"][number],
 ): Promise<void> {
   if (!isImageAttachment(attachment)) return;
-  if (!props.vaultKey || !props.keyId) return;
+  if (!props.vaultSessionId || !props.keyId) return;
 
   revokePreviewUrl();
   preview.visible = true;
@@ -235,7 +235,7 @@ async function previewImage(
   try {
     const blob = await loadAttachmentFile(
       attachment,
-      props.vaultKey,
+      props.vaultSessionId,
       props.keyId,
     );
     preview.url = URL.createObjectURL(blob);

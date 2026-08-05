@@ -56,7 +56,7 @@ defineExpose({ mainGridElement });
         @delete-vault="page.requestDeleteVault"
         @manage-users="page.openUserManagement"
         @open-management="page.openManagement"
-        @show-recovery-key="page.openRecoveryKeyModal"
+        @show-secret-key="page.openSecretKeyModal"
         @sign-out-current-user="page.openSignOutCurrentUserModal"
         @lock="page.lockApp"
       />
@@ -93,7 +93,7 @@ defineExpose({ mainGridElement });
         :show-sensitive="page.showSensitive"
         :selected-item="page.selectedItem"
         :attachments="page.selectedItemAttachments"
-        :vault-key="page.vaultKey"
+        :vault-session-id="page.vaultSessionId"
         :key-id="page.keyId"
         @update:active-tab="page.updateActiveTab"
         @update:show-sensitive="page.updateShowSensitive"

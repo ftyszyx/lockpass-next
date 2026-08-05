@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n'
 import { useVaultStore } from '@/stores/vault'
 
 const props = defineProps<{
-  revealedRecoveryKey: string
+  revealedSecretKey: string
   revealError: string
   revealIssue: 'missing' | 'unsupported' | ''
   savingToDevice: boolean
@@ -15,15 +15,15 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   copyValue: [value: string]
-  saveRecoveryKeyToDevice: [recoveryKey: string]
+  saveSecretKeyToDevice: [secretKey: string]
 }>()
 
 const { t } = useI18n()
 const vaultStore = useVaultStore()
-const recoveryKeyQrDataUrl = ref('')
-const recoveryKeyToSave = ref('')
+const secretKeyQrDataUrl = ref('')
+const secretKeyToSave = ref('')
 const detailsOpen = ref(false)
-const canSaveRecoveryKeyToDevice = computed(() => props.revealIssue === 'missing' && !props.revealedRecoveryKey)
+const canSaveSecretKeyToDevice = computed(() => props.revealIssue === 'missing' && !props.revealedSecretKey)
 const activeUser = computed(() => vaultStore.activeUser)
 const accountLabel = computed(() => activeUser.value?.sync?.accountLabel || activeUser.value?.displayName || activeUser.value?.username || '')
 const serverLabel = computed(() => {
@@ -31,16 +31,16 @@ const serverLabel = computed(() => {
   if (sync.mode === 'official') return t('sync.officialHosted')
   return sync.serverUrl.replace(/^https?:\/\//i, '').replace(/\/$/, '')
 })
-const maskedRecoveryKey = computed(() => props.revealedRecoveryKey ? '••••••••••••••••' : '')
+const maskedSecretKey = computed(() => props.revealedSecretKey ? '••••••••••••••••' : '')
 
 watch(
-  () => props.revealedRecoveryKey,
-  async (recoveryKey) => {
-    recoveryKeyQrDataUrl.value = ''
-    if (!recoveryKey) return
+  () => props.revealedSecretKey,
+  async (secretKey) => {
+    secretKeyQrDataUrl.value = ''
+    if (!secretKey) return
 
     try {
-      recoveryKeyQrDataUrl.value = await QRCode.toDataURL(recoveryKey, {
+      secretKeyQrDataUrl.value = await QRCode.toDataURL(secretKey, {
         errorCorrectionLevel: 'M',
         margin: 2,
         width: 236,
@@ -50,16 +50,16 @@ watch(
         }
       })
     } catch {
-      recoveryKeyQrDataUrl.value = ''
+      secretKeyQrDataUrl.value = ''
     }
   },
   { immediate: true }
 )
 
 watch(
-  () => props.revealedRecoveryKey,
-  (recoveryKey) => {
-    if (recoveryKey) recoveryKeyToSave.value = ''
+  () => props.revealedSecretKey,
+  (secretKey) => {
+    if (secretKey) secretKeyToSave.value = ''
   }
 )
 </script>
@@ -73,10 +73,10 @@ watch(
         <button class="icon-button" type="button" @click="emit('close')"><X class="size-4" /></button>
       </div>
 
-      <div v-if="revealedRecoveryKey" class="grid gap-4">
+      <div v-if="revealedSecretKey" class="grid gap-4">
         <div class="grid gap-5 md:grid-cols-[260px_minmax(0,1fr)] md:items-center">
           <div class="mx-auto grid size-[260px] place-items-center rounded-lg border border-slate-200 bg-white p-3 text-slate-700">
-            <img v-if="recoveryKeyQrDataUrl" class="size-full rounded-md" :src="recoveryKeyQrDataUrl" :alt="t('settings.recoveryKeyQrAlt')" />
+            <img v-if="secretKeyQrDataUrl" class="size-full rounded-md" :src="secretKeyQrDataUrl" :alt="t('settings.secretKeyQrAlt')" />
             <div v-else class="grid place-items-center gap-1 text-xs font-bold">
               <QrCodeIcon class="size-12" />
               <span>QR</span>
@@ -121,13 +121,13 @@ watch(
           </div>
           <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center bg-blue-50">
             <div class="min-w-0 px-4 py-3">
-              <span class="block text-xs font-semibold text-violet-700">{{ t('user.recoveryKey') }}</span>
-              <span class="block truncate font-mono text-sm font-bold tracking-wide text-slate-900">{{ maskedRecoveryKey }}</span>
+              <span class="block text-xs font-semibold text-violet-700">{{ t('user.secretKey') }}</span>
+              <span class="block truncate font-mono text-sm font-bold tracking-wide text-slate-900">{{ maskedSecretKey }}</span>
             </div>
             <button
               class="flex h-full min-h-12 items-center gap-2 border-l border-blue-100 px-4 text-sm font-bold text-slate-800 hover:bg-blue-100"
               type="button"
-              @click="emit('copyValue', revealedRecoveryKey)"
+              @click="emit('copyValue', revealedSecretKey)"
             >
               <Copy class="size-4" />
               {{ t('quick.copy') }}
@@ -139,22 +139,22 @@ watch(
       <div v-else class="grid gap-4">
         <p v-if="revealError" class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{{ revealError }}</p>
 
-        <div v-if="canSaveRecoveryKeyToDevice" class="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <div v-if="canSaveSecretKeyToDevice" class="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
           <textarea
-            v-model="recoveryKeyToSave"
+            v-model="secretKeyToSave"
             class="form-input min-h-24 resize-y font-mono text-sm"
-            :placeholder="t('settings.recoveryKeyBindPlaceholder')"
+            :placeholder="t('settings.secretKeyBindPlaceholder')"
             autocomplete="off"
             spellcheck="false"
           ></textarea>
           <button
             class="plain-button justify-self-start"
             type="button"
-            :disabled="savingToDevice || !recoveryKeyToSave.trim()"
-            @click="emit('saveRecoveryKeyToDevice', recoveryKeyToSave)"
+            :disabled="savingToDevice || !secretKeyToSave.trim()"
+            @click="emit('saveSecretKeyToDevice', secretKeyToSave)"
           >
             <Save class="size-4" />
-            {{ t('settings.recoveryKeySaveToDevice') }}
+            {{ t('settings.secretKeySaveToDevice') }}
           </button>
         </div>
       </div>

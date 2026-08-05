@@ -76,26 +76,16 @@ export interface DesktopVaultStoreData {
 }
 
 export type StorageBackend = 'tauri' | 'browser'
-export type SecureRecoveryKeyResult =
+export type SecureSecretKeyResult =
   | { status: 'saved' }
-  | { status: 'loaded'; recoveryKey: string }
+  | { status: 'loaded'; secretKey: string }
   | { status: 'missing' }
   | { status: 'deleted' }
   | { status: 'unsupported' }
 
 export type SecureDeviceUnlockKeyResult =
-  | { status: 'saved' }
-  | { status: 'loaded'; deviceUnlockKey: string }
-  | { status: 'missing' }
   | { status: 'deleted' }
   | { status: 'unsupported' }
-
-export interface DeviceUnlockCapability {
-  supportsPasswordless: boolean
-  requiresUserPresence: boolean
-  provider: string
-  reason: string
-}
 
 export interface LoadedVaultStore {
   data: DesktopVaultStoreData | null
@@ -257,63 +247,25 @@ export async function setStartOnLogin(enabled: boolean): Promise<boolean | null>
   return invoke<boolean | null>('set_start_on_login', { enabled })
 }
 
-export async function saveRecoveryKey(userId: string, recoveryKey: string): Promise<SecureRecoveryKeyResult> {
+export async function saveSecretKey(userId: string, secretKey: string): Promise<SecureSecretKeyResult> {
   if (!isTauriRuntime()) return { status: 'unsupported' }
 
-  await invoke('save_recovery_key', { userId, recoveryKey })
+  await invoke('save_secret_key', { userId, secretKey })
   return { status: 'saved' }
 }
 
-export async function loadRecoveryKey(userId: string): Promise<SecureRecoveryKeyResult> {
+export async function loadSecretKey(userId: string): Promise<SecureSecretKeyResult> {
   if (!isTauriRuntime()) return { status: 'unsupported' }
 
-  const recoveryKey = await invoke<string | null>('load_recovery_key', { userId })
-  return recoveryKey ? { status: 'loaded', recoveryKey } : { status: 'missing' }
+  const secretKey = await invoke<string | null>('load_secret_key', { userId })
+  return secretKey ? { status: 'loaded', secretKey } : { status: 'missing' }
 }
 
-export async function deleteRecoveryKey(userId: string): Promise<SecureRecoveryKeyResult> {
+export async function deleteSecretKey(userId: string): Promise<SecureSecretKeyResult> {
   if (!isTauriRuntime()) return { status: 'unsupported' }
 
-  await invoke('delete_recovery_key', { userId })
+  await invoke('delete_secret_key', { userId })
   return { status: 'deleted' }
-}
-
-export async function loadDeviceUnlockCapability(): Promise<DeviceUnlockCapability> {
-  if (!isTauriRuntime()) {
-    return {
-      supportsPasswordless: false,
-      requiresUserPresence: false,
-      provider: 'browser-preview',
-      reason: 'tauri-runtime-unavailable'
-    }
-  }
-
-  return invoke<DeviceUnlockCapability>('device_unlock_capability')
-}
-
-export async function saveDeviceUnlockKey(
-  accountId: string,
-  userId: string,
-  deviceId: string,
-  deviceKeyId: string,
-  deviceUnlockKey: string
-): Promise<SecureDeviceUnlockKeyResult> {
-  if (!isTauriRuntime()) return { status: 'unsupported' }
-
-  await invoke('save_device_unlock_key', { accountId, userId, deviceId, deviceKeyId, deviceUnlockKey })
-  return { status: 'saved' }
-}
-
-export async function loadDeviceUnlockKey(
-  accountId: string,
-  userId: string,
-  deviceId: string,
-  deviceKeyId: string
-): Promise<SecureDeviceUnlockKeyResult> {
-  if (!isTauriRuntime()) return { status: 'unsupported' }
-
-  const deviceUnlockKey = await invoke<string | null>('load_device_unlock_key', { accountId, userId, deviceId, deviceKeyId })
-  return deviceUnlockKey ? { status: 'loaded', deviceUnlockKey } : { status: 'missing' }
 }
 
 export async function deleteDeviceUnlockKey(
@@ -358,12 +310,12 @@ export async function saveAttachmentFile(
   userId: string,
   attachmentId: string,
   file: File,
-  vaultKey: Uint8Array,
+  sessionId: string,
   keyId: string
 ): Promise<UploadedAttachment> {
   const bytes = new Uint8Array(await file.arrayBuffer())
   const checksumSha256 = await sha256Hex(bytes)
-  const encryptedBytes = await encryptAttachmentBlobBytes(attachmentId, bytes, vaultKey, keyId)
+  const encryptedBytes = await encryptAttachmentBlobBytes(attachmentId, bytes, sessionId, keyId)
   attachmentBlobCache.set(attachmentId, file)
 
   const encryptedBlobRef = await writeAttachmentBlob(userId, attachmentId, `${attachmentId}.lpblob`, encryptedBytes)
@@ -375,12 +327,12 @@ export async function migrateLegacyAttachmentBlob(
   attachmentId: string,
   fileName: string,
   legacyBlobRef: string,
-  vaultKey: Uint8Array,
+  sessionId: string,
   keyId: string
 ): Promise<UploadedAttachment> {
   const bytes = await loadRawAttachmentBlob(attachmentId, legacyBlobRef)
   const checksumSha256 = await sha256Hex(bytes)
-  const encryptedBytes = await encryptAttachmentBlobBytes(attachmentId, bytes, vaultKey, keyId)
+  const encryptedBytes = await encryptAttachmentBlobBytes(attachmentId, bytes, sessionId, keyId)
   const encryptedBlobRef = await writeAttachmentBlob(userId, attachmentId, `${attachmentId}.lpblob`, encryptedBytes)
   return { encryptedBlobRef, checksumSha256 }
 }
@@ -413,7 +365,7 @@ async function writeAttachmentBlob(userId: string, attachmentId: string, fileNam
   return `browser://users/${userId}/attachments/${attachmentId}`
 }
 
-export async function loadAttachmentFile(attachment: AttachmentLoadInput, vaultKey: Uint8Array, keyId: string): Promise<Blob> {
+export async function loadAttachmentFile(attachment: AttachmentLoadInput, sessionId: string, keyId: string): Promise<Blob> {
   if (attachment.previewFile) return attachment.previewFile
 
   const cached = attachmentBlobCache.get(attachment.id)
@@ -432,7 +384,7 @@ export async function loadAttachmentFile(attachment: AttachmentLoadInput, vaultK
     encryptedBytes = base64ToUint8(raw)
   }
 
-  const decrypted = await decryptAttachmentBytes(vaultKey, keyId, attachment.id, parseAttachmentEnvelope(encryptedBytes))
+  const decrypted = await decryptAttachmentBytes(sessionId, keyId, attachment.id, parseAttachmentEnvelope(encryptedBytes))
   const blob = new Blob([uint8ToArrayBuffer(decrypted)], { type: attachment.mimeType || 'application/octet-stream' })
   attachmentBlobCache.set(attachment.id, blob)
   return blob
@@ -465,10 +417,10 @@ export async function deleteAttachmentBlobRef(blobRef: string, attachmentId: str
 async function encryptAttachmentBlobBytes(
   attachmentId: string,
   bytes: Uint8Array,
-  vaultKey: Uint8Array,
+  sessionId: string,
   keyId: string
 ): Promise<Uint8Array> {
-  const encryptedEnvelope = await encryptAttachmentBytes(vaultKey, keyId, attachmentId, bytes)
+  const encryptedEnvelope = await encryptAttachmentBytes(sessionId, keyId, attachmentId, bytes)
   return serializeEnvelope(encryptedEnvelope)
 }
 
@@ -495,7 +447,7 @@ function findForbiddenLocalStoreField(value: unknown): string | null {
 
   for (const [key, child] of Object.entries(value)) {
     const normalizedKey = key.toLowerCase()
-    if (normalizedKey === 'recoverykey') return 'recoveryKey plaintext'
+    if (normalizedKey === 'secretkey') return 'secretKey plaintext'
     if (normalizedKey === 'deviceunlockkey') return 'deviceUnlockKey plaintext'
     if (normalizedKey === 'encryptedpayload') return 'legacy encryptedPayload blob'
     const field = findForbiddenLocalStoreField(child)

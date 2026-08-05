@@ -1,6 +1,6 @@
 import { computed, reactive, ref, type Ref } from "vue";
 import type { SyncMode } from "@/services/syncClient";
-import { generateRecoveryKey } from "@/services/masterPassword";
+import { generateSecretKey } from "@/services/masterPassword";
 import { isUserWebRuntime } from "@/services/runtime";
 import { loadWebDeviceBinding } from "@/services/webDeviceBinding";
 import type {
@@ -37,18 +37,19 @@ interface UserSessionStore {
   createUser(input: {
     username: string;
     password: string;
-    recoveryKey: string;
+    secretKey: string;
     sync: Pick<SyncConnectPayload, "mode" | "serverUrl">;
   }): Promise<{
-    recoveryKeyStorage: "saved" | "unsupported" | "failed";
+    secretKeyStorage: "saved" | "unsupported" | "failed";
   }>;
-  lock(): void;
+  lock(): Promise<void>;
   persist(): Promise<void>;
   removeActiveUserFromDevice(): Promise<{ displayName: string } | null>;
   restoreServerAccount(input: {
     exchange: PendingSyncDeviceBindExchange;
     password: string;
-    recoveryKey: string;
+    secretKey: string;
+    requireSecretKeyStorage?: boolean;
   }): Promise<void>;
   saveSyncSettings(input: SyncConnectPayload): Promise<void>;
   switchUser(userId: string): Promise<void>;
@@ -70,12 +71,13 @@ interface UseUserSessionFlowInput {
 export function useUserSessionFlow(input: UseUserSessionFlowInput) {
   const authError = ref("");
   const unlockPassword = ref("");
-  const unlockRecoveryKey = ref("");
+  const unlockSecretKey = ref("");
+  const unlockRequiresSecretKey = ref(false);
+  const fullUnlockRequired = ref(false);
   const unlockingVault = ref(false);
   const creatingUser = ref(false);
-  const generatedRecoveryKey = ref("");
-  const recoveryUserName = ref("");
-  const userSetupInitialMode = ref<"choice" | "new" | "restore">("choice");
+  const generatedSecretKey = ref("");
+  const createdUserName = ref("");
   const setupServerMode = ref<SyncMode>("official");
   const setupServerUrl = ref(input.vaultStore.settings.sync.serverUrl);
   const setupServerBusy = ref(false);
@@ -106,7 +108,7 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
       (input.vaultStore.needsUserSetup ||
         input.activeModal.value === "user") &&
         !pendingServerExchange.value &&
-        !generatedRecoveryKey.value
+        !generatedSecretKey.value
     );
   });
   const setupServerAccountFlow = computed(
@@ -126,8 +128,8 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
     userDraft.password = "";
     userDraft.confirmPassword = "";
     authError.value = "";
-    generatedRecoveryKey.value = "";
-    recoveryUserName.value = "";
+    generatedSecretKey.value = "";
+    createdUserName.value = "";
     if (!input.vaultStore.needsUserSetup) {
       pendingServerExchange.value = null;
     }
@@ -157,7 +159,6 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
     setupServerMode.value = exchange.mode;
     setupServerUrl.value = exchange.serverUrl;
     setupServerBusy.value = false;
-    userSetupInitialMode.value = "restore";
     userDraft.username =
       exchange.account.email ??
       exchange.account.displayName ??
@@ -171,22 +172,13 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
   }
 
   function openAddUser(
-    initialMode: "choice" | "new" | "restore" = "choice",
     options: { returnToUserManagement?: boolean } = {},
   ): void {
     resetUserDraft();
-    userSetupInitialMode.value = initialMode;
     returnToUserManagementAfterSetup.value = Boolean(
       options.returnToUserManagement,
     );
     input.activeModal.value = "user";
-  }
-
-  function createNewUserFromLock(): void {
-    unlockPassword.value = "";
-    unlockRecoveryKey.value = "";
-    authError.value = "";
-    openAddUser("new");
   }
 
   function closeUserSetup(
@@ -202,30 +194,29 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
     resetUserDraft();
   }
 
-  function prepareUserRecoveryKey(): void {
+  function prepareUserSecretKey(): void {
     const validationError = validateUserDraft();
     authError.value = validationError;
     if (validationError) {
       return;
     }
 
-    generatedRecoveryKey.value = generateRecoveryKey();
-    recoveryUserName.value =
+    generatedSecretKey.value = generateSecretKey();
+    createdUserName.value =
       userDraft.username.trim() ||
       setupServerAccountLabel.value ||
       input.t("user.currentUser");
   }
 
-  function backToUserDraftFromRecoveryKey(): void {
+  function backToUserDraftFromSecretKey(): void {
     authError.value = "";
-    generatedRecoveryKey.value = "";
-    recoveryUserName.value = "";
-    userSetupInitialMode.value = "new";
+    generatedSecretKey.value = "";
+    createdUserName.value = "";
   }
 
   async function restoreExistingServerAccount(payload: {
     password: string;
-    recoveryKey: string;
+    secretKey: string;
   }): Promise<void> {
     if (!pendingServerExchange.value) {
       authError.value = input.t("sync.syncOfficialAuthorizationMissing");
@@ -237,7 +228,8 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
       await input.vaultStore.restoreServerAccount({
         exchange: pendingServerExchange.value,
         password: payload.password,
-        recoveryKey: payload.recoveryKey,
+        secretKey: payload.secretKey,
+        requireSecretKeyStorage: true,
       });
       pendingServerExchange.value = null;
       closeUserSetup({ returnToPrevious: false });
@@ -248,6 +240,8 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
       authError.value =
         message === "serverVaultKeyMissing"
           ? input.t("user.serverVaultKeyMissing")
+          : message === "secretKeyStorageRequired"
+            ? input.t("user.secretKeySaveFailed")
           : message === "duplicate-username"
             ? input.t("user.duplicateUsername")
             : input.t("user.wrongUnlockSecret");
@@ -256,20 +250,15 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
     }
   }
 
-  function showUnavailableRecoveryQr(): void {
-    input.showToast(input.t("user.restoreQrUnavailable"));
-  }
-
   async function createUser(): Promise<void> {
     const validationError = validateUserDraft();
     authError.value = validationError;
     if (validationError) {
-      generatedRecoveryKey.value = "";
-      userSetupInitialMode.value = "new";
+      generatedSecretKey.value = "";
       return;
     }
-    if (!generatedRecoveryKey.value) {
-      prepareUserRecoveryKey();
+    if (!generatedSecretKey.value) {
+      prepareUserSecretKey();
       return;
     }
 
@@ -281,7 +270,7 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
           setupServerAccountLabel.value ||
           "server-user",
         password: userDraft.password,
-        recoveryKey: generatedRecoveryKey.value,
+        secretKey: generatedSecretKey.value,
         sync: {
           mode: setupServerMode.value,
           serverUrl: setupServerUrl.value,
@@ -294,11 +283,11 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
         pendingServerExchange.value = null;
       }
       const toastMessage =
-        result.recoveryKeyStorage === "unsupported"
-          ? input.t("toast.recoveryKeyBrowserPreview")
-          : result.recoveryKeyStorage === "saved"
-            ? input.t("toast.recoveryKeySaved")
-            : input.t("toast.recoveryKeySaveFailed");
+        result.secretKeyStorage === "unsupported"
+          ? input.t("toast.secretKeyBrowserPreview")
+          : result.secretKeyStorage === "saved"
+            ? input.t("toast.secretKeySaved")
+            : input.t("toast.secretKeySaveFailed");
       closeUserSetup({ returnToPrevious: false });
       input.showToast(toastMessage);
       input.promptServerSignInIfNeeded();
@@ -317,7 +306,9 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
   async function switchUser(userId: string): Promise<void> {
     authError.value = "";
     unlockPassword.value = "";
-    unlockRecoveryKey.value = "";
+    unlockSecretKey.value = "";
+    unlockRequiresSecretKey.value = false;
+    fullUnlockRequired.value = false;
     pendingSwitchUserId.value = null;
     input.clearPendingClipboard();
     input.clearSensitiveUiState();
@@ -347,7 +338,7 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
   }
 
   function openAddUserFromManagement(): void {
-    openAddUser("choice", { returnToUserManagement: true });
+    openAddUser({ returnToUserManagement: true });
   }
 
   async function signOutCurrentUser(payload: {
@@ -375,11 +366,12 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
       }
 
       if (input.vaultStore.unlocked) await input.vaultStore.persist();
+      await input.vaultStore.lock();
       input.clearPendingClipboard();
       input.clearSensitiveUiState();
-      input.vaultStore.lock();
       unlockPassword.value = "";
-      unlockRecoveryKey.value = "";
+      unlockSecretKey.value = "";
+      unlockRequiresSecretKey.value = false;
       authError.value = "";
       input.activeDrawer.value = null;
       input.activeModal.value = "lock";
@@ -432,14 +424,14 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
     applyPendingServerExchange,
     applyWebDeviceBindingIfAvailable,
     authError,
-    backToUserDraftFromRecoveryKey,
+    backToUserDraftFromSecretKey,
     closeSwitchUserConfirm,
     closeUserSetup,
     confirmSwitchUser,
-    createNewUserFromLock,
     createUser,
     creatingUser,
-    generatedRecoveryKey,
+    generatedSecretKey,
+    fullUnlockRequired,
     hasLegacyImport,
     openAddUser,
     openAddUserFromManagement,
@@ -447,8 +439,8 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
     pendingServerExchange,
     pendingSwitchUserId,
     pendingSwitchUserName,
-    prepareUserRecoveryKey,
-    recoveryUserName,
+    prepareUserSecretKey,
+    createdUserName,
     requestSwitchUser,
     resetUserDraft,
     restoreExistingServerAccount,
@@ -458,16 +450,15 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
     setupServerConnected,
     setupServerMode,
     setupServerUrl,
-    showUnavailableRecoveryQr,
     signOutCurrentUser,
     signingOutCurrentUser,
     switchUser,
     unlockPassword,
-    unlockRecoveryKey,
+    unlockSecretKey,
+    unlockRequiresSecretKey,
     unlockingVault,
     updateSetupServerMode,
     updateSetupServerUrl,
     userDraft,
-    userSetupInitialMode,
   };
 }

@@ -65,10 +65,10 @@ const activeDrawer = ref<DrawerName>(null);
 const activeManagementPage = ref<ManagementPageName | null>(null);
 const activeModal = ref<ModalName>(null);
 const quickQuery = ref("");
-const revealedRecoveryKey = ref("");
+const revealedSecretKey = ref("");
 const revealError = ref("");
-const revealRecoveryKeyIssue = ref<"missing" | "unsupported" | "">("");
-const savingRecoveryKeyToDevice = ref(false);
+const revealSecretKeyIssue = ref<"missing" | "unsupported" | "">("");
+const savingSecretKeyToDevice = ref(false);
 const pendingDeleteVaultId = ref<string | null>(null);
 const deletingVault = ref(false);
 const sensitiveViewKey = ref(0);
@@ -170,21 +170,20 @@ const {
   applyPendingServerExchange,
   applyWebDeviceBindingIfAvailable,
   authError,
-  backToUserDraftFromRecoveryKey,
+  backToUserDraftFromSecretKey,
   closeSwitchUserConfirm,
   closeUserSetup,
   confirmSwitchUser,
-  createNewUserFromLock,
   createUser,
   creatingUser,
-  generatedRecoveryKey,
+  fullUnlockRequired,
+  generatedSecretKey,
   hasLegacyImport,
   openAddUserFromManagement,
   openUserManagement,
-  pendingServerExchange,
   pendingSwitchUserName,
-  prepareUserRecoveryKey,
-  recoveryUserName,
+  prepareUserSecretKey,
+  createdUserName,
   requestSwitchUser,
   resetUserDraft,
   restoreExistingServerAccount,
@@ -194,17 +193,16 @@ const {
   setupServerConnected,
   setupServerMode,
   setupServerUrl,
-  showUnavailableRecoveryQr,
   signOutCurrentUser,
   signingOutCurrentUser,
   switchUser,
   unlockPassword,
-  unlockRecoveryKey,
+  unlockSecretKey,
+  unlockRequiresSecretKey,
   unlockingVault,
   updateSetupServerMode,
   updateSetupServerUrl,
   userDraft,
-  userSetupInitialMode,
 } = useUserSessionFlow({
   activeDrawer,
   activeModal,
@@ -259,7 +257,8 @@ provide(
     editingItemId,
     filteredItems,
     generatedPassword,
-    generatedRecoveryKey,
+    generatedSecretKey,
+    fullUnlockRequired,
     hasLegacyImport,
     itemDraft,
     itemError,
@@ -272,13 +271,13 @@ provide(
     pendingSwitchUserName,
     pickingItemType,
     quickQuery,
-    recoveryUserName,
+    createdUserName,
     revealError,
-    revealedRecoveryKey,
-    revealRecoveryKeyIssue,
+    revealedSecretKey,
+    revealSecretKeyIssue,
     resizingTarget,
     savedBackupResult,
-    savingRecoveryKeyToDevice,
+    savingSecretKeyToDevice,
     selectedItem,
     selectedItemAttachments,
     sensitiveViewKey,
@@ -293,14 +292,14 @@ provide(
     toast,
     unlockingVault,
     unlockPassword,
-    unlockRecoveryKey,
+    unlockSecretKey,
+    unlockRequiresSecretKey,
     uploadingFiles,
     userDraft,
-    userSetupInitialMode,
     vaultDraft,
     vaultHasUsers: computed(() => vaultStore.hasUsers),
     vaultHydrated: computed(() => vaultStore.hydrated),
-    vaultKey: computed(() => vaultStore.vaultKey),
+    vaultSessionId: computed(() => vaultStore.vaultSessionId),
     vaultNeedsUserSetup: computed(() => vaultStore.needsUserSetup),
     vaultStore,
     vaultUnlocked: computed(() => vaultStore.unlocked),
@@ -311,7 +310,7 @@ provide(
     addDraftGroupChild,
     addWebsiteField,
     backToItemTypePicker,
-    backToUserDraftFromRecoveryKey,
+    backToUserDraftFromSecretKey,
     changeLocale,
     changeLogLevel,
     changeSecuritySettings,
@@ -326,7 +325,7 @@ provide(
     closeManagement: () => {
       activeManagementPage.value = null;
     },
-    closeRecoveryKeyModal,
+    closeSecretKeyModal,
     closeSavedBackup: () => {
       savedBackupResult.value = null;
     },
@@ -336,7 +335,6 @@ provide(
     copySavedBackupPath,
     copyValue,
     createBackup,
-    createNewUserFromLock,
     createUser,
     exportCsv,
     hideOperationProgress,
@@ -355,10 +353,11 @@ provide(
     openNewVault,
     openPasswordGenerator,
     openQuickSearch,
-    openRecoveryKeyModal,
+    openSecretKeyModal,
     openSavedBackupDirectory,
     openSignOutCurrentUserModal,
-    prepareUserRecoveryKey,
+    openUserManagement,
+    prepareUserSecretKey,
     regeneratePassword,
     removeDraftAttachment,
     removeDraftAttachmentBlock,
@@ -370,14 +369,13 @@ provide(
     restoreBackup,
     restoreExistingServerAccount,
     saveItem,
-    saveRecoveryKeyToDevice,
+    saveSecretKeyToDevice,
     saveVault,
     securityChecked: () => showToast(t("toast.securityChecked")),
     selectItem,
     selectQuickResult,
     showOperationProgress,
     showToast,
-    showUnavailableRecoveryQr,
     signOutCurrentUser,
     startColumnResize,
     startNewItem,
@@ -399,12 +397,13 @@ provide(
     updateUnlockPassword: (value: string) => {
       unlockPassword.value = value;
     },
-    updateUnlockRecoveryKey: (value: string) => {
-      unlockRecoveryKey.value = value;
+    updateUnlockSecretKey: (value: string) => {
+      unlockSecretKey.value = value;
     },
     unlockApp,
+    unlockSelectedUser,
     useGeneratedPassword,
-    useSavedRecoveryKey,
+    useSavedSecretKey,
   }),
 );
 
@@ -513,15 +512,15 @@ function clearSensitiveUiState(): void {
   resetItemDraft();
   resetVaultDraft();
   resetUserDraft();
-  clearRecoveryReveal();
+  clearSecretKeyReveal();
   sensitiveViewKey.value += 1;
 }
 
-function clearRecoveryReveal(): void {
-  revealedRecoveryKey.value = "";
+function clearSecretKeyReveal(): void {
+  revealedSecretKey.value = "";
   revealError.value = "";
-  revealRecoveryKeyIssue.value = "";
-  savingRecoveryKeyToDevice.value = false;
+  revealSecretKeyIssue.value = "";
+  savingSecretKeyToDevice.value = false;
 }
 
 function openSignOutCurrentUserModal(): void {
@@ -589,19 +588,19 @@ async function openManagement(
 function closeDrawer(): void {
   activeDrawer.value = null;
   clearPasswordTarget();
-  clearRecoveryReveal();
+  clearSecretKeyReveal();
 }
 
-async function openRecoveryKeyModal(): Promise<void> {
+async function openSecretKeyModal(): Promise<void> {
   activeDrawer.value = null;
-  clearRecoveryReveal();
-  activeModal.value = "recoveryKey";
-  await loadRecoveryKeyForAnotherDevice();
+  clearSecretKeyReveal();
+  activeModal.value = "secretKey";
+  await loadSecretKeyForAnotherDevice();
 }
 
-function closeRecoveryKeyModal(): void {
+function closeSecretKeyModal(): void {
   activeModal.value = null;
-  clearRecoveryReveal();
+  clearSecretKeyReveal();
 }
 
 function openNewVault(): void {
@@ -717,19 +716,10 @@ async function handleDeepLink(url: string): Promise<void> {
   if (!url.startsWith("lockpass://auth/callback")) return;
 
   try {
-    if (vaultStore.needsUserSetup && !vaultStore.activeUser?.crypto) {
+    if (isSettingUpServerAccount()) {
       const exchange = vaultStore.parseServerAccountAuthorizationCallback(url);
-      pendingServerExchange.value = exchange;
-      setupServerMode.value = exchange.mode;
-      setupServerUrl.value = exchange.serverUrl;
-      setupServerBusy.value = false;
-      userSetupInitialMode.value = "restore";
-      userDraft.username =
-        exchange.account.email ??
-        exchange.account.displayName ??
-        exchange.account.id;
+      applyPendingServerExchange(exchange);
       vaultStore.clearOfficialLoginState();
-      authError.value = "";
       showToast(t("user.serverConnectedToast"));
       return;
     }
@@ -742,7 +732,7 @@ async function handleDeepLink(url: string): Promise<void> {
     scheduleAutoSync("device-bound", 250);
   } catch (error) {
     setupServerBusy.value = false;
-    if (vaultStore.needsUserSetup && !vaultStore.activeUser?.crypto) {
+    if (isSettingUpServerAccount()) {
       authError.value = syncErrorToast(error);
       vaultStore.setOfficialLoginError(
         error instanceof Error ? error.message : "syncFailed",
@@ -756,6 +746,13 @@ async function handleDeepLink(url: string): Promise<void> {
     );
     showToast(syncErrorToast(error));
   }
+}
+
+function isSettingUpServerAccount(): boolean {
+  return (
+    activeModal.value === "user" ||
+    (vaultStore.needsUserSetup && !vaultStore.activeUser?.crypto)
+  );
 }
 
 async function openInitialServerLogin(
@@ -876,20 +873,42 @@ function promptServerSignInIfNeeded(): void {
 
 async function lockApp(): Promise<void> {
   if (vaultStore.unlocked) await vaultStore.persist();
+  await vaultStore.lock();
   clearPendingClipboard();
   clearSensitiveUiState();
-  vaultStore.lock();
   unlockPassword.value = "";
-  unlockRecoveryKey.value = "";
+  unlockSecretKey.value = "";
+  unlockRequiresSecretKey.value = false;
+  fullUnlockRequired.value = false;
   authError.value = "";
   activeModal.value = "lock";
   showToast(t("toast.locked"));
 }
 
-async function useSavedRecoveryKey(): Promise<void> {
-  const perf = createPerfTrace("unlockWithSavedRecoveryKey");
+async function unlockSelectedUser(userId: string): Promise<void> {
+  if (unlockingVault.value || !userId) return;
+
   authError.value = "";
-  unlockRecoveryKey.value = "";
+  unlockRequiresSecretKey.value = false;
+  fullUnlockRequired.value = false;
+  unlockingVault.value = true;
+  await nextFrame();
+  try {
+    if (userId !== vaultStore.activeUserId) {
+      await switchUser(userId);
+    }
+    fullUnlockRequired.value = true;
+  } catch {
+    authError.value = t("lock.unlockUnavailable");
+  } finally {
+    unlockingVault.value = false;
+  }
+}
+
+async function useSavedSecretKey(): Promise<void> {
+  const perf = createPerfTrace("unlockWithSavedSecretKey");
+  authError.value = "";
+  unlockSecretKey.value = "";
 
   unlockingVault.value = true;
   await nextFrame();
@@ -900,31 +919,12 @@ async function useSavedRecoveryKey(): Promise<void> {
       return;
     }
 
-    const sessionUnlock = await perf.measure(
-      "store.unlockActiveUserWithSessionCache",
-      () => vaultStore.unlockActiveUserWithSessionCache(unlockPassword.value),
-    );
-    if (sessionUnlock === "unlocked") {
-      unlockPassword.value = "";
-      activeModal.value = null;
-      showToast(t("toast.unlocked"));
-      scheduleAutoSync("unlock");
-      promptServerSignInIfNeeded();
-      perf.done({ status: "session-cache-unlocked" });
-      return;
-    }
-    if (sessionUnlock === "invalid") {
-      authError.value = t("user.wrongPassword");
-      perf.done({ status: "session-cache-invalid-password" });
-      return;
-    }
-
-    const result = await perf.measure("secureStorage.loadRecoveryKey", () =>
-      vaultStore.loadSavedRecoveryKeyForActiveUser(),
+    const result = await perf.measure("secureStorage.loadSecretKey", () =>
+      vaultStore.loadSavedSecretKeyForActiveUser(),
     );
     if (result.status === "loaded") {
       const valid = await perf.measure("store.unlockActiveUser", () =>
-        vaultStore.unlockActiveUser(unlockPassword.value, result.recoveryKey),
+        vaultStore.unlockActiveUser(unlockPassword.value, result.secretKey),
       );
       if (!valid) {
         authError.value = t("user.wrongUnlockSecret");
@@ -932,6 +932,7 @@ async function useSavedRecoveryKey(): Promise<void> {
       }
 
       unlockPassword.value = "";
+      fullUnlockRequired.value = false;
       activeModal.value = null;
       showToast(t("toast.unlocked"));
       scheduleAutoSync("unlock");
@@ -940,10 +941,8 @@ async function useSavedRecoveryKey(): Promise<void> {
       return;
     }
 
-    authError.value =
-      result.status === "unsupported"
-        ? t("lock.savedRecoveryKeyUnsupported")
-        : t("lock.savedRecoveryKeyMissing");
+    authError.value = "";
+    unlockRequiresSecretKey.value = true;
     perf.done({ status: result.status });
   } catch (error) {
     authError.value = error instanceof Error ? error.message : String(error);
@@ -954,34 +953,46 @@ async function useSavedRecoveryKey(): Promise<void> {
 }
 
 async function unlockApp(): Promise<void> {
-  const perf = createPerfTrace("unlockWithManualRecoveryKey");
+  const perf = createPerfTrace("unlockWithManualSecretKey");
   authError.value = "";
-  if (!unlockRecoveryKey.value.trim()) {
-    authError.value = t("lock.recoveryKeyRequired");
+  if (!unlockSecretKey.value.trim()) {
+    authError.value = t("lock.secretKeyRequired");
     return;
   }
 
   const password = unlockPassword.value;
-  const recoveryKey = unlockRecoveryKey.value.trim();
+  const secretKey = unlockSecretKey.value.trim();
   unlockingVault.value = true;
   await nextFrame();
   try {
     const valid = await perf.measure("store.unlockActiveUser", () =>
-      vaultStore.unlockActiveUser(password, recoveryKey),
+      vaultStore.unlockActiveUser(password, secretKey),
     );
     if (!valid) {
       authError.value = t("user.wrongUnlockSecret");
       return;
     }
 
+    const storageStatus = await perf.measure(
+      "secureStorage.saveSecretKey",
+      () => vaultStore.saveVerifiedSecretKeyForActiveUser(secretKey),
+    );
+    if (storageStatus !== "saved") {
+      await vaultStore.lock();
+      authError.value = t("user.secretKeySaveFailed");
+      perf.done({ failed: true, secretKeySave: storageStatus });
+      return;
+    }
+
     unlockPassword.value = "";
-    unlockRecoveryKey.value = "";
+    unlockSecretKey.value = "";
+    unlockRequiresSecretKey.value = false;
+    fullUnlockRequired.value = false;
     activeModal.value = null;
     showToast(t("toast.unlocked"));
     scheduleAutoSync("unlock");
     promptServerSignInIfNeeded();
-    perf.done({ status: "unlocked", recoveryKeySave: "background" });
-    void saveRecoveryKeyAfterManualUnlock(recoveryKey);
+    perf.done({ status: "unlocked", secretKeySave: storageStatus });
   } catch {
     authError.value = t("user.wrongUnlockSecret");
     perf.done({ failed: true });
@@ -996,98 +1007,72 @@ function nextFrame(): Promise<void> {
   );
 }
 
-async function saveRecoveryKeyAfterManualUnlock(
-  recoveryKey: string,
-): Promise<void> {
-  const perf = createPerfTrace("saveRecoveryKeyAfterManualUnlock");
-  try {
-    const storageStatus = await perf.measure(
-      "secureStorage.saveRecoveryKey",
-      () => vaultStore.saveVerifiedRecoveryKeyForActiveUser(recoveryKey),
-    );
-    perf.done({ status: storageStatus });
-    showToast(
-      storageStatus === "saved"
-        ? t("toast.recoveryKeySaved")
-        : storageStatus === "unsupported"
-          ? t("toast.recoveryKeyBrowserPreview")
-          : t("toast.recoveryKeySaveFailed"),
-    );
-  } catch (error) {
-    perf.done({
-      failed: true,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    showToast(t("toast.recoveryKeySaveFailed"));
-  }
-}
-
-async function loadRecoveryKeyForAnotherDevice(): Promise<void> {
+async function loadSecretKeyForAnotherDevice(): Promise<void> {
   revealError.value = "";
-  revealedRecoveryKey.value = "";
-  revealRecoveryKeyIssue.value = "";
+  revealedSecretKey.value = "";
+  revealSecretKeyIssue.value = "";
 
   if (!vaultStore.unlocked) {
-    revealError.value = t("settings.recoveryKeyLocked");
+    revealError.value = t("settings.secretKeyLocked");
     return;
   }
   try {
-    const result = await vaultStore.loadSavedRecoveryKeyForActiveUser();
+    const result = await vaultStore.loadSavedSecretKeyForActiveUser();
     if (result.status === "loaded") {
-      revealedRecoveryKey.value = result.recoveryKey;
+      revealedSecretKey.value = result.secretKey;
       return;
     }
 
-    revealRecoveryKeyIssue.value =
+    revealSecretKeyIssue.value =
       result.status === "unsupported" ? "unsupported" : "missing";
     revealError.value =
-      revealRecoveryKeyIssue.value === "unsupported"
-        ? t("settings.recoveryKeyUnsupported")
-        : t("settings.recoveryKeyMissing");
+      revealSecretKeyIssue.value === "unsupported"
+        ? t("settings.secretKeyUnsupported")
+        : t("settings.secretKeyMissing");
   } catch (error) {
     revealError.value = error instanceof Error ? error.message : String(error);
   }
 }
 
-async function saveRecoveryKeyToDevice(recoveryKey: string): Promise<void> {
+async function saveSecretKeyToDevice(secretKey: string): Promise<void> {
   revealError.value = "";
-  revealedRecoveryKey.value = "";
+  revealedSecretKey.value = "";
 
   if (!vaultStore.unlocked) {
-    revealRecoveryKeyIssue.value = "";
-    revealError.value = t("settings.recoveryKeyLocked");
+    revealSecretKeyIssue.value = "";
+    revealError.value = t("settings.secretKeyLocked");
     return;
   }
-  const normalizedRecoveryKey = recoveryKey.trim();
-  if (!normalizedRecoveryKey) {
-    revealRecoveryKeyIssue.value = "missing";
-    revealError.value = t("settings.recoveryKeyBindRequired");
+  const normalizedSecretKey = secretKey.trim();
+  if (!normalizedSecretKey) {
+    revealSecretKeyIssue.value = "missing";
+    revealError.value = t("settings.secretKeyBindRequired");
     return;
   }
 
-  savingRecoveryKeyToDevice.value = true;
+  savingSecretKeyToDevice.value = true;
   try {
-    const storageStatus = await vaultStore.saveVerifiedRecoveryKeyForActiveUser(
-      normalizedRecoveryKey,
+    const storageStatus = await vaultStore.saveVerifiedSecretKeyForActiveUser(
+      normalizedSecretKey,
     );
     if (storageStatus === "saved") {
-      revealRecoveryKeyIssue.value = "";
-      revealedRecoveryKey.value = normalizedRecoveryKey;
-      showToast(t("toast.recoveryKeySaved"));
+      revealSecretKeyIssue.value = "";
+      revealedSecretKey.value = normalizedSecretKey;
+      showToast(t("toast.secretKeySaved"));
       return;
     }
 
-    revealRecoveryKeyIssue.value =
+    revealSecretKeyIssue.value =
       storageStatus === "unsupported" ? "unsupported" : "missing";
     revealError.value =
       storageStatus === "unsupported"
-        ? t("settings.recoveryKeyUnsupported")
-        : t("settings.recoveryKeySaveFailed");
+        ? t("settings.secretKeyUnsupported")
+        : t("settings.secretKeySaveFailed");
   } catch {
-    revealRecoveryKeyIssue.value = "missing";
+    revealSecretKeyIssue.value = "missing";
     revealError.value = t("user.wrongUnlockSecret");
   } finally {
-    savingRecoveryKeyToDevice.value = false;
+    savingSecretKeyToDevice.value = false;
   }
 }
 

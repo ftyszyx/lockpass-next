@@ -38,7 +38,7 @@ AppData/com.lockpass.next/
 系统安全存储 key：
 
 ```text
-lockpass-next:recovery-key:{accountId}
+lockpass-next:secret-key:{accountId}
 lockpass-next-fast-unlock:{accountId}:{deviceId}:{deviceKeyId}
 lockpass-next-sync-device-token:{accountId}
 ```

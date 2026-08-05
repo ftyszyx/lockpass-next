@@ -1,25 +1,25 @@
 import {
   deleteDeviceUnlockKey,
-  deleteRecoveryKey,
+  deleteSecretKey,
   deleteSyncDeviceToken,
-  loadRecoveryKey,
-  saveRecoveryKey,
+  loadSecretKey,
+  saveSecretKey,
   type DesktopUserProfile,
   type StorageBackend
 } from '@/services/vaultRepository'
-import type { RecoveryKeyStorageStatus } from './types'
+import type { SecretKeyStorageStatus } from './types'
 
-export async function saveAndVerifyRecoveryKey(userId: string, recoveryKey: string): Promise<RecoveryKeyStorageStatus> {
-  const savedRecoveryKey = await saveRecoveryKey(userId, recoveryKey)
-  if (savedRecoveryKey.status !== 'saved') return 'unsupported'
+export async function saveAndVerifySecretKey(userId: string, secretKey: string): Promise<SecretKeyStorageStatus> {
+  const savedSecretKey = await saveSecretKey(userId, secretKey)
+  if (savedSecretKey.status !== 'saved') return 'unsupported'
 
-  const loadedRecoveryKey = await loadRecoveryKey(userId)
-  return loadedRecoveryKey.status === 'loaded' && loadedRecoveryKey.recoveryKey === recoveryKey ? 'saved' : 'failed'
+  const loadedSecretKey = await loadSecretKey(userId)
+  return loadedSecretKey.status === 'loaded' && loadedSecretKey.secretKey === secretKey ? 'saved' : 'failed'
 }
 
 export async function cleanupLocalSecretsForUser(user: DesktopUserProfile, storageBackend: StorageBackend): Promise<void> {
   const tasks: Array<Promise<{ status: string }>> = [
-    deleteRecoveryKey(user.id),
+    deleteSecretKey(user.id),
     user.crypto?.fastUnlock
       ? deleteDeviceUnlockKey(
           user.crypto.fastUnlock.accountId,

@@ -99,7 +99,7 @@ function sanitizeValue(value: unknown): unknown {
 function isSensitiveKey(key: string): boolean {
   const normalized = key.toLowerCase()
   return normalized.includes('password') ||
-    normalized.includes('recoverykey') ||
+    normalized.includes('secretkey') ||
     normalized.includes('token') ||
     normalized.includes('secret') ||
     normalized.includes('vaultkey') ||

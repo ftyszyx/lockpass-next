@@ -11,7 +11,7 @@ import { SyncApiClient, type SyncDeviceBindCallbackPayload } from '@/services/sy
 export interface InitialServerVaultInput {
   binding: SyncDeviceBindCallbackPayload
   masterPassword: string
-  recoveryKey: string
+  secretKey: string
   defaultVaultName: string
   defaultVaultDescription: string
 }
@@ -19,7 +19,7 @@ export interface InitialServerVaultInput {
 export interface InitialServerVaultResult {
   payload: DesktopVaultPayload
   crypto: DesktopUserCrypto
-  vaultKey: Uint8Array
+  sessionId: string
   syncSpaceId: string
   cursor: number
 }
@@ -32,7 +32,7 @@ export async function createInitialServerVault(input: InitialServerVaultInput): 
     defaultVaultName: input.defaultVaultName,
     defaultVaultDescription: input.defaultVaultDescription
   })
-  const created = await createUserCrypto(input.binding.account.id, input.masterPassword, payload, input.recoveryKey)
+  const created = await createUserCrypto(input.binding.account.id, input.masterPassword, payload, input.secretKey)
   const vault = payload.vaults[0]
   const vaultId = requireServerUuidFromLocalId(vault.id)
 
@@ -63,7 +63,7 @@ export async function createInitialServerVault(input: InitialServerVaultInput): 
       baseRevision: 0,
       revision: 1,
       encryptedPayload: await encryptSyncObjectPayload(
-        created.vaultKey,
+        created.sessionId,
         created.crypto.keyId,
         {
           objectType: 'vault_metadata',
@@ -88,7 +88,7 @@ export async function createInitialServerVault(input: InitialServerVaultInput): 
       vaults: [cleanVault]
     },
     crypto: created.crypto,
-    vaultKey: created.vaultKey,
+    sessionId: created.sessionId,
     syncSpaceId: syncSpace.id,
     cursor: pushResult.nextCursor
   }

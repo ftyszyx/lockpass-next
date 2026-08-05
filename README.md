@@ -62,8 +62,6 @@ npm run dev:desktop
 npm run dev:desktop:debug
 ```
 
-启动后可以访问 `http://127.0.0.1:9222/json`，用于连接 WebView2 调试端口。
-
 ### 服务器端
 
 ```bash

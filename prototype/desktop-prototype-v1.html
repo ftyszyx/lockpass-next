@@ -1901,7 +1901,7 @@
               <div id="profileUserList"></div>
               <div class="profile-menu-actions">
                 <button id="addUserFromProfile" type="button"><i data-lucide="user-plus"></i><span>新增用户</span></button>
-                <button id="showRecoveryKeyFromProfile" type="button"><i data-lucide="key-round"></i><span>显示安全密钥 / 新设备迁移预留</span></button>
+                <button id="showSecretKeyFromProfile" type="button"><i data-lucide="key-round"></i><span>显示安全密钥 / 新设备迁移预留</span></button>
                 <button class="danger" id="removeUserFromProfile" type="button"><i data-lucide="user-minus"></i><span>从此设备移除用户</span></button>
                 <button id="lockFromProfile" type="button"><i data-lucide="lock"></i><span>锁定</span></button>
               </div>
@@ -2353,11 +2353,11 @@
               <input id="existingPassword" class="input" type="password" />
             </div>
             <div class="form-field">
-              <label for="existingRecoveryKey">安全密钥<span class="required-mark">*</span></label>
-              <textarea id="existingRecoveryKey" class="input" rows="4" spellcheck="false" placeholder="输入安全密钥，或扫描旧设备二维码后自动填入"></textarea>
+              <label for="existingSecretKey">安全密钥<span class="required-mark">*</span></label>
+              <textarea id="existingSecretKey" class="input" rows="4" spellcheck="false" placeholder="输入安全密钥，或扫描旧设备二维码后自动填入"></textarea>
             </div>
             <div class="modal-actions" style="padding: 0">
-              <button class="button" id="scanRecoveryQr" type="button">
+              <button class="button" id="scanSecretKeyQr" type="button">
                 <i data-lucide="scan-line"></i>
                 扫描二维码
               </button>
@@ -2387,15 +2387,15 @@
             </div>
             <div class="form-error hidden" id="userError"></div>
           </div>
-          <div class="form-grid hidden" id="recoveryKeyPanel">
-            <button class="button" id="backUserSetupFromRecovery" type="button" style="justify-self: start">
+          <div class="form-grid hidden" id="secretKeyPanel">
+            <button class="button" id="backUserSetupFromSecretKey" type="button" style="justify-self: start">
               <i data-lucide="arrow-left"></i>
               返回上一步
             </button>
             <h2>保存安全密钥</h2>
-            <textarea class="input" id="generatedRecoveryKey" readonly rows="4"></textarea>
+            <textarea class="input" id="generatedSecretKey" readonly rows="4"></textarea>
             <label class="form-field" style="grid-template-columns: 20px minmax(0, 1fr); align-items: center">
-              <input id="savedRecoveryKeyOffline" type="checkbox" />
+              <input id="savedSecretKeyOffline" type="checkbox" />
               我已离线保存安全密钥
             </label>
           </div>
@@ -2461,45 +2461,45 @@
       </section>
     </div>
 
-    <div class="modal-layer" id="recoveryExportModal" aria-hidden="true">
-      <div class="scrim" data-close="recoveryExportModal"></div>
-      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="recoveryExportTitle">
+    <div class="modal-layer" id="secretKeyExportModal" aria-hidden="true">
+      <div class="scrim" data-close="secretKeyExportModal"></div>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="secretKeyExportTitle">
         <div class="panel-head">
-          <h3 id="recoveryExportTitle">显示安全密钥 / 新设备迁移预留</h3>
-          <button class="button icon-only" data-close="recoveryExportModal" title="关闭" aria-label="关闭">
+          <h3 id="secretKeyExportTitle">显示安全密钥 / 新设备迁移预留</h3>
+          <button class="button icon-only" data-close="secretKeyExportModal" title="关闭" aria-label="关闭">
             <i data-lucide="x"></i>
           </button>
         </div>
         <div class="modal-body">
           <div class="form-grid">
-            <div class="form-grid" id="recoveryVerifyPanel">
+            <div class="form-grid" id="secretKeyVerifyPanel">
               <p class="sync-note">请重新验证主密码。验证后可显示安全密钥；新设备二维码迁移仍为预留流程，二维码内容等价于安全密钥。</p>
               <div class="form-field">
-                <label for="recoveryExportPassword">主密码</label>
-                <input id="recoveryExportPassword" class="input" type="password" autocomplete="current-password" />
+                <label for="secretKeyExportPassword">主密码</label>
+                <input id="secretKeyExportPassword" class="input" type="password" autocomplete="current-password" />
               </div>
-              <button class="button primary" id="verifyRecoveryExport" type="button">
+              <button class="button primary" id="verifySecretKeyExport" type="button">
                 <i data-lucide="shield-check"></i>
                 验证并显示
               </button>
-              <p class="form-error hidden" id="recoveryExportError"></p>
-              <div class="form-grid hidden" id="recoveryTrustPanel">
-                <textarea class="input" id="recoveryTrustKey" rows="3" placeholder="输入已离线保存的安全密钥"></textarea>
-                <button class="button" id="saveRecoveryTrust" type="button">
+              <p class="form-error hidden" id="secretKeyExportError"></p>
+              <div class="form-grid hidden" id="secretKeyTrustPanel">
+                <textarea class="input" id="secretKeyTrustKey" rows="3" placeholder="输入已离线保存的安全密钥"></textarea>
+                <button class="button" id="saveSecretKeyTrust" type="button">
                   <i data-lucide="save"></i>
                   保存到此设备并显示
                 </button>
               </div>
             </div>
-            <div class="form-grid hidden" id="recoveryExportResult">
-              <textarea class="input" id="revealedRecoveryKey" readonly rows="3"></textarea>
+            <div class="form-grid hidden" id="secretKeyExportResult">
+              <textarea class="input" id="revealedSecretKey" readonly rows="3"></textarea>
               <div class="qr-placeholder" aria-label="二维码占位">QR<br />安全密钥</div>
               <p class="sync-note">新设备迁移需要同步服务和 wrappedVaultKey 恢复闭环接入后完成。本机只演示流程，不生成真实二维码图片。</p>
             </div>
           </div>
         </div>
         <div class="modal-actions">
-          <button class="button" data-close="recoveryExportModal">关闭</button>
+          <button class="button" data-close="secretKeyExportModal">关闭</button>
         </div>
       </section>
     </div>
@@ -2549,7 +2549,7 @@
         <h2 id="unlockTitle">解锁保险库</h2>
         <p id="unlockBody">输入主密码。受信任设备会从系统安全存储读取安全密钥。</p>
         <input class="input" id="unlockPassword" type="password" placeholder="主密码" />
-        <div class="form-grid hidden" id="recoveryChoicePanel">
+        <div class="form-grid hidden" id="secretKeyChoicePanel">
           <button class="button" id="backToPasswordUnlock" type="button">
             <i data-lucide="arrow-left"></i>
             返回解锁
@@ -2561,7 +2561,7 @@
               <span>创建新用户并生成安全密钥。</span>
             </div>
           </button>
-          <button class="action-card" id="showExistingUserRecovery" type="button">
+          <button class="action-card" id="showExistingUserSecretKey" type="button">
             <span class="action-icon"><i data-lucide="cloud"></i></span>
             <div>
               <strong>我是已有用户</strong>
@@ -2569,14 +2569,14 @@
             </div>
           </button>
         </div>
-        <div class="form-grid hidden" id="recoveryKeyUnlockFields">
-          <button class="button" id="backToRecoveryChoice" type="button">
+        <div class="form-grid hidden" id="secretKeyUnlockFields">
+          <button class="button" id="backToSecretKeyChoice" type="button">
             <i data-lucide="arrow-left"></i>
             返回上一步
           </button>
-          <textarea class="input" id="unlockRecoveryKey" rows="3" spellcheck="false" placeholder="安全密钥"></textarea>
+          <textarea class="input" id="unlockSecretKey" rows="3" spellcheck="false" placeholder="安全密钥"></textarea>
         </div>
-        <button class="button" id="showRecoveryKeyUnlock" type="button">
+        <button class="button" id="showSecretKeyUnlock" type="button">
           <i data-lucide="rotate-ccw"></i>
           新用户 / 已有用户恢复预留
         </button>
@@ -2794,7 +2794,7 @@
           $("#profileStatus").textContent = "需要创建用户"
           $("#profileUserList").innerHTML = '<button type="button" disabled><strong>暂无用户</strong><span></span></button>'
           renderUserOptions()
-          ;["showRecoveryKeyFromProfile", "removeUserFromProfile", "lockFromProfile", "settingsRemoveUser"].forEach((id) => {
+          ;["showSecretKeyFromProfile", "removeUserFromProfile", "lockFromProfile", "settingsRemoveUser"].forEach((id) => {
             const button = document.getElementById(id)
             if (button) button.disabled = true
           })
@@ -2819,7 +2819,7 @@
         $$("[data-switch-user]").forEach((button) => {
           button.addEventListener("click", () => requestSwitchUser(button.dataset.switchUser))
         })
-        ;["showRecoveryKeyFromProfile", "removeUserFromProfile", "lockFromProfile", "settingsRemoveUser"].forEach((id) => {
+        ;["showSecretKeyFromProfile", "removeUserFromProfile", "lockFromProfile", "settingsRemoveUser"].forEach((id) => {
           const button = document.getElementById(id)
           if (button) button.disabled = false
         })
@@ -2910,12 +2910,12 @@
         $("#userPassword").value = ""
         $("#userConfirmPassword").value = ""
         $("#existingPassword").value = ""
-        $("#existingRecoveryKey").value = ""
-        $("#generatedRecoveryKey").value = ""
-        $("#savedRecoveryKeyOffline").checked = false
+        $("#existingSecretKey").value = ""
+        $("#generatedSecretKey").value = ""
+        $("#savedSecretKeyOffline").checked = false
         $("#userStartChoice").classList.remove("hidden")
         $("#oldDeviceGuide").classList.add("hidden")
-        $("#recoveryKeyPanel").classList.add("hidden")
+        $("#secretKeyPanel").classList.add("hidden")
         $("#userSetupFields").classList.add("hidden")
         $("#saveUser").classList.add("hidden")
         $("#saveUser").disabled = false
@@ -2934,12 +2934,12 @@
       function showUserSetupFields() {
         $("#userStartChoice").classList.add("hidden")
         $("#oldDeviceGuide").classList.add("hidden")
-        $("#recoveryKeyPanel").classList.add("hidden")
+        $("#secretKeyPanel").classList.add("hidden")
         $("#userSetupFields").classList.remove("hidden")
         $("#saveUser").classList.remove("hidden")
         $("#saveUser").disabled = false
         $("#saveUser").innerHTML = '<i data-lucide="save"></i>创建并生成安全密钥'
-        $("#savedRecoveryKeyOffline").checked = false
+        $("#savedSecretKeyOffline").checked = false
         refreshIcons()
         setTimeout(() => $("#userName").focus(), 0)
       }
@@ -2947,19 +2947,19 @@
       function showOldDeviceGuide() {
         $("#userStartChoice").classList.add("hidden")
         $("#userSetupFields").classList.add("hidden")
-        $("#recoveryKeyPanel").classList.add("hidden")
+        $("#secretKeyPanel").classList.add("hidden")
         $("#saveUser").classList.add("hidden")
         $("#oldDeviceGuide").classList.remove("hidden")
         setTimeout(() => $("#existingPassword").focus(), 0)
       }
 
-      function showUserRecoveryKeyPanel() {
-        $("#generatedRecoveryKey").value = generateRecoveryKey()
-        $("#savedRecoveryKeyOffline").checked = false
+      function showUserSecretKeyPanel() {
+        $("#generatedSecretKey").value = generateSecretKey()
+        $("#savedSecretKeyOffline").checked = false
         $("#userStartChoice").classList.add("hidden")
         $("#userSetupFields").classList.add("hidden")
         $("#oldDeviceGuide").classList.add("hidden")
-        $("#recoveryKeyPanel").classList.remove("hidden")
+        $("#secretKeyPanel").classList.remove("hidden")
         $("#saveUser").classList.remove("hidden")
         $("#saveUser").disabled = true
         $("#saveUser").innerHTML = '<i data-lucide="check"></i>进入保险库'
@@ -2967,8 +2967,8 @@
       }
 
       function saveUser() {
-        if (!$("#recoveryKeyPanel").classList.contains("hidden")) {
-          if (!$("#savedRecoveryKeyOffline").checked) {
+        if (!$("#secretKeyPanel").classList.contains("hidden")) {
+          if (!$("#savedSecretKeyOffline").checked) {
             toast("请先确认已离线保存安全密钥")
             return
           }
@@ -3010,62 +3010,62 @@
         }
 
         error.classList.add("hidden")
-        showUserRecoveryKeyPanel()
+        showUserSecretKeyPanel()
         toast("请离线保存安全密钥")
       }
 
-      function openRecoveryExportModal() {
+      function openSecretKeyExportModal() {
         $("#profileMenu").classList.add("hidden")
         closeLayer("settingsDrawer")
-        $("#recoveryExportPassword").value = ""
-        $("#revealedRecoveryKey").value = ""
-        $("#recoveryTrustKey").value = ""
-        $("#recoveryExportError").classList.add("hidden")
-        $("#recoveryTrustPanel").classList.add("hidden")
-        $("#recoveryVerifyPanel").classList.remove("hidden")
-        $("#recoveryExportResult").classList.add("hidden")
-        openLayer("recoveryExportModal")
-        setTimeout(() => $("#recoveryExportPassword").focus(), 0)
+        $("#secretKeyExportPassword").value = ""
+        $("#revealedSecretKey").value = ""
+        $("#secretKeyTrustKey").value = ""
+        $("#secretKeyExportError").classList.add("hidden")
+        $("#secretKeyTrustPanel").classList.add("hidden")
+        $("#secretKeyVerifyPanel").classList.remove("hidden")
+        $("#secretKeyExportResult").classList.add("hidden")
+        openLayer("secretKeyExportModal")
+        setTimeout(() => $("#secretKeyExportPassword").focus(), 0)
       }
 
-      function verifyRecoveryExport() {
-        const password = $("#recoveryExportPassword").value.trim()
+      function verifySecretKeyExport() {
+        const password = $("#secretKeyExportPassword").value.trim()
         if (!password) {
           toast("请先重新验证主密码")
           return
         }
-        $("#recoveryExportError").classList.add("hidden")
-        $("#recoveryTrustPanel").classList.add("hidden")
-        $("#revealedRecoveryKey").value = "LP-TRUSTED-DEVICE-7K9D-M4Q2-H6VR-P8CX"
-        $("#recoveryVerifyPanel").classList.add("hidden")
-        $("#recoveryExportResult").classList.remove("hidden")
+        $("#secretKeyExportError").classList.add("hidden")
+        $("#secretKeyTrustPanel").classList.add("hidden")
+        $("#revealedSecretKey").value = "LP-TRUSTED-DEVICE-7K9D-M4Q2-H6VR-P8CX"
+        $("#secretKeyVerifyPanel").classList.add("hidden")
+        $("#secretKeyExportResult").classList.remove("hidden")
         refreshIcons()
         toast("已验证，安全密钥已显示；新设备迁移仍为预留流程")
       }
 
-      function saveRecoveryTrust() {
-        const password = $("#recoveryExportPassword").value.trim()
-        const recoveryKey = $("#recoveryTrustKey").value.trim()
+      function saveSecretKeyTrust() {
+        const password = $("#secretKeyExportPassword").value.trim()
+        const secretKey = $("#secretKeyTrustKey").value.trim()
         if (!password) {
-          $("#recoveryExportError").textContent = "请先重新验证主密码"
-          $("#recoveryExportError").classList.remove("hidden")
+          $("#secretKeyExportError").textContent = "请先重新验证主密码"
+          $("#secretKeyExportError").classList.remove("hidden")
           return
         }
-        if (!recoveryKey) {
-          $("#recoveryExportError").textContent = "请输入已离线保存的安全密钥"
-          $("#recoveryExportError").classList.remove("hidden")
+        if (!secretKey) {
+          $("#secretKeyExportError").textContent = "请输入已离线保存的安全密钥"
+          $("#secretKeyExportError").classList.remove("hidden")
           return
         }
-        $("#recoveryExportError").classList.add("hidden")
-        $("#revealedRecoveryKey").value = recoveryKey
-        $("#recoveryTrustPanel").classList.add("hidden")
-        $("#recoveryVerifyPanel").classList.add("hidden")
-        $("#recoveryExportResult").classList.remove("hidden")
+        $("#secretKeyExportError").classList.add("hidden")
+        $("#revealedSecretKey").value = secretKey
+        $("#secretKeyTrustPanel").classList.add("hidden")
+        $("#secretKeyVerifyPanel").classList.add("hidden")
+        $("#secretKeyExportResult").classList.remove("hidden")
         refreshIcons()
         toast("安全密钥已保存到此设备")
       }
 
-      function generateRecoveryKey() {
+      function generateSecretKey() {
         const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
         const bytes = new Uint8Array(32)
         crypto.getRandomValues(bytes)
@@ -4259,7 +4259,7 @@
         $("#profileButton").setAttribute("aria-expanded", String(!$("#profileMenu").classList.contains("hidden")))
       })
       $("#addUserFromProfile").addEventListener("click", openUserModal)
-      $("#showRecoveryKeyFromProfile").addEventListener("click", openRecoveryExportModal)
+      $("#showSecretKeyFromProfile").addEventListener("click", openSecretKeyExportModal)
       $("#removeUserFromProfile").addEventListener("click", openRemoveUserModal)
       $("#lockFromProfile").addEventListener("click", () => {
         $("#profileMenu").classList.add("hidden")
@@ -4270,8 +4270,8 @@
       $("#settingsUser").addEventListener("change", (event) => requestSwitchUser(event.target.value))
       $("#confirmSwitchUser").addEventListener("click", confirmSwitchUser)
       $("#languageSelect").addEventListener("change", (event) => toast(`界面语言已切换：${event.target.selectedOptions[0].textContent}`))
-      $("#verifyRecoveryExport").addEventListener("click", verifyRecoveryExport)
-      $("#saveRecoveryTrust").addEventListener("click", saveRecoveryTrust)
+      $("#verifySecretKeyExport").addEventListener("click", verifySecretKeyExport)
+      $("#saveSecretKeyTrust").addEventListener("click", saveSecretKeyTrust)
       $("#editButton").addEventListener("click", () => {
         const item = currentItem()
         openItemEditor(item)
@@ -4288,20 +4288,20 @@
       $("#startOldDevice").addEventListener("click", showOldDeviceGuide)
       $("#backUserChoice").addEventListener("click", resetUserModalState)
       $("#backUserChoiceFromSetup").addEventListener("click", resetUserModalState)
-      $("#backUserSetupFromRecovery").addEventListener("click", showUserSetupFields)
-      $("#savedRecoveryKeyOffline").addEventListener("change", (event) => {
+      $("#backUserSetupFromSecretKey").addEventListener("click", showUserSetupFields)
+      $("#savedSecretKeyOffline").addEventListener("change", (event) => {
         $("#saveUser").disabled = !event.target.checked
       })
       $("#removeUserConfirmed").addEventListener("change", (event) => {
         $("#confirmRemoveUser").disabled = !event.target.checked
       })
       $("#confirmRemoveUser").addEventListener("click", removeActiveUserFromDevice)
-      $("#scanRecoveryQr").addEventListener("click", () => {
-        $("#existingRecoveryKey").value = "LP-TRUSTED-DEVICE-7K9D-M4Q2-H6VR-P8CX"
+      $("#scanSecretKeyQr").addEventListener("click", () => {
+        $("#existingSecretKey").value = "LP-TRUSTED-DEVICE-7K9D-M4Q2-H6VR-P8CX"
         toast("已填入旧设备二维码中的安全密钥")
       })
       $("#recoverExistingVault").addEventListener("click", () => {
-        if (!$("#existingPassword").value.trim() || !$("#existingRecoveryKey").value.trim()) {
+        if (!$("#existingPassword").value.trim() || !$("#existingSecretKey").value.trim()) {
           toast("请输入主密码和安全密钥")
           return
         }
@@ -4313,39 +4313,39 @@
         $("#unlockTitle").classList.remove("hidden")
         $("#unlockBody").classList.remove("hidden")
         $("#unlockPassword").classList.remove("hidden")
-        $("#recoveryChoicePanel").classList.add("hidden")
-        $("#recoveryKeyUnlockFields").classList.add("hidden")
-        $("#showRecoveryKeyUnlock").classList.remove("hidden")
+        $("#secretKeyChoicePanel").classList.add("hidden")
+        $("#secretKeyUnlockFields").classList.add("hidden")
+        $("#showSecretKeyUnlock").classList.remove("hidden")
         $("#unlockApp").classList.remove("hidden")
       }
 
-      function showRecoveryChoiceStep() {
+      function showSecretKeyChoiceStep() {
         $("#unlockBrand").classList.add("hidden")
         $("#unlockTitle").classList.add("hidden")
         $("#unlockBody").classList.add("hidden")
         $("#unlockPassword").classList.add("hidden")
-        $("#recoveryChoicePanel").classList.remove("hidden")
-        $("#recoveryKeyUnlockFields").classList.add("hidden")
-        $("#showRecoveryKeyUnlock").classList.add("hidden")
+        $("#secretKeyChoicePanel").classList.remove("hidden")
+        $("#secretKeyUnlockFields").classList.add("hidden")
+        $("#showSecretKeyUnlock").classList.add("hidden")
         $("#unlockApp").classList.add("hidden")
       }
 
-      function showExistingRecoveryStep() {
+      function showExistingSecretKeyStep() {
         $("#unlockBrand").classList.add("hidden")
         $("#unlockTitle").classList.add("hidden")
         $("#unlockBody").classList.add("hidden")
         $("#unlockPassword").classList.remove("hidden")
-        $("#recoveryChoicePanel").classList.add("hidden")
-        $("#recoveryKeyUnlockFields").classList.remove("hidden")
-        $("#showRecoveryKeyUnlock").classList.add("hidden")
+        $("#secretKeyChoicePanel").classList.add("hidden")
+        $("#secretKeyUnlockFields").classList.remove("hidden")
+        $("#showSecretKeyUnlock").classList.add("hidden")
         $("#unlockApp").classList.remove("hidden")
-        $("#unlockRecoveryKey").focus()
+        $("#unlockSecretKey").focus()
       }
 
-      $("#showRecoveryKeyUnlock").addEventListener("click", showRecoveryChoiceStep)
+      $("#showSecretKeyUnlock").addEventListener("click", showSecretKeyChoiceStep)
       $("#backToPasswordUnlock").addEventListener("click", showPasswordUnlockStep)
-      $("#backToRecoveryChoice").addEventListener("click", showRecoveryChoiceStep)
-      $("#showExistingUserRecovery").addEventListener("click", showExistingRecoveryStep)
+      $("#backToSecretKeyChoice").addEventListener("click", showSecretKeyChoiceStep)
+      $("#showExistingUserSecretKey").addEventListener("click", showExistingSecretKeyStep)
       $("#createNewUserFromLock").addEventListener("click", () => {
         closeLayer("lockLayer")
         showPasswordUnlockStep()
@@ -4354,21 +4354,21 @@
       })
       $("#unlockApp").addEventListener("click", () => {
         const password = $("#unlockPassword").value.trim()
-        const recoveryKey = $("#unlockRecoveryKey").value.trim()
-        const manualRecovery = !$("#recoveryKeyUnlockFields").classList.contains("hidden")
+        const secretKey = $("#unlockSecretKey").value.trim()
+        const manualSecretKey = !$("#secretKeyUnlockFields").classList.contains("hidden")
         if (!password) {
           toast("请输入主密码")
           return
         }
-        if (manualRecovery && !recoveryKey) {
+        if (manualSecretKey && !secretKey) {
           toast("请输入安全密钥")
           return
         }
         closeLayer("lockLayer")
         $("#unlockPassword").value = ""
-        $("#unlockRecoveryKey").value = ""
+        $("#unlockSecretKey").value = ""
         showPasswordUnlockStep()
-        toast(manualRecovery ? "已使用安全密钥解锁" : "已使用本机系统安全存储中的安全密钥解锁")
+        toast(manualSecretKey ? "已使用安全密钥解锁" : "已使用本机系统安全存储中的安全密钥解锁")
       })
       $("#lengthRange").addEventListener("input", (event) => {
         $("#lengthValue").textContent = event.target.value
@@ -4462,7 +4462,7 @@
             "itemModal",
             "userModal",
             "removeUserModal",
-            "recoveryExportModal",
+            "secretKeyExportModal",
             "imagePreviewModal",
             "quickLayer"
           ].forEach(closeLayer)
