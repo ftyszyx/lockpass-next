@@ -88,3 +88,20 @@ npm run dev:admin_web
 npm run dev:landing
 npm run build:landing
 ```
+
+### web extension
+
+
+先构建
+```
+npm run build:extension
+```
+然后：
+打开 chrome://extensions
+开启“开发者模式”
+点击“加载已解压的扩展程序”
+选择：
+E:\opensource\mywork\lockpass-next\apps\browser_extension\dist
+点击浏览器工具栏中的 LockPass 图标
+Chrome 应打开密码库侧边栏
+

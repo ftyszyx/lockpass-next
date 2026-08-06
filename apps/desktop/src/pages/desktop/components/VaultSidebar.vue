@@ -15,6 +15,7 @@ import {
   Trash2,
   Users,
 } from "@lucide/vue";
+import { VaultAccountSummary } from "@lockpass/ui";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useVaultStore } from "@/stores/vault";
@@ -82,58 +83,45 @@ function requestDeleteVault(event: MouseEvent, vaultId: string): void {
 </script>
 
 <template>
-  <aside class="flex min-h-0 flex-col border-r border-slate-200 bg-[#f1f5f4]">
-    <div class="relative px-3 py-3">
-      <button
-        class="grid w-full grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-white/80"
-        @click="userMenuOpen = !userMenuOpen"
+  <aside class="app-sidebar flex min-h-0 flex-col border-r">
+    <div class="relative px-2.5 py-2">
+      <VaultAccountSummary
+        :name="activeUserName"
+        :initials="activeUserInitials"
+        :status-label="accountStatusLabel()"
+        :status-tone="connectionStatus === 'online' ? 'normal' : 'warning'"
+        interactive
+        @activate="userMenuOpen = !userMenuOpen"
       >
-        <span
-          class="grid size-9 place-items-center rounded-lg bg-slate-900 font-bold text-white"
-          >{{ activeUserInitials }}</span
-        >
-        <span class="min-w-0">
-          <strong class="block truncate leading-tight">{{
-            activeUserName
-          }}</strong>
-          <span
-            class="inline-flex min-h-5 max-w-full items-center rounded px-1.5 text-xs font-semibold leading-none"
-            :class="
-              connectionStatus === 'online'
-                ? 'pl-0 text-slate-500'
-                : 'border border-rose-200 bg-rose-50 text-rose-700'
-            "
-          >
-            <span class="truncate">{{ accountStatusLabel() }}</span>
-          </span>
-        </span>
-        <ChevronDown
-          class="size-4 text-slate-500"
-          :class="{ 'rotate-180': userMenuOpen }"
-        />
-      </button>
+        <template #trailing>
+          <ChevronDown
+            class="size-4 text-[var(--app-muted)]"
+            :class="{ 'rotate-180': userMenuOpen }"
+          />
+        </template>
+      </VaultAccountSummary>
 
       <button
         v-if="userMenuOpen"
         class="fixed inset-0 z-30 cursor-default"
-        aria-label="Close user menu"
+        :aria-label="t('editor.close')"
         @click="closeUserMenu"
       ></button>
       <div
         v-if="userMenuOpen"
-        class="absolute left-3 right-3 top-[66px] z-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl"
+        class="floating-panel absolute left-2.5 right-2.5 top-[58px] z-40 overflow-hidden rounded-md border"
       >
         <div class="grid gap-1 p-1">
           <div class="grid gap-1">
             <button
-              class="grid min-h-9 w-full grid-cols-[20px_minmax(0,1fr)] items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-teal-50"
+              class="menu-item"
               @click="manageUsers"
             >
               <Users class="size-4" />
               <span>{{ t("user.manageUsers") }}</span>
             </button>
             <button
-              class="grid min-h-9 w-full grid-cols-[20px_minmax(0,1fr)] items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-teal-50"
+              class="menu-item"
               @click="showSecretKey"
             >
               <QrCode class="size-4" />
@@ -145,7 +133,7 @@ function requestDeleteVault(event: MouseEvent, vaultId: string): void {
 
           <div class="border-t border-slate-100 pt-1">
             <button
-              class="grid min-h-9 w-full grid-cols-[20px_minmax(0,1fr)] items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-teal-50"
+              class="menu-item"
               @click="openManagement"
             >
               <Settings class="size-4" />
@@ -155,7 +143,7 @@ function requestDeleteVault(event: MouseEvent, vaultId: string): void {
 
           <div class="grid gap-1 border-t border-slate-100 pt-1">
             <button
-              class="grid min-h-9 w-full grid-cols-[20px_minmax(0,1fr)] items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-teal-50"
+              class="menu-item"
               @click="signOutCurrentUser"
             >
               <LogOut class="size-4" />
@@ -164,7 +152,7 @@ function requestDeleteVault(event: MouseEvent, vaultId: string): void {
               }}</span>
             </button>
             <button
-              class="grid min-h-9 w-full grid-cols-[20px_minmax(0,1fr)] items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-teal-50"
+              class="menu-item"
               @click="lock"
             >
               <Lock class="size-4" />
@@ -175,9 +163,9 @@ function requestDeleteVault(event: MouseEvent, vaultId: string): void {
       </div>
     </div>
 
-    <nav class="px-3 py-2">
+    <nav class="px-2.5 py-1.5">
       <div class="mb-2 flex items-center justify-between px-1">
-        <span class="text-xs font-bold text-slate-500">{{
+        <span class="text-xs font-semibold text-[var(--app-muted)]">{{
           t("nav.vaults")
         }}</span>
         <button
@@ -190,55 +178,57 @@ function requestDeleteVault(event: MouseEvent, vaultId: string): void {
       </div>
       <button
         class="nav-button"
-        :class="{ 'bg-white': vaultStore.selectedVaultId === 'all' }"
+        :class="{ 'nav-button-active': vaultStore.selectedVaultId === 'all' }"
         @click="vaultStore.selectVault('all')"
       >
         <span class="inline-flex items-center gap-2"
           ><LayoutGrid class="size-4" />{{ t("nav.allItems") }}</span
         >
-        <span class="text-xs text-slate-500">{{
+        <span class="text-xs text-[var(--app-muted)]">{{
           vaultStore.vaultCount("all")
         }}</span>
       </button>
-      <button
+      <div
         v-for="vault in vaultStore.visibleVaults"
         :key="vault.id"
-        class="nav-button group"
-        :class="{ 'bg-white': vaultStore.selectedVaultId === vault.id }"
-        @click="vaultStore.selectVault(vault.id)"
+        class="group relative"
       >
-        <span class="inline-flex min-w-0 items-center gap-2">
-          <BriefcaseBusiness
-            v-if="vault.icon.includes('briefcase')"
-            class="size-4"
-          />
-          <House v-else-if="vault.icon.includes('home')" class="size-4" />
-          <CreditCard
-            v-else-if="vault.icon.includes('credit')"
-            class="size-4"
-          />
-          <KeyRound v-else-if="vault.icon.includes('key')" class="size-4" />
-          <FolderLock v-else class="size-4" />
-          <span class="truncate">{{ vault.name }}</span>
-        </span>
-        <span class="inline-flex items-center gap-1">
-          <span class="text-xs text-slate-500">{{
+        <button
+          class="nav-button group w-full pr-8"
+          :class="{ 'nav-button-active': vaultStore.selectedVaultId === vault.id }"
+          @click="vaultStore.selectVault(vault.id)"
+        >
+          <span class="inline-flex min-w-0 items-center gap-2">
+            <BriefcaseBusiness
+              v-if="vault.icon.includes('briefcase')"
+              class="size-4"
+            />
+            <House v-else-if="vault.icon.includes('home')" class="size-4" />
+            <CreditCard
+              v-else-if="vault.icon.includes('credit')"
+              class="size-4"
+            />
+            <KeyRound v-else-if="vault.icon.includes('key')" class="size-4" />
+            <FolderLock v-else class="size-4" />
+            <span class="truncate">{{ vault.name }}</span>
+          </span>
+          <span class="text-xs text-[var(--app-muted)] transition-opacity group-hover:opacity-0 group-focus-visible:opacity-0">{{
             vaultStore.vaultCount(vault.id)
           }}</span>
-          <button
-            class="inline-flex size-6 items-center justify-center rounded-md text-slate-400 opacity-0 hover:bg-rose-50 hover:text-rose-700 group-hover:opacity-100 group-focus-within:opacity-100"
-            type="button"
-            :title="t('vault.delete')"
-            :aria-label="t('vault.delete')"
-            @click="requestDeleteVault($event, vault.id)"
-          >
-            <Trash2 class="size-3.5" />
-          </button>
-        </span>
-      </button>
+        </button>
+        <button
+          class="absolute right-1 top-1/2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 opacity-0 hover:bg-rose-50 hover:text-rose-700 group-hover:opacity-100 group-focus-within:opacity-100"
+          type="button"
+          :title="t('vault.delete')"
+          :aria-label="t('vault.delete')"
+          @click="requestDeleteVault($event, vault.id)"
+        >
+          <Trash2 class="size-3.5" />
+        </button>
+      </div>
     </nav>
 
-    <div class="mt-auto border-t border-slate-200 p-3">
+    <div class="mt-auto border-t border-[var(--app-sidebar-border)] p-2.5">
       <div
         v-if="vaultStore.storageError"
         class="min-w-0 px-1 text-xs text-rose-700"

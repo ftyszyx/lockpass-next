@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ArrowLeft, Unlock } from "@lucide/vue";
-import { ref, watch } from "vue";
+import { ArrowLeft, ShieldCheck, Unlock } from "@lucide/vue";
+import { nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useVaultStore } from "@/stores/vault";
 
@@ -26,10 +26,22 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const vaultStore = useVaultStore();
-const unlockStep = ref<"account" | "password" | "secretKey">("account");
 const selectedUserId = ref(
   vaultStore.activeUserId ?? vaultStore.users[0]?.id ?? "",
 );
+const passwordInput = ref<HTMLInputElement | null>(null);
+const unlockStep = ref<"account" | "password" | "secretKey">(
+  props.secretKeyRequired
+    ? "secretKey"
+    : selectedUserId.value
+      ? "password"
+      : "account",
+);
+
+function preferredUnlockStep(): "account" | "password" | "secretKey" {
+  if (props.secretKeyRequired) return "secretKey";
+  return selectedUserId.value ? "password" : "account";
+}
 
 watch(
   () => [vaultStore.activeUserId, vaultStore.users.length] as const,
@@ -43,7 +55,7 @@ watch(
 watch(
   () => props.activeUserName,
   () => {
-    unlockStep.value = props.secretKeyRequired ? "secretKey" : "account";
+    unlockStep.value = preferredUnlockStep();
     emit("update:secretKey", "");
   },
 );
@@ -55,7 +67,9 @@ watch(
       unlockStep.value = "secretKey";
       return;
     }
-    if (unlockStep.value === "secretKey") unlockStep.value = "account";
+    if (unlockStep.value === "secretKey") {
+      unlockStep.value = preferredUnlockStep();
+    }
   },
   { immediate: true },
 );
@@ -66,6 +80,16 @@ watch(
     if (required && unlockStep.value === "account") {
       unlockStep.value = "password";
     }
+  },
+  { immediate: true },
+);
+
+watch(
+  unlockStep,
+  async (step) => {
+    if (step !== "password") return;
+    await nextTick();
+    passwordInput.value?.focus();
   },
   { immediate: true },
 );
@@ -113,16 +137,16 @@ function submitUnlock(): void {
 </script>
 
 <template>
-  <div
-    class="fixed inset-0 z-50 grid place-items-center bg-teal-50/90 backdrop-blur"
-  >
+  <div class="auth-backdrop fixed inset-0 z-50 grid place-items-center p-4">
     <form
-      class="grid w-[400px] max-w-[94vw] gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-2xl"
+      class="auth-panel grid w-[420px] max-w-[94vw] gap-4 rounded-lg border p-6"
       @submit.prevent="submitUnlock"
     >
+      <span class="auth-mark" aria-hidden="true"><ShieldCheck class="size-5" /></span>
+
       <div v-if="unlockStep === 'account'" class="grid gap-3">
         <div class="grid gap-1">
-          <h2 class="text-2xl font-black">
+          <h2 class="auth-heading">
             {{ t("lock.accountPickerTitle") }}
           </h2>
         </div>
@@ -154,16 +178,17 @@ function submitUnlock(): void {
         </button>
       </div>
       <div v-else-if="unlockStep === 'secretKey'" class="grid gap-3">
-        <h2 class="text-2xl font-black">{{ t("lock.secretKeyTitle") }}</h2>
+        <div class="grid gap-1">
+          <h2 class="auth-heading">{{ t("lock.secretKeyTitle") }}</h2>
+        </div>
         <input
+          ref="passwordInput"
           :value="password"
           class="form-input"
           autocomplete="current-password"
           type="password"
           :placeholder="t('lock.passwordPlaceholder')"
-          @input="
-            emit('update:password', ($event.target as HTMLInputElement).value)
-          "
+          @input="emit('update:password', ($event.target as HTMLInputElement).value)"
         />
         <textarea
           :value="secretKey"
@@ -171,12 +196,7 @@ function submitUnlock(): void {
           autocomplete="off"
           spellcheck="false"
           :placeholder="t('lock.secretKeyPlaceholder')"
-          @input="
-            emit(
-              'update:secretKey',
-              ($event.target as HTMLTextAreaElement).value,
-            )
-          "
+          @input="emit('update:secretKey', ($event.target as HTMLTextAreaElement).value)"
         ></textarea>
         <p
           v-if="authError"
@@ -184,7 +204,7 @@ function submitUnlock(): void {
         >
           {{ authError }}
         </p>
-        <button class="primary-button" type="submit" :disabled="unlocking">
+        <button class="primary-button justify-center" type="submit" :disabled="unlocking">
           <Unlock class="size-4" />
           {{
             unlocking ? t("lock.unlocking") : t("lock.unlockWithSecretKey")
@@ -195,7 +215,7 @@ function submitUnlock(): void {
         <div class="flex items-center justify-between gap-3">
           <div class="flex items-center gap-3 font-bold">
             <span
-              class="grid size-9 place-items-center rounded-lg bg-[#10201e] text-white"
+              class="brand-avatar grid size-9 place-items-center rounded-lg text-white"
               >{{ activeUserInitials }}</span
             >
             <span
@@ -215,16 +235,17 @@ function submitUnlock(): void {
             <ArrowLeft class="size-4" />
           </button>
         </div>
-        <h2 class="text-2xl font-black">{{ t("lock.title") }}</h2>
+        <div class="grid gap-1">
+          <h2 class="auth-heading">{{ t("lock.title") }}</h2>
+        </div>
         <input
+          ref="passwordInput"
           :value="password"
           class="form-input"
           autocomplete="current-password"
           type="password"
           :placeholder="t('lock.passwordPlaceholder')"
-          @input="
-            emit('update:password', ($event.target as HTMLInputElement).value)
-          "
+          @input="emit('update:password', ($event.target as HTMLInputElement).value)"
         />
         <p
           v-if="authError"
@@ -232,7 +253,7 @@ function submitUnlock(): void {
         >
           {{ authError }}
         </p>
-        <button class="primary-button" type="submit" :disabled="unlocking">
+        <button class="primary-button justify-center" type="submit" :disabled="unlocking">
           <Unlock class="size-4" />
           {{ unlocking ? t("lock.unlocking") : t("app.unlock") }}
         </button>

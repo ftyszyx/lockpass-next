@@ -1,0 +1,36 @@
+:root {
+  color-scheme: light;
+  --app-canvas: #edf1f4;
+  --app-header: #ffffff;
+  --app-sidebar: #f1f5f4;
+  --app-list: #fbfcfd;
+  --app-detail: #f3f5f7;
+  --app-surface: #ffffff;
+  --app-surface-muted: #f4f6f8;
+  --app-border: #cbd5de;
+  --app-border-strong: #a9b7c3;
+  --app-text: #182330;
+  --app-muted: #5b6b7b;
+  --app-primary: #0b776f;
+  --app-primary-dark: #08635d;
+  --app-primary-soft: #e2f1ee;
+  --app-primary-border: #a4cbc5;
+  --app-focus: rgb(11 119 111 / 14%);
+  --app-search: #f5f7f9;
+  --app-search-placeholder: #718091;
+  --app-sidebar-border: #cbd6d3;
+  --app-brand: #125b56;
+  --app-nav-text: #425365;
+  --app-nav-hover: #e8efed;
+  --app-primary-text: #08635d;
+  --app-tabs: #e8edf1;
+  --app-tab-muted: #5d6d7e;
+  --app-tab-hover: #f4f7f8;
+  --app-field-border: #e1e7ec;
+  --app-field-hover: #f8fafb;
+  --app-divider: #dce4e9;
+  --app-item-row: #ffffff;
+  --app-auth-backdrop: rgb(237 242 244 / 94%);
+  --app-shadow-sm: 0 1px 2px rgb(24 35 48 / 7%);
+  --app-shadow-lg: 0 20px 48px rgb(24 35 48 / 18%);
+}

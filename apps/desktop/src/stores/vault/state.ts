@@ -12,7 +12,8 @@ import {
   DEFAULT_LOGGING_SETTINGS,
   DEFAULT_SECURITY_SETTINGS,
   DEFAULT_SHORTCUTS,
-  DEFAULT_SYNC_SETTINGS
+  DEFAULT_SYNC_SETTINGS,
+  DEFAULT_THEME
 } from './model'
 import type { SelectedType } from './types'
 
@@ -71,6 +72,7 @@ export function createVaultStoreState(): VaultStoreState {
     query: '',
     settings: {
       locale: detectBrowserLocale(),
+      theme: DEFAULT_THEME,
       deviceId: '',
       layout: { ...DEFAULT_LAYOUT },
       logging: { ...DEFAULT_LOGGING_SETTINGS },

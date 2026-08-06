@@ -75,7 +75,7 @@ onUnmounted(() => {
           class="grid min-h-14 w-full grid-cols-[38px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg p-2 text-left hover:bg-teal-50"
           @click="emit('selectAndCopy', item)"
         >
-          <span class="grid size-10 place-items-center rounded-lg bg-[#eef0e8] text-[11px] font-bold">{{ itemIconText(item) }}</span>
+          <span class="grid size-10 place-items-center rounded-lg bg-[var(--app-surface-muted)] text-[11px] font-bold text-[var(--app-text)]">{{ itemIconText(item) }}</span>
           <span class="min-w-0">
             <strong class="block truncate">{{ item.title }}</strong>
             <small class="block truncate text-slate-500">{{ item.subtitle }}</small>

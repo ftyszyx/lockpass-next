@@ -15,6 +15,11 @@ assert.match(
   /@toggle-group="page\.toggleDraftGroup"/,
   "DesktopVaultModalLayer should route group toggle events through page context",
 );
+assert.match(
+  modalLayerSource,
+  /@add-user="page\.openAddUserFromManagement"/,
+  "DesktopVaultModalLayer should route add-account events through page context",
+);
 
 const itemEditorBindings =
   pageSource.match(/const\s*{([\s\S]*?)}\s*=\s*useItemEditor\(/)?.[1] ?? "";
@@ -25,11 +30,18 @@ assert.match(
 );
 
 const providedContext =
-  pageSource.match(/reactive\(\s*{([\s\S]*?)}\s*,?\s*\)\s*\);/)?.[1] ?? "";
+  pageSource.match(
+    /provide\(\s*desktopPageContextKey,\s*reactive\(\s*{([\s\S]*?)}\s*,?\s*\)\s*,?\s*\);/,
+  )?.[1] ?? "";
 assert.match(
   providedContext,
   /\btoggleDraftGroup\b/,
   "DesktopVaultPage should provide toggleDraftGroup to modal components",
+);
+assert.match(
+  providedContext,
+  /\bopenAddUserFromManagement\b/,
+  "DesktopVaultPage should provide openAddUserFromManagement to modal components",
 );
 
 console.log("desktopPageContext tests passed");

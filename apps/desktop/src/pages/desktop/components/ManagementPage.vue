@@ -10,11 +10,14 @@ import {
   Keyboard,
   LockKeyhole,
   Logs,
+  Monitor,
+  Moon,
   PackagePlus,
   RefreshCw,
   RotateCcw,
   Settings,
   Shield,
+  Sun,
   X,
 } from "@lucide/vue";
 import { computed, ref, watch, type Component } from "vue";
@@ -42,6 +45,7 @@ import {
 import type {
   DesktopLogLevel,
   DesktopSecuritySettings,
+  ColorTheme,
   ShortcutAction,
   ShortcutScope,
 } from "@/services/vaultRepository";
@@ -58,6 +62,7 @@ const emit = defineEmits<{
   updatePage: [page: ManagementPageName];
   copyValue: [value: string];
   changeLocale: [locale: SupportedLocale];
+  changeTheme: [theme: ColorTheme];
   changeLogLevel: [level: DesktopLogLevel];
   changeSecuritySettings: [settings: Partial<DesktopSecuritySettings>];
   changeShortcut: [
@@ -99,6 +104,13 @@ const shortcutChecking = ref<Record<string, boolean>>({});
 const startOnLoginSupported = ref(true);
 const startOnLoginBusy = ref(false);
 const autoLockDelayOptions = [0, 30, 60, 300, 900, 1800, 3600];
+const themeOptions = computed<
+  Array<{ value: ColorTheme; label: string; icon: Component }>
+>(() => [
+  { value: "system", label: t("settings.themeSystem"), icon: Monitor },
+  { value: "light", label: t("settings.themeLight"), icon: Sun },
+  { value: "dark", label: t("settings.themeDark"), icon: Moon },
+]);
 const webRuntime = isUserWebRuntime();
 const pages = computed<
   Array<{ name: ManagementPageName; label: string; icon: Component }>
@@ -259,6 +271,12 @@ function changeAutoLockDelay(event: Event): void {
   emit("changeSecuritySettings", {
     autoLockOnLimit: autoLockDelaySeconds > 0,
     autoLockDelaySeconds,
+  });
+}
+
+function changeLockOnSystemLock(event: Event): void {
+  emit("changeSecuritySettings", {
+    lockOnSystemLock: (event.target as HTMLInputElement).checked,
   });
 }
 
@@ -505,10 +523,10 @@ function clearShortcutError(
 </script>
 
 <template>
-  <section class="grid min-h-0 grid-cols-[240px_minmax(0,1fr)] bg-[#f7f8fa]">
-    <aside class="flex min-h-0 flex-col border-r border-slate-200 bg-white">
+  <section class="management-shell grid min-h-0 grid-cols-[220px_minmax(0,1fr)]">
+    <aside class="management-sidebar flex min-h-0 flex-col border-r">
       <div
-        class="flex min-h-16 items-center justify-between border-b border-slate-200 px-4"
+        class="management-header flex min-h-[52px] items-center justify-between border-b px-3.5"
       >
         <div class="leading-tight">
           <h2 class="font-bold text-slate-950">{{ t("management.title") }}</h2>
@@ -524,14 +542,13 @@ function clearShortcutError(
           <X class="size-4" />
         </button>
       </div>
-      <nav class="grid gap-1 p-3">
+      <nav class="grid gap-1 p-2.5">
         <button
           v-for="page in pages"
           :key="page.name"
-          class="grid min-h-11 grid-cols-[24px_minmax(0,1fr)] items-center gap-3 rounded-lg px-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          class="management-nav-button"
           :class="{
-            'bg-teal-50 text-teal-900 hover:bg-teal-50':
-              activePage === page.name,
+            'management-nav-button-active': activePage === page.name,
           }"
           type="button"
           @click="emit('updatePage', page.name)"
@@ -542,9 +559,9 @@ function clearShortcutError(
       </nav>
     </aside>
 
-    <div class="grid min-h-0 grid-rows-[64px_minmax(0,1fr)]">
+    <div class="grid min-h-0 grid-rows-[52px_minmax(0,1fr)]">
       <header
-        class="flex min-h-16 items-center justify-between border-b border-slate-200 bg-white px-6"
+        class="management-header flex min-h-[52px] items-center justify-between border-b px-5"
       >
         <h1 class="text-lg font-bold text-slate-950">{{ pageTitle }}</h1>
         <button class="plain-button" type="button" @click="emit('close')">
@@ -552,7 +569,7 @@ function clearShortcutError(
         </button>
       </header>
 
-      <main class="min-h-0 overflow-auto p-6">
+      <main class="management-content min-h-0 overflow-auto p-5">
         <div v-if="activePage === 'backup'" class="grid max-w-3xl gap-4">
           <p class="text-sm text-slate-500">{{ t("drawer.backupBody") }}</p>
           <div class="grid grid-cols-2 gap-3">
@@ -647,9 +664,9 @@ function clearShortcutError(
           />
         </div>
 
-        <div v-else-if="activePage === 'settings'" class="grid max-w-3xl gap-6">
+        <div v-else-if="activePage === 'settings'" class="grid max-w-3xl gap-5">
           <section
-            class="grid gap-4 rounded-lg border border-slate-200 bg-white p-5"
+            class="management-section"
           >
             <label class="form-label">
               {{ t("settings.language") }}
@@ -673,10 +690,37 @@ function clearShortcutError(
                 </option>
               </select>
             </label>
+            <div class="grid gap-2">
+              <span class="form-label">{{ t("settings.theme") }}</span>
+              <div
+                class="theme-segmented"
+                role="group"
+                :aria-label="t('settings.theme')"
+              >
+                <button
+                  v-for="option in themeOptions"
+                  :key="option.value"
+                  class="theme-option"
+                  :class="{
+                    'theme-option-active':
+                      vaultStore.settings.theme === option.value,
+                  }"
+                  type="button"
+                  :aria-pressed="vaultStore.settings.theme === option.value"
+                  @click="emit('changeTheme', option.value)"
+                >
+                  <component :is="option.icon" class="size-4" />
+                  <span>{{ option.label }}</span>
+                </button>
+              </div>
+              <small class="text-xs leading-5 text-slate-500">{{
+                t("settings.themeHint")
+              }}</small>
+            </div>
           </section>
 
           <section
-            class="grid gap-4 rounded-lg border border-slate-200 bg-white p-5"
+            class="management-section"
           >
             <div class="flex items-center gap-2 font-bold">
               <Logs class="size-4" />
@@ -718,7 +762,7 @@ function clearShortcutError(
             </button>
           </section>
 
-          <section class="rounded-lg border border-slate-200 bg-white p-5">
+          <section class="management-section">
             <div class="mb-2 flex items-center gap-2 font-bold">
               <Shield class="size-4" />
               {{ t("settings.security") }}
@@ -737,6 +781,17 @@ function clearShortcutError(
                 :checked="vaultStore.settings.security.startOnLogin"
                 :disabled="startOnLoginBusy || !startOnLoginSupported"
                 @change="changeStartOnLogin"
+              />
+            </label>
+            <label v-if="!webRuntime" class="setting-row">
+              <span>
+                <strong>{{ t("settings.lockOnSystemLock") }}</strong>
+                <small>{{ t("settings.lockOnSystemLockHint") }}</small>
+              </span>
+              <input
+                type="checkbox"
+                :checked="vaultStore.settings.security.lockOnSystemLock"
+                @change="changeLockOnSystemLock"
               />
             </label>
             <label class="setting-row">
@@ -776,7 +831,7 @@ function clearShortcutError(
           class="grid max-w-4xl gap-4"
         >
           <section
-            class="grid gap-4 rounded-lg border border-slate-200 bg-white p-5"
+            class="management-section"
           >
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div class="grid gap-1">
@@ -889,7 +944,7 @@ function clearShortcutError(
 
         <div v-else-if="activePage === 'logs'" class="grid max-w-5xl gap-4">
           <section
-            class="grid gap-4 rounded-lg border border-slate-200 bg-white p-5"
+            class="management-section"
           >
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div class="grid gap-1">
@@ -950,9 +1005,9 @@ function clearShortcutError(
           </section>
         </div>
 
-        <div v-else class="grid max-w-3xl gap-6">
+        <div v-else class="grid max-w-3xl gap-5">
           <section
-            class="grid gap-4 rounded-lg border border-slate-200 bg-white p-5"
+            class="management-section"
           >
             <div class="grid gap-1">
               <h2 class="font-bold text-slate-950">

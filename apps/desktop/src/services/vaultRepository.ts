@@ -1,5 +1,11 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { SupportedLocale } from '@/i18n'
+import {
+  deleteBrowserSecretKey,
+  loadBrowserSecretKey,
+  saveBrowserSecretKey
+} from '@/services/browserSecretKeyStorage'
+import { isUserWebRuntime } from '@/services/runtime'
 import type { SyncMode } from '@/services/syncClient'
 import {
   decryptAttachmentBytes,
@@ -22,6 +28,8 @@ export interface DesktopLoggingSettings {
   level: DesktopLogLevel
 }
 
+export type ColorTheme = 'system' | 'light' | 'dark'
+
 export type ShortcutScope = 'global' | 'internal'
 export type GlobalShortcutAction = 'quickSearch' | 'lock' | 'showMainWindow' | 'hideMainWindow'
 export type InternalShortcutAction = 'quickSearch' | 'newItem' | 'lock' | 'passwordGenerator' | 'settings' | 'syncNow'
@@ -34,6 +42,7 @@ export interface DesktopShortcutSettings {
 
 export interface DesktopSecuritySettings {
   startOnLogin: boolean
+  lockOnSystemLock: boolean
   autoLockOnLimit: boolean
   autoLockDelaySeconds: number
 }
@@ -66,6 +75,7 @@ export interface DesktopVaultStoreData {
   users: DesktopUserProfile[]
   settings: {
     locale: SupportedLocale
+    theme: ColorTheme
     deviceId: string
     layout: DesktopLayoutSettings
     logging: DesktopLoggingSettings
@@ -217,10 +227,13 @@ export async function upsertEncryptedObjects(userId: string, records: EncryptedO
 
 export async function openExternalUrl(url: string): Promise<void> {
   if (!isTauriRuntime()) {
-    const opened = window.open(url, '_blank', 'noopener,noreferrer')
+    const opened = window.open('', '_blank')
     if (!opened) {
       window.location.assign(url)
+      return
     }
+    opened.opener = null
+    opened.location.href = url
     return
   }
 
@@ -248,21 +261,33 @@ export async function setStartOnLogin(enabled: boolean): Promise<boolean | null>
 }
 
 export async function saveSecretKey(userId: string, secretKey: string): Promise<SecureSecretKeyResult> {
-  if (!isTauriRuntime()) return { status: 'unsupported' }
+  if (!isTauriRuntime()) {
+    return isUserWebRuntime()
+      ? saveBrowserSecretKey(userId, secretKey)
+      : { status: 'unsupported' }
+  }
 
   await invoke('save_secret_key', { userId, secretKey })
   return { status: 'saved' }
 }
 
 export async function loadSecretKey(userId: string): Promise<SecureSecretKeyResult> {
-  if (!isTauriRuntime()) return { status: 'unsupported' }
+  if (!isTauriRuntime()) {
+    return isUserWebRuntime()
+      ? loadBrowserSecretKey(userId)
+      : { status: 'unsupported' }
+  }
 
   const secretKey = await invoke<string | null>('load_secret_key', { userId })
   return secretKey ? { status: 'loaded', secretKey } : { status: 'missing' }
 }
 
 export async function deleteSecretKey(userId: string): Promise<SecureSecretKeyResult> {
-  if (!isTauriRuntime()) return { status: 'unsupported' }
+  if (!isTauriRuntime()) {
+    return isUserWebRuntime()
+      ? deleteBrowserSecretKey(userId)
+      : { status: 'unsupported' }
+  }
 
   await invoke('delete_secret_key', { userId })
   return { status: 'deleted' }

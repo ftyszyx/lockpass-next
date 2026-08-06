@@ -2,6 +2,8 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+#[cfg(target_os = "windows")]
+use std::sync::OnceLock;
 #[cfg(debug_assertions)]
 use std::time::Instant;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -12,16 +14,22 @@ use rusqlite::{params, types::Type, Connection, OpenFlags, OptionalExtension};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_deep_link::DeepLinkExt;
 #[cfg(target_os = "windows")]
-use windows_sys::Win32::Foundation::NTE_BAD_KEYSET;
+use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, NTE_BAD_KEYSET, WPARAM};
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Security::Cryptography::{
     NCryptDeleteKey, NCryptFreeObject, NCryptOpenKey, NCryptOpenStorageProvider,
     MS_KEY_STORAGE_PROVIDER, NCRYPT_KEY_HANDLE, NCRYPT_PROV_HANDLE,
 };
 #[cfg(target_os = "windows")]
+use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
+#[cfg(target_os = "windows")]
 use windows_sys::Win32::System::Registry::{
     RegCloseKey, RegDeleteValueW, RegOpenKeyExW, RegQueryValueExW, RegSetValueExW,
     HKEY_CURRENT_USER, KEY_READ, KEY_WRITE, REG_SZ,
+};
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::System::RemoteDesktop::{
+    WTSRegisterSessionNotification, WTSUnRegisterSessionNotification, NOTIFY_FOR_THIS_SESSION,
 };
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
@@ -30,7 +38,11 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::Shell::ShellExecuteW;
 #[cfg(target_os = "windows")]
-use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW, RegisterClassW,
+    TranslateMessage, HWND_MESSAGE, MSG, SW_SHOWNORMAL, WM_WTSSESSION_CHANGE, WNDCLASSW,
+    WTS_SESSION_LOCK,
+};
 
 mod app_meta_migrations {
     use refinery::embed_migrations;
@@ -47,9 +59,13 @@ const DEVICE_UNLOCK_KEY_SERVICE: &str = "lockpass-next-fast-unlock";
 const SYNC_DEVICE_TOKEN_SERVICE: &str = "lockpass-next-sync-device-token";
 const DEEP_LINK_SCHEME: &str = "lockpass://";
 const DEEP_LINK_EVENT: &str = "lockpass-deep-link";
+const SYSTEM_SESSION_LOCKED_EVENT: &str = "lockpass://system-session-locked";
 const DESKTOP_STORE_SCHEMA_VERSION: i64 = 2;
 const APP_META_SQLITE_FILE: &str = "app-meta.sqlite";
 const USER_VAULT_SQLITE_FILE: &str = "vault.sqlite";
+
+#[cfg(target_os = "windows")]
+static SYSTEM_SESSION_APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 
 #[derive(Default)]
 struct PendingDeepLinks {
@@ -624,6 +640,109 @@ fn open_system_target(target: &str, label: &str) -> Result<(), String> {
 #[cfg(target_os = "windows")]
 fn wide_null(value: &str) -> Vec<u16> {
     value.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+#[cfg(target_os = "windows")]
+fn start_system_session_lock_listener(app: AppHandle) {
+    if SYSTEM_SESSION_APP_HANDLE.set(app).is_err() {
+        return;
+    }
+
+    if let Err(error) = std::thread::Builder::new()
+        .name("lockpass-system-session-listener".to_string())
+        .spawn(run_system_session_lock_listener)
+    {
+        eprintln!("failed to start system session listener: {error}");
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn run_system_session_lock_listener() {
+    let class_name = wide_null("LockPassSystemSessionListener");
+    let instance = unsafe { GetModuleHandleW(std::ptr::null()) };
+    if instance.is_null() {
+        eprintln!("failed to resolve the module handle for the system session listener");
+        return;
+    }
+
+    let window_class = WNDCLASSW {
+        lpfnWndProc: Some(system_session_window_proc),
+        hInstance: instance,
+        lpszClassName: class_name.as_ptr(),
+        ..Default::default()
+    };
+    if unsafe { RegisterClassW(&window_class) } == 0 {
+        eprintln!("failed to register the system session listener window class");
+        return;
+    }
+
+    let window = unsafe {
+        CreateWindowExW(
+            0,
+            class_name.as_ptr(),
+            std::ptr::null(),
+            0,
+            0,
+            0,
+            0,
+            0,
+            HWND_MESSAGE,
+            std::ptr::null_mut(),
+            instance,
+            std::ptr::null(),
+        )
+    };
+    if window.is_null() {
+        eprintln!("failed to create the system session listener window");
+        return;
+    }
+
+    if unsafe { WTSRegisterSessionNotification(window, NOTIFY_FOR_THIS_SESSION) } == 0 {
+        eprintln!("failed to register for Windows session notifications");
+        unsafe {
+            DestroyWindow(window);
+        }
+        return;
+    }
+
+    let mut message: MSG = unsafe { std::mem::zeroed() };
+    loop {
+        let result = unsafe { GetMessageW(&mut message, std::ptr::null_mut(), 0, 0) };
+        if result <= 0 {
+            if result < 0 {
+                eprintln!("failed to read a Windows session message");
+            }
+            break;
+        }
+        unsafe {
+            TranslateMessage(&message);
+            DispatchMessageW(&message);
+        }
+    }
+
+    unsafe {
+        WTSUnRegisterSessionNotification(window);
+        DestroyWindow(window);
+    }
+}
+
+#[cfg(target_os = "windows")]
+unsafe extern "system" fn system_session_window_proc(
+    window: HWND,
+    message: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    if message == WM_WTSSESSION_CHANGE {
+        if wparam == WTS_SESSION_LOCK as usize {
+            if let Some(app) = SYSTEM_SESSION_APP_HANDLE.get() {
+                let _ = app.emit(SYSTEM_SESSION_LOCKED_EVENT, ());
+            }
+        }
+        return 0;
+    }
+
+    unsafe { DefWindowProcW(window, message, wparam, lparam) }
 }
 
 #[tauri::command]
@@ -2493,6 +2612,8 @@ pub fn run() {
         .setup(|app| {
             app.handle()
                 .plugin(tauri_plugin_updater::Builder::new().build())?;
+            #[cfg(target_os = "windows")]
+            start_system_session_lock_listener(app.handle().clone());
             set_main_window_title(app);
             let _ = app.deep_link().register("lockpass");
             capture_deep_link_urls(&app.handle().clone(), std::env::args());

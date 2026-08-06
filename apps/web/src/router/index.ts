@@ -33,7 +33,12 @@ router.beforeEach(async (to) => {
   if (to.name !== 'web-login' && !session.token) {
     return { name: 'web-login', query: { redirect: to.fullPath } }
   }
-  if (to.name === 'web-login' && session.token && to.query.desktopBind !== '1') {
+  if (
+    to.name === 'web-login' &&
+    session.token &&
+    to.query.desktopBind !== '1' &&
+    to.query.extensionBind !== '1'
+  ) {
     return { path: String(to.query.redirect || '/vault') }
   }
   return true

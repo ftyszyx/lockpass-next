@@ -33,6 +33,7 @@ defineExpose({ mainGridElement });
       @update-page="page.updateManagementPage"
       @copy-value="page.copyValue"
       @change-locale="page.changeLocale"
+      @change-theme="page.changeTheme"
       @change-log-level="page.changeLogLevel"
       @change-security-settings="page.changeSecuritySettings"
       @change-shortcut="page.changeShortcut"

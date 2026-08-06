@@ -5,26 +5,11 @@ import type {
   VaultItemFieldKind,
   VaultItemType,
 } from "@lockpass/core";
+import { getAccountInitials, vaultItemIconText } from "@lockpass/ui";
 
 type Translate = (key: string) => string;
 
-export function getInitials(value: string): string {
-  const clean = value.trim();
-  if (!clean) return "LP";
-  if (clean.includes("@")) {
-    const emailName = clean.split("@")[0]?.replace(/[^a-z0-9]/gi, "") ?? "";
-    if (emailName) return emailName.slice(0, 2).toUpperCase();
-  }
-  const asciiWords = clean.match(/[a-z0-9]+/gi);
-  if (asciiWords?.length) {
-    return asciiWords
-      .slice(0, 2)
-      .map((word) => word[0])
-      .join("")
-      .toUpperCase();
-  }
-  return clean.slice(0, 2).toUpperCase();
-}
+export const getInitials = getAccountInitials;
 
 export function typeLabel(t: Translate, type: VaultItemType | "all"): string {
   const labels: Record<string, string> = {
@@ -73,12 +58,7 @@ export function fieldDisplayLabel(
   return field.label || fieldLabel(t, field.kind);
 }
 
-export function itemIconText(item: VaultItem): string {
-  if (item.type === "payment-card") return "CARD";
-  if (item.type === "secure-note") return "NOTE";
-  if (item.type === "attachment") return "FILE";
-  return item.title.slice(0, 2).toUpperCase();
-}
+export const itemIconText = vaultItemIconText;
 
 export function displayValue(
   field: VaultItemField,

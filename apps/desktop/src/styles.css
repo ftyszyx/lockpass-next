@@ -1,4 +1,7 @@
 @import "tailwindcss";
+@import "@lockpass/ui/theme.css";
+@import "@lockpass/ui/styles.css";
+@source "./";
 
 :root {
   color-scheme: light;
@@ -17,7 +20,8 @@ body {
   min-width: 980px;
   min-height: 100vh;
   overflow: hidden;
-  background: #f7f8fa;
+  background: var(--app-canvas);
+  color: var(--app-text);
 }
 
 button,
@@ -27,17 +31,29 @@ select {
   font: inherit;
 }
 
-button {
-  border: 0;
-}
-
 @layer components {
   .plain-button {
-    @apply inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 hover:border-slate-300 hover:bg-slate-50;
+    @apply inline-flex h-[34px] items-center justify-center gap-2 rounded-md border px-3 text-sm font-semibold;
+    border-color: var(--app-border);
+    background: var(--app-surface);
+    color: var(--app-text);
+    box-shadow: var(--app-shadow-sm);
+  }
+
+  .plain-button:hover {
+    border-color: var(--app-border-strong);
+    background: var(--app-surface-muted);
   }
 
   .primary-button {
-    @apply inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-teal-700 bg-teal-700 px-3 text-sm font-semibold text-white shadow-sm shadow-teal-900/10 hover:bg-teal-800;
+    @apply inline-flex h-[34px] items-center justify-center gap-2 rounded-md border px-3 text-sm font-semibold text-white;
+    border-color: var(--app-primary-dark);
+    background: var(--app-primary);
+    box-shadow: 0 1px 2px rgb(5 99 93 / 24%);
+  }
+
+  .primary-button:hover {
+    background: var(--app-primary-dark);
   }
 
   .danger-button {
@@ -45,19 +61,49 @@ button {
   }
 
   .icon-button {
-    @apply inline-flex size-9 items-center justify-center rounded-lg border border-transparent bg-transparent text-slate-600 hover:border-slate-200 hover:bg-white hover:text-slate-950;
+    @apply inline-flex size-[34px] items-center justify-center rounded-md border border-transparent bg-transparent;
+    color: var(--app-muted);
+  }
+
+  .icon-button:hover {
+    border-color: var(--app-border);
+    background: var(--app-surface);
+    color: var(--app-text);
   }
 
   .mini-button {
-    @apply inline-flex size-7 items-center justify-center rounded-lg border border-transparent text-slate-500 hover:border-slate-200 hover:bg-white hover:text-teal-700;
+    @apply inline-flex size-7 items-center justify-center rounded-lg border border-transparent;
+    color: var(--app-muted);
+  }
+
+  .mini-button:hover {
+    border-color: var(--app-border);
+    background: var(--app-surface);
+    color: var(--app-primary);
   }
 
   .nav-button {
-    @apply flex h-9 w-full items-center justify-between gap-2 rounded-lg px-2 text-left text-sm text-slate-700 hover:bg-white hover:text-slate-950;
+    @apply flex h-[34px] w-full items-center justify-between gap-2 rounded-md border border-transparent px-2 text-left text-sm;
+    border-bottom-color: var(--app-divider);
+    color: var(--app-nav-text);
+  }
+
+  .nav-button:hover {
+    border-color: transparent transparent var(--app-divider);
+    background: var(--app-nav-hover);
+    color: var(--app-text);
+  }
+
+  .nav-button-active {
+    border-color: transparent;
+    background: var(--app-primary-soft);
+    color: var(--app-primary-text);
+    box-shadow: inset 2px 0 0 var(--app-primary);
   }
 
   .form-label {
-    @apply grid gap-2 text-xs font-bold text-slate-500;
+    @apply grid gap-1.5 text-xs font-semibold;
+    color: var(--app-muted);
   }
 
   .required-mark {
@@ -65,7 +111,15 @@ button {
   }
 
   .form-input {
-    @apply min-h-9 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-950 outline-none focus:border-teal-700 focus:ring-4 focus:ring-teal-700/10;
+    @apply min-h-9 w-full rounded-lg border px-3 py-2 text-sm font-normal outline-none;
+    border-color: var(--app-border);
+    background: var(--app-surface);
+    color: var(--app-text);
+  }
+
+  .form-input:focus {
+    border-color: var(--app-primary);
+    box-shadow: 0 0 0 4px var(--app-focus);
   }
 
   .check {
@@ -73,7 +127,14 @@ button {
   }
 
   .action-card {
-    @apply grid min-h-14 grid-cols-[34px_minmax(0,1fr)] items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left hover:border-slate-300 hover:bg-slate-50;
+    @apply grid min-h-14 grid-cols-[34px_minmax(0,1fr)] items-center gap-3 rounded-md border p-3 text-left;
+    border-color: var(--app-border);
+    background: var(--app-surface);
+  }
+
+  .action-card:hover {
+    border-color: var(--app-border-strong);
+    background: var(--app-surface-muted);
   }
 
   .action-card small,
@@ -82,11 +143,36 @@ button {
   }
 
   .action-icon {
-    @apply grid size-9 place-items-center rounded-lg bg-slate-100 text-teal-700;
+    @apply grid size-9 place-items-center rounded-md;
+    background: var(--app-primary-soft);
+    color: var(--app-primary-text);
   }
 
   .setting-row {
-    @apply flex min-h-14 items-center justify-between gap-4 border-b border-slate-200 py-2 last:border-b-0;
+    @apply flex min-h-14 items-center justify-between gap-4 border-b py-2 last:border-b-0;
+    border-color: var(--app-border);
+  }
+
+  .theme-segmented {
+    @apply grid grid-cols-3 gap-1 rounded-lg border p-1;
+    border-color: var(--app-border);
+    background: var(--app-surface-muted);
+  }
+
+  .theme-option {
+    @apply inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold;
+    color: var(--app-muted);
+  }
+
+  .theme-option:hover {
+    background: var(--app-surface);
+    color: var(--app-text);
+  }
+
+  .theme-option-active {
+    background: var(--app-surface);
+    color: var(--app-primary-text);
+    box-shadow: 0 1px 2px rgb(15 23 42 / 12%);
   }
 
   .file-icon {
@@ -94,7 +180,8 @@ button {
   }
 
   .resize-handle {
-    @apply relative h-full cursor-col-resize bg-[#f7f8fa] outline-none;
+    @apply relative h-full cursor-col-resize outline-none;
+    background: var(--app-canvas);
     touch-action: none;
   }
 
@@ -103,7 +190,7 @@ button {
     inset: 0 auto 0 50%;
     width: 1px;
     content: "";
-    background: rgb(226 232 240);
+    background: var(--app-border);
     transform: translateX(-50%);
   }
 
@@ -126,6 +213,167 @@ button {
   .resize-handle:focus-visible::after,
   .resize-handle[data-active="true"]::after {
     height: 56px;
-    background: rgb(15 118 110);
+    background: var(--app-primary);
+  }
+
+  .app-shell {
+    background: var(--app-canvas);
+    color: var(--app-text);
+  }
+
+  .app-header {
+    border-color: var(--app-border);
+    background: var(--app-header);
+    box-shadow: var(--app-shadow-sm);
+  }
+
+  .app-sidebar {
+    border-color: var(--app-sidebar-border);
+    background: var(--app-sidebar);
+  }
+
+  .brand-avatar {
+    background: var(--app-brand);
+    color: #ffffff;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 18%);
+  }
+
+  .floating-panel {
+    border-color: var(--app-border);
+    background: var(--app-surface);
+    box-shadow: var(--app-shadow-lg);
+  }
+
+  .app-list-panel {
+    border-color: var(--app-border);
+    background: var(--app-list);
+  }
+
+  .item-list-header {
+    border-color: var(--app-border);
+    background: var(--app-surface);
+  }
+
+  .app-detail-panel {
+    background: var(--app-detail);
+  }
+
+  .detail-tabs {
+    border: 1px solid var(--app-border);
+    background: var(--app-tabs);
+  }
+
+  .detail-tab-active {
+    background: var(--app-surface);
+    color: var(--app-primary-text);
+    box-shadow: 0 1px 2px rgb(15 23 42 / 12%);
+  }
+
+  .detail-tab-inactive {
+    color: var(--app-tab-muted);
+  }
+
+  .detail-tab-inactive:hover {
+    background: var(--app-tab-hover);
+    color: var(--app-text);
+  }
+
+  .detail-surface {
+    border-color: var(--app-border);
+    background: var(--app-surface);
+    box-shadow: var(--app-shadow-sm);
+  }
+
+  .detail-field-row {
+    border-color: var(--app-field-border);
+  }
+
+  .detail-field-row:hover {
+    background: var(--app-field-hover);
+  }
+
+  .detail-label {
+    color: var(--app-nav-text);
+  }
+
+  .menu-item {
+    @apply grid min-h-[34px] w-full grid-cols-[20px_minmax(0,1fr)] items-center gap-2 rounded-md px-2 text-left text-sm;
+    color: var(--app-nav-text);
+  }
+
+  .menu-item:hover {
+    background: var(--app-primary-soft);
+    color: var(--app-primary-text);
+  }
+
+  .auth-backdrop {
+    background: var(--app-auth-backdrop);
+    backdrop-filter: blur(12px);
+  }
+
+  .auth-modal-backdrop {
+    background: rgb(15 23 42 / 42%);
+    backdrop-filter: blur(6px);
+  }
+
+  .auth-panel {
+    border-color: var(--app-border);
+    background: var(--app-surface);
+    color: var(--app-text);
+    box-shadow: var(--app-shadow-lg);
+  }
+
+  .auth-mark {
+    @apply grid size-10 shrink-0 place-items-center rounded-md;
+    background: var(--app-primary-soft);
+    color: var(--app-primary-text);
+  }
+
+  .auth-copy {
+    color: var(--app-muted);
+  }
+
+  .auth-heading {
+    @apply text-xl font-bold tracking-normal;
+    color: var(--app-text);
+  }
+
+  .management-shell {
+    background: var(--app-detail);
+  }
+
+  .management-sidebar {
+    border-color: var(--app-border);
+    background: var(--app-sidebar);
+  }
+
+  .management-header {
+    border-color: var(--app-border);
+    background: var(--app-header);
+  }
+
+  .management-nav-button {
+    @apply grid min-h-9 grid-cols-[22px_minmax(0,1fr)] items-center gap-2 rounded-md border border-transparent px-2.5 text-left text-sm font-semibold;
+    color: var(--app-nav-text);
+  }
+
+  .management-nav-button:hover {
+    background: var(--app-nav-hover);
+    color: var(--app-text);
+  }
+
+  .management-nav-button-active {
+    background: var(--app-primary-soft);
+    color: var(--app-primary-text);
+    box-shadow: inset 2px 0 0 var(--app-primary);
+  }
+
+  .management-content {
+    background: var(--app-detail);
+  }
+
+  .management-section {
+    @apply grid gap-4 border-b pb-5;
+    border-color: var(--app-border);
   }
 }

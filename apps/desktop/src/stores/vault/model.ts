@@ -20,6 +20,7 @@ import type {
   DesktopSyncSettings,
   DesktopUserProfile,
   DesktopVaultStoreData,
+  ColorTheme,
 } from "@/services/vaultRepository";
 import type { AttachmentDraft } from "./types";
 import type { DesktopVaultPayload } from "@/services/masterPassword";
@@ -27,15 +28,17 @@ import type { DesktopVaultPayload } from "@/services/masterPassword";
 export const CORE_SCHEMA_VERSION = 1;
 export const DESKTOP_STORE_SCHEMA_VERSION = 2;
 export const DEFAULT_LAYOUT: DesktopLayoutSettings = {
-  sidebarWidth: 236,
-  itemListWidth: 358,
+  sidebarWidth: 220,
+  itemListWidth: 320,
 };
 export const DEFAULT_LOGGING_SETTINGS: DesktopLoggingSettings = {
   level: "error",
 };
+export const DEFAULT_THEME: ColorTheme = "system";
 export const DEFAULT_SHORTCUTS: DesktopShortcutSettings = DEFAULT_SHORTCUT_SETTINGS;
 export const DEFAULT_SECURITY_SETTINGS: DesktopSecuritySettings = {
   startOnLogin: false,
+  lockOnSystemLock: true,
   autoLockOnLimit: true,
   autoLockDelaySeconds: 300,
 };
@@ -79,6 +82,7 @@ export function normalizeLoadedData(
       users,
       settings: {
         locale,
+        theme: normalizeTheme(data?.settings?.theme),
         deviceId: data?.settings?.deviceId || `device-${crypto.randomUUID()}`,
         layout: normalizeLayout(data?.settings?.layout),
         logging: normalizeLoggingSettings(data?.settings?.logging),
@@ -225,11 +229,17 @@ export function normalizeLoggingSettings(
   };
 }
 
+export function normalizeTheme(theme: unknown): ColorTheme {
+  return theme === "light" || theme === "dark" ? theme : DEFAULT_THEME;
+}
+
 export function normalizeSecuritySettings(
   security: Partial<DesktopSecuritySettings> | null | undefined,
 ): DesktopSecuritySettings {
   return {
     startOnLogin: Boolean(security?.startOnLogin),
+    lockOnSystemLock:
+      security?.lockOnSystemLock ?? DEFAULT_SECURITY_SETTINGS.lockOnSystemLock,
     autoLockOnLimit:
       security?.autoLockOnLimit ?? DEFAULT_SECURITY_SETTINGS.autoLockOnLimit,
     autoLockDelaySeconds: clampNumber(

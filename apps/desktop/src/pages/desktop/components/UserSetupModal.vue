@@ -8,6 +8,7 @@ import {
   KeyRound,
   LogIn,
   Save,
+  ShieldCheck,
   Unlock,
   UserPlus,
   X,
@@ -191,12 +192,12 @@ function saveSelfhostUrl(): void {
   <div
     :class="
       isAdding
-        ? 'fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4'
-        : 'fixed inset-0 z-50 grid place-items-center bg-[#f6f8fb]'
+        ? 'auth-modal-backdrop fixed inset-0 z-50 grid place-items-center p-4'
+        : 'auth-backdrop fixed inset-0 z-50 grid place-items-center p-4'
     "
   >
     <form
-      class="relative grid w-[500px] max-w-[94vw] gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-2xl"
+      class="auth-panel relative grid w-[500px] max-w-[94vw] gap-4 rounded-lg border p-6"
       @submit.prevent="handleSubmit"
     >
       <button
@@ -209,9 +210,11 @@ function saveSelfhostUrl(): void {
         <X class="size-4" />
       </button>
 
+      <span class="auth-mark" aria-hidden="true"><ShieldCheck class="size-5" /></span>
+
       <div v-if="showServerStep" class="grid gap-4">
         <div class="grid gap-1">
-          <h2 class="text-2xl font-black">
+          <h2 class="auth-heading">
             {{ t("user.serverAccountTitle") }}
           </h2>
         </div>
@@ -264,7 +267,7 @@ function saveSelfhostUrl(): void {
         v-else-if="showRestoreStep"
         class="grid gap-3"
       >
-        <h2 class="text-2xl font-black">
+        <h2 class="auth-heading">
           {{ t("user.existingVaultTitle") }}
         </h2>
         <label class="form-label">
@@ -306,14 +309,14 @@ function saveSelfhostUrl(): void {
       </div>
 
       <div v-else-if="!secretKey" class="grid gap-3">
-        <h2 class="text-2xl font-black">
+        <h2 class="auth-heading">
           {{
             isLegacyImport
               ? t("user.firstRunTitle")
               : t("user.newUserCreateTitle")
           }}
         </h2>
-        <p v-if="isLegacyImport" class="text-sm text-slate-500">
+        <p v-if="isLegacyImport" class="auth-copy text-sm leading-5">
           {{ t("user.legacyImportBody") }}
         </p>
         <label v-if="isLegacyImport || !serverFirst" class="form-label">
@@ -415,10 +418,10 @@ function saveSelfhostUrl(): void {
           ><KeyRound class="size-5"
         /></span>
         <div class="grid gap-1">
-          <h2 class="text-2xl font-black">
+          <h2 class="auth-heading">
             {{ t("user.secretKeySaveTitle") }}
           </h2>
-          <p class="text-sm text-slate-500">
+          <p class="auth-copy text-sm leading-5">
             {{ t("user.secretKeySaveBody", { name: createdUserName }) }}
           </p>
         </div>
@@ -461,11 +464,11 @@ function saveSelfhostUrl(): void {
       class="fixed inset-0 z-10 grid place-items-center bg-slate-950/30 p-4"
     >
       <section
-        class="grid w-[440px] max-w-[94vw] gap-4 rounded-lg bg-white p-5 shadow-2xl"
+        class="auth-panel grid w-[440px] max-w-[94vw] gap-4 rounded-lg border p-5"
       >
         <div class="flex items-center justify-between gap-3">
           <div class="relative flex items-center gap-2">
-            <h2 class="text-xl font-black">{{ t("sync.selfHosted") }}</h2>
+            <h2 class="text-lg font-bold">{{ t("sync.selfHosted") }}</h2>
             <button
               class="grid size-7 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
               type="button"
@@ -536,14 +539,14 @@ function saveSelfhostUrl(): void {
   height: 30px;
   align-items: center;
   justify-content: center;
-  color: rgb(71 85 105);
-  border-radius: 8px;
+  color: var(--app-muted);
+  border-radius: 6px;
   transform: translateY(-50%);
 }
 
 .password-visibility-button:hover {
-  color: rgb(15 118 110);
-  background: rgb(240 253 250);
+  color: var(--app-primary-text);
+  background: var(--app-primary-soft);
 }
 
 .saved-confirm-check {

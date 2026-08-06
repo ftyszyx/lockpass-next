@@ -12,8 +12,12 @@ import { openLogDir } from "@/services/logger";
 import { createPerfTrace } from "@/services/perfTrace";
 import type { SyncMode } from "@/services/syncClient";
 import { shortcutMatchesEvent } from "@/services/shortcuts";
+import { startSystemSessionLockListener } from "@/services/systemSession";
+import { applyColorTheme } from "@/services/theme";
+import { userWebAppUrl } from "@/services/webApp";
 import {
   openExternalUrl,
+  type ColorTheme,
   type DesktopLogLevel,
   type DesktopSecuritySettings,
   type ShortcutAction,
@@ -78,6 +82,7 @@ let clipboardCleanupTimer: number | null = null;
 let clipboardCleanupValue = "";
 let deepLinkUnlisten: (() => void) | null = null;
 let deepLinkListenerStop: (() => void) | null = null;
+let systemSessionLockStop: (() => void) | null = null;
 let autoLockTimer: number | null = null;
 let autoSyncTimer: number | null = null;
 
@@ -312,6 +317,7 @@ provide(
     backToItemTypePicker,
     backToUserDraftFromSecretKey,
     changeLocale,
+    changeTheme,
     changeLogLevel,
     changeSecuritySettings,
     changeShortcut,
@@ -346,6 +352,7 @@ provide(
     onResizeHandleKeydown,
     openDesktopLogDir,
     openEditItem,
+    openAddUserFromManagement,
     openImportFromItemPicker,
     openInitialServerLogin,
     openManagement,
@@ -409,6 +416,9 @@ provide(
 
 onMounted(async () => {
   await initializeVaultPage();
+  systemSessionLockStop = await startSystemSessionLockListener(
+    handleSystemSessionLock,
+  );
   updateOnlineStatus();
   window.addEventListener("keydown", handleInternalShortcut);
   window.addEventListener("blur", scheduleAutoLock);
@@ -435,6 +445,7 @@ async function initializeVaultPage(): Promise<void> {
   deepLinkUnlisten ??= subscribeToDeepLinks(handleDeepLink);
   deepLinkListenerStop = await startDeepLinkListener();
   setI18nLocale(vaultStore.settings.locale);
+  applyColorTheme(vaultStore.settings.theme);
   if (
     vaultStore.hasUsers &&
     !vaultStore.needsUserSetup &&
@@ -465,11 +476,18 @@ onUnmounted(() => {
   deepLinkUnlisten = null;
   deepLinkListenerStop?.();
   deepLinkListenerStop = null;
+  systemSessionLockStop?.();
+  systemSessionLockStop = null;
 });
 
 watch(
   () => vaultStore.settings.locale,
   (locale) => setI18nLocale(locale),
+);
+
+watch(
+  () => vaultStore.settings.theme,
+  (theme) => applyColorTheme(theme),
 );
 
 watch(
@@ -1082,6 +1100,12 @@ async function changeLocale(locale: SupportedLocale): Promise<void> {
   showToast(t("toast.settingsSaved"));
 }
 
+async function changeTheme(theme: ColorTheme): Promise<void> {
+  applyColorTheme(theme);
+  await vaultStore.setTheme(theme);
+  showToast(t("toast.settingsSaved"));
+}
+
 async function changeLogLevel(level: DesktopLogLevel): Promise<void> {
   await vaultStore.setLogLevel(level);
   showToast(t("toast.settingsSaved"));
@@ -1118,6 +1142,14 @@ async function openDesktopLogDir(): Promise<void> {
     );
   } catch {
     showToast(t("settings.openLogDirFailed"));
+  }
+}
+
+async function openUserWebApp(): Promise<void> {
+  try {
+    await openExternalUrl(userWebAppUrl(vaultStore.settings.sync));
+  } catch {
+    showToast(t("app.openWebAppFailed"));
   }
 }
 
@@ -1173,6 +1205,16 @@ function handleVisibilityAutoLock(): void {
   }
 }
 
+async function handleSystemSessionLock(): Promise<void> {
+  cancelAutoLock();
+  if (
+    !vaultStore.unlocked ||
+    !vaultStore.settings.security.lockOnSystemLock
+  )
+    return;
+  await lockApp();
+}
+
 function scheduleAutoLock(): void {
   cancelAutoLock();
   if (!vaultStore.unlocked || !vaultStore.settings.security.autoLockOnLimit)
@@ -1210,11 +1252,12 @@ function cancelAutoLock(): void {
 
   <div
     v-else
-    class="grid h-screen min-h-[680px] grid-rows-[56px_minmax(0,1fr)] bg-[#f7f8fa] text-slate-950"
+    class="app-shell grid h-screen min-h-[680px] grid-rows-[52px_minmax(0,1fr)]"
   >
     <DesktopHeader
       @quick-search="openQuickSearch"
       @open-generator="openStandalonePasswordGenerator"
+      @open-web-app="openUserWebApp"
       @new-item="openNewItem()"
       @lock="lockApp"
     />

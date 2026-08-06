@@ -40,10 +40,14 @@ const completedAccountExchange = ref<SyncDeviceBindResponse | null>(null)
 const pendingWebBinding = ref<SyncDeviceBindCallbackPayload | null>(null)
 
 const desktopBind = computed(() => route.query.desktopBind === '1')
+const extensionBind = computed(() => route.query.extensionBind === '1')
+const externalBind = computed(() => desktopBind.value || extensionBind.value)
 const bindMode = computed<SyncMode>(() => route.query.mode === 'selfhost' ? 'selfhost' : 'official')
 const bindServerUrl = computed(() => String(route.query.serverUrl || configuredOfficialApiUrl()))
-const desktopDeviceName = computed(() => String(route.query.deviceName || t('webAuth.defaultDesktopDeviceName')))
-const desktopClientDeviceId = computed(() => String(route.query.clientDeviceId || ''))
+const bindingDeviceName = computed(() => String(
+  route.query.deviceName || t(extensionBind.value ? 'webAuth.defaultExtensionDeviceName' : 'webAuth.defaultDesktopDeviceName')
+))
+const bindingClientDeviceId = computed(() => String(route.query.clientDeviceId || ''))
 const isRegisterPasswordStep = computed(() => mode.value === 'register' && step.value === 'masterPassword')
 const isRegisterSecretStep = computed(() => mode.value === 'register' && (step.value === 'generateSecretKey' || step.value === 'backupSecretKey'))
 const submitting = computed(() => session.loading || busy.value)
@@ -61,8 +65,8 @@ onMounted(async () => {
     mode.value = 'register'
   }
   await session.restore()
-  if (desktopBind.value && session.token && mode.value === 'login') {
-    await completeDesktopBind()
+  if (externalBind.value && session.token && mode.value === 'login') {
+    await completeExternalBind()
   }
 })
 
@@ -93,8 +97,8 @@ async function submit(): Promise<void> {
       }
 
       await session.completeEmailLogin(verified.accountSetupToken)
-      if (desktopBind.value) {
-        await completeDesktopBind()
+      if (externalBind.value) {
+        await completeExternalBind()
         return
       }
       await prepareWebVaultUnlock()
@@ -134,10 +138,10 @@ async function submit(): Promise<void> {
         error.value = t('webAuth.secretKeyMissing')
         return
       }
-      const bindingMode = desktopBind.value ? bindMode.value : 'official'
-      const serverUrl = desktopBind.value ? bindServerUrl.value : configuredOfficialApiUrl()
-      const deviceName = desktopBind.value ? desktopDeviceName.value : t('webAuth.defaultWebDeviceName')
-      const clientDeviceId = desktopBind.value ? desktopClientDeviceId.value || undefined : webClientDeviceId()
+      const bindingMode = externalBind.value ? bindMode.value : 'official'
+      const serverUrl = externalBind.value ? bindServerUrl.value : configuredOfficialApiUrl()
+      const deviceName = externalBind.value ? bindingDeviceName.value : t('webAuth.defaultWebDeviceName')
+      const clientDeviceId = externalBind.value ? bindingClientDeviceId.value || undefined : webClientDeviceId()
       const exchange = completedAccountExchange.value ?? await session.completeAccount({
         setupToken: accountSetupToken.value,
         mode: bindingMode,
@@ -154,7 +158,7 @@ async function submit(): Promise<void> {
         defaultVaultName: desktopMessages[locale.value as SupportedLocale].vault.defaultName,
         defaultVaultDescription: desktopMessages[locale.value as SupportedLocale].vault.defaultDescription
       })
-      if (!desktopBind.value) {
+      if (!externalBind.value) {
         if (!vaultStore.hydrated) {
           await vaultStore.hydrate()
         }
@@ -166,8 +170,8 @@ async function submit(): Promise<void> {
         })
       }
       finalizingSetup.value = true
-      if (desktopBind.value) {
-        redirectDesktopBinding(binding)
+      if (externalBind.value) {
+        redirectExternalBinding(binding)
         clearSecretInputs({ keepFinalizing: true })
         return
       }
@@ -234,6 +238,7 @@ function authErrorMessage(cause: unknown): string {
   if (cause instanceof TypeError) return t('webAuth.networkFailed')
   if (cause instanceof Error) {
     if (cause.message === 'syncNetworkBlocked') return t('webAuth.networkFailed')
+    if (cause.message === 'extensionCallbackInvalid') return t('webAuth.extensionCallbackInvalid')
     if (cause.message === 'initialVaultUploadFailed') return t('webAuth.initialVaultUploadFailed')
     if (cause.message === 'syncUnsupportedId') return t('sync.syncUnsupportedId')
     if (cause.message === 'syncNotConnected') return t('sync.syncNotConnected')
@@ -271,18 +276,37 @@ async function completeWebVaultUnlock(): Promise<void> {
   clearSecretInputs()
 }
 
-async function completeDesktopBind(): Promise<void> {
+async function completeExternalBind(): Promise<void> {
   const binding = await session.bindWebDevice({
     mode: bindMode.value,
     serverUrl: bindServerUrl.value,
-    deviceName: desktopDeviceName.value,
-    clientDeviceId: desktopClientDeviceId.value || undefined
+    deviceName: bindingDeviceName.value,
+    clientDeviceId: bindingClientDeviceId.value || undefined
   })
-  redirectDesktopBinding(binding)
+  redirectExternalBinding(binding)
 }
 
-function redirectDesktopBinding(binding: SyncDeviceBindCallbackPayload): void {
-  window.location.href = `lockpass://auth/callback?payload=${encodeURIComponent(base64UrlEncode(JSON.stringify(binding)))}`
+function redirectExternalBinding(binding: SyncDeviceBindCallbackPayload): void {
+  const payload = base64UrlEncode(JSON.stringify(binding))
+  if (extensionBind.value) {
+    const redirectUrl = validatedExtensionRedirectUrl()
+    redirectUrl.searchParams.set('payload', payload)
+    window.location.replace(redirectUrl.toString())
+    return
+  }
+  window.location.href = `lockpass://auth/callback?payload=${encodeURIComponent(payload)}`
+}
+
+function validatedExtensionRedirectUrl(): URL {
+  const redirectUrl = new URL(String(route.query.redirectUri || ''))
+  if (
+    redirectUrl.protocol !== 'https:' ||
+    !/^[a-p]{32}\.chromiumapp\.org$/.test(redirectUrl.hostname) ||
+    redirectUrl.pathname !== '/auth/callback'
+  ) {
+    throw new Error('extensionCallbackInvalid')
+  }
+  return redirectUrl
 }
 
 function webClientDeviceId(): string {
@@ -339,7 +363,9 @@ function changeLocale(event: Event): void {
 
       <div class="max-w-3xl pt-4 lg:pt-12">
         <h1 class="m-0 text-3xl font-black tracking-normal text-slate-950 sm:text-4xl">{{ t('webAuth.title') }}</h1>
-        <p class="mt-4 max-w-2xl text-sm leading-6 text-slate-600">{{ desktopBind ? t('webAuth.desktopBindBody') : t('webAuth.body') }}</p>
+        <p class="mt-4 max-w-2xl text-sm leading-6 text-slate-600">
+          {{ extensionBind ? t('webAuth.extensionBindBody') : desktopBind ? t('webAuth.desktopBindBody') : t('webAuth.body') }}
+        </p>
       </div>
 
       <div class="grid max-w-3xl grid-cols-1 gap-3 sm:grid-cols-3">

@@ -7,6 +7,7 @@ import {
   normalizeLoggingSettings,
   normalizeSecuritySettings,
   normalizeSyncSettings,
+  normalizeTheme,
   requireSelfHostServerUrl,
 } from "./model";
 
@@ -36,14 +37,23 @@ assert.deepEqual(normalizeLoggingSettings({ level: "debug" }), {
 assert.deepEqual(normalizeLoggingSettings({ level: "verbose" as never }), {
   level: "error",
 });
+assert.equal(normalizeTheme(undefined), "system");
+assert.equal(normalizeTheme("light"), "light");
+assert.equal(normalizeTheme("dark"), "dark");
+assert.equal(normalizeTheme("sepia"), "system");
 
 assert.deepEqual(
   normalizeSecuritySettings({ autoLockDelaySeconds: 4.4, startOnLogin: true }),
   {
     startOnLogin: true,
+    lockOnSystemLock: true,
     autoLockOnLimit: true,
     autoLockDelaySeconds: 4,
   },
+);
+assert.equal(
+  normalizeSecuritySettings({ lockOnSystemLock: false }).lockOnSystemLock,
+  false,
 );
 
 const selfhostSync = normalizeSyncSettings({

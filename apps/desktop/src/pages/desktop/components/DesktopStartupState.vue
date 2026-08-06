@@ -17,7 +17,7 @@ const { t } = useI18n();
 
 <template>
   <div
-    class="grid h-screen min-h-[560px] place-items-center bg-[#f7f8fa] p-6 text-slate-950"
+    class="app-shell grid h-screen min-h-[560px] place-items-center p-6 text-slate-950"
   >
     <div
       v-if="variant === 'loading'"

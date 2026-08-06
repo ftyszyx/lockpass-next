@@ -1,0 +1,11 @@
+{
+  "extensionName": {
+    "message": "LockPass Password Manager"
+  },
+  "extensionDescription": {
+    "message": "Securely fill and save LockPass logins on the web."
+  },
+  "openVault": {
+    "message": "Open LockPass vault"
+  }
+}

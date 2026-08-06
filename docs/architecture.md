@@ -30,6 +30,8 @@ flowchart LR
 
 普通用户 Web 端不使用 Tauri shell。它复用 Vue 保险库 UI、Core、Crypto 和 Sync client，但平台能力通过 Web adapter 提供。浏览器本地只能保存密文缓存、cursor 和待保存队列；服务器 snapshot / pull / push 的结果是用户数据的权威来源。
 
+Chrome 浏览器扩展也是完整的独立客户端，不依赖 Desktop。它复用 Core、Crypto、Sync client 和受信任浏览器存储模型，通过 Extension adapter 提供输入框识别、快捷填充、密码生成和登录信息保存能力。详细方案见 [Chrome 浏览器扩展设计](./browser-extension-design.md)。
+
 ## 服务器账号与首启流程
 
 桌面端第一次启动时应引导用户登录服务器账号，可以选择 LockPass 官方托管或自建服务器。账号身份以服务器账号为准，桌面端不再维护另一套独立账号系统。
@@ -61,6 +63,8 @@ apps/
       tauri/      Tauri 命令、插件和系统集成
   web/
     src/        普通用户 Web 保险库入口
+  browser_extension/
+    src/        Chrome 扩展、输入框识别、填充界面和独立保险库客户端
   server/
     src/        Rust + Axum HTTP API、同步服务、PostgreSQL migration
   admin_web/

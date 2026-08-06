@@ -184,8 +184,8 @@
       }
 
       .screen-row.old-device-flow {
-        width: min(100%, 820px);
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        width: min(100%, 620px);
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
       .screen-card {
@@ -997,59 +997,41 @@
         <div class="story-head">
           <div class="story-title">
             <h2>3. 老用户 · 旧电脑</h2>
-            <p>本机已有登录信息和受信任设备快速解锁材料。选择账号后，由系统直接弹出 Windows Hello、PIN 或设备密码认证；快速解锁不可用时再进入主密码 + 安全密钥的完整解锁流程。</p>
+            <p>本机已有账号信息和受信任设备保存的安全密钥。启动后直接弹出主密码输入框；需要切换账号时再返回账号选择。</p>
           </div>
           <span class="story-tag"><i data-lucide="laptop-minimal-check"></i>日常解锁</span>
         </div>
 
         <div class="screen-row old-device-flow">
           <article class="screen-card">
-            <div class="screen-label"><span class="screen-number">1</span>选择本地账号</div>
+            <div class="screen-label"><span class="screen-number">1</span>输入主密码</div>
             <div class="frame">
               <div class="frame-bar">
                 <div class="traffic"><span></span><span></span><span></span></div>
                 LockPass Desktop
               </div>
               <div class="frame-body center-body">
-                <div class="mini-title">选择账号</div>
+                <div class="mini-title">解锁保险库</div>
                 <div class="account-row">
                   <div class="avatar">Z</div>
                   <div class="account-meta">
                     <strong>Zyx</strong>
-                    <span>whyzi@example.com</span>
+                    <span>whyzi@example.com · LockPass 官方托管</span>
                   </div>
-                  <i data-lucide="chevron-down"></i>
+                  <i data-lucide="arrow-left-right"></i>
                 </div>
+                <label class="field">
+                  主密码
+                  <div class="input">••••••••••••</div>
+                </label>
+                <div class="notice info"><i data-lucide="key-round"></i>安全密钥会从系统安全存储读取</div>
                 <button class="button primary"><i data-lucide="unlock"></i>解锁</button>
-                <button class="button secondary"><i data-lucide="users"></i>管理账号</button>
               </div>
             </div>
           </article>
 
           <article class="screen-card">
-            <div class="screen-label"><span class="screen-number">2</span>系统直接弹出认证</div>
-            <div class="frame system-auth-frame">
-              <div class="system-dialog" aria-label="Windows 系统认证弹窗">
-                <div class="system-dialog-bar">
-                  <span class="system-dialog-title"><i data-lucide="shield-check"></i>Windows 安全中心</span>
-                  <i data-lucide="x"></i>
-                </div>
-                <div class="system-dialog-body">
-                  <div class="system-auth-icon"><i data-lucide="scan-face"></i></div>
-                  <div class="mini-title">请确认是你本人</div>
-                  <p class="mini-copy">LockPass 正在请求解锁保险库。</p>
-                  <div class="system-auth-status"><i data-lucide="camera"></i>请看向摄像头</div>
-                  <div class="system-dialog-actions">
-                    <button class="system-button">使用 PIN</button>
-                    <button class="system-button">取消</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </article>
-
-          <article class="screen-card">
-            <div class="screen-label"><span class="screen-number">3</span>进入保险库</div>
+            <div class="screen-label"><span class="screen-number">2</span>进入保险库</div>
             <div class="frame">
               <div class="frame-bar">
                 <div class="traffic"><span></span><span></span><span></span></div>

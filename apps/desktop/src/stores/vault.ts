@@ -42,6 +42,7 @@ import {
   type DesktopLoggingSettings,
   type DesktopLayoutSettings,
   type DesktopLogLevel,
+  type ColorTheme,
   type DesktopSecuritySettings,
   type DesktopShortcutSettings,
   type ShortcutAction,
@@ -67,6 +68,7 @@ import {
   normalizeLoadedData,
   normalizeLoggingSettings,
   normalizeSecuritySettings,
+  normalizeTheme,
   normalizeSyncSettings,
   normalizeUsername,
   requireSelfHostServerUrl,
@@ -217,6 +219,11 @@ export const useVaultStore = defineStore('vault', {
       this.settings.locale = locale
       await this.persist()
     },
+    async setTheme(theme: ColorTheme) {
+      this.settings.theme = normalizeTheme(theme)
+      await this.persist()
+      await logInfo('desktop color theme changed', { theme: this.settings.theme })
+    },
     async setLayout(layout: Partial<DesktopLayoutSettings>, options: { persist?: boolean } = {}) {
       this.settings.layout = {
         ...this.settings.layout,
@@ -259,6 +266,7 @@ export const useVaultStore = defineStore('vault', {
       await this.persist()
       await logInfo('desktop security settings changed', {
         startOnLogin: this.settings.security.startOnLogin,
+        lockOnSystemLock: this.settings.security.lockOnSystemLock,
         autoLockOnLimit: this.settings.security.autoLockOnLimit,
         autoLockDelaySeconds: this.settings.security.autoLockDelaySeconds
       })

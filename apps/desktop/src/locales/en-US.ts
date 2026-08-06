@@ -10,6 +10,9 @@ const enUS: LocaleMessages = {
     searchPlaceholder: "Search items, URLs, tags",
     quickSearch: "Quick search",
     generator: "Generate",
+    openWebApp: "Web app",
+    openWebAppHint: "Open the web app in your default browser",
+    openWebAppFailed: "Could not open the web app.",
     newItem: "New",
     lock: "Lock",
     unlock: "Unlock",
@@ -68,10 +71,13 @@ const enUS: LocaleMessages = {
     passwordTooShort: "Master password must be at least 8 characters",
     passwordMismatch: "The master passwords do not match",
     emailCodeInvalid: "Enter the 6-digit verification code.",
-    desktopBindBody:
-      "After sign-in, this grants the desktop app access to save and read encrypted server data.",
-    defaultWebDeviceName: "LockPass Web",
-    defaultDesktopDeviceName: "LockPass desktop",
+      desktopBindBody:
+        "After sign-in, this grants the desktop app access to save and read encrypted server data.",
+      extensionBindBody:
+        "After sign-in, this grants the browser extension access to save and read encrypted server data.",
+      defaultWebDeviceName: "LockPass Web",
+      defaultDesktopDeviceName: "LockPass desktop",
+      defaultExtensionDeviceName: "LockPass browser extension",
     continueToVault: "Open vault",
     signedIn: "Server account signed in",
     signOut: "Sign out",
@@ -85,9 +91,11 @@ const enUS: LocaleMessages = {
       "The email or verification code does not meet the requirements.",
     serverUnavailable:
       "The server is temporarily unavailable. Try again later.",
-    networkFailed:
-      "Cannot reach the server. Check that it is running, the address is correct, or CORS is allowed.",
-    initialVaultUploadFailed:
+      networkFailed:
+        "Cannot reach the server. Check that it is running, the address is correct, or CORS is allowed.",
+      extensionCallbackInvalid:
+        "The browser extension callback is invalid. Start sign-in from the extension again.",
+      initialVaultUploadFailed:
       "The account was created, but the initial vault could not be saved. Try completing setup again.",
   },
   user: {
@@ -134,11 +142,11 @@ const enUS: LocaleMessages = {
     secretKeyWarning:
       "LockPass does not store this Secret Key in the vault store. Encrypted backups will not include it.",
     secretKeySavedToDevice:
-      "Saved to this trusted device using OS secure storage.",
+      "Saved to secure storage on this trusted device.",
     secretKeyBrowserPreview:
-      "Browser preview will not save the Secret Key. Save it offline before continuing.",
+      "This browser cannot save the Secret Key. Save it offline before continuing.",
     secretKeySaveFailed:
-      "Could not save to OS secure storage. Save it offline before continuing.",
+      "Could not save to secure storage on this device. Save it offline before continuing.",
     savedSecretKey: "I saved it offline",
     savedSecretKeyConfirm: "I saved the Secret Key offline",
     enterVault: "Enter vault",
@@ -549,6 +557,12 @@ const enUS: LocaleMessages = {
   settings: {
     title: "Settings",
     language: "Language",
+    theme: "Color theme",
+    themeHint:
+      "System automatically follows the operating system appearance setting.",
+    themeSystem: "System",
+    themeLight: "Light",
+    themeDark: "Dark",
     security: "Security",
     autoLock: "Auto-lock after leaving",
     autoLockHint:
@@ -565,6 +579,9 @@ const enUS: LocaleMessages = {
     startOnLoginUnsupported:
       "This system does not support configuring start on login yet.",
     startOnLoginFailed: "Could not update start-on-login settings.",
+    lockOnSystemLock: "Lock app when system locks",
+    lockOnSystemLockHint:
+      "Immediately lock the vault when the Windows session is locked.",
     openLocalStorage: "Open local storage folder",
     openLocalStorageSuccess: "Opened the local storage folder",
     openLocalStorageBrowserPreview:
@@ -576,13 +593,13 @@ const enUS: LocaleMessages = {
     secretKeyLocked: "Unlock the vault before showing the Secret Key.",
     secretKeyPasswordRequired: "Enter the master password first.",
     secretKeyUnsupported:
-      "Browser preview does not save Secret Keys. Use the offline Secret Key.",
+      "This device cannot safely store the Secret Key. Use the offline Secret Key.",
     secretKeyMissing: "No Secret Key is saved on this device.",
     secretKeyBindPlaceholder: "Enter the Secret Key you saved offline",
     secretKeyBindRequired: "Enter the Secret Key saved offline.",
     secretKeySaveToDevice: "Save to this device and show",
     secretKeySaveFailed:
-      "Could not save the Secret Key to OS secure storage.",
+      "Could not save the Secret Key to secure storage on this device.",
     secretKeyQrHint: "Choose Scan QR code when signing in on another device.",
     secretKeyQrAlt: "Secret Key QR code",
     setupAnotherDeviceTitle: "Set up another device",
@@ -686,9 +703,9 @@ const enUS: LocaleMessages = {
     secretKeySaved:
       "Secret Key saved to this trusted device. Also save a copy offline.",
     secretKeyBrowserPreview:
-      "Browser preview will not save the Secret Key. Save it offline.",
+      "This browser cannot save the Secret Key. Save it offline.",
     secretKeySaveFailed:
-      "Could not save the Secret Key to OS secure storage.",
+      "Could not save the Secret Key to secure storage on this device.",
     secretKeyLoaded: "Secret Key loaded from this device",
     userSignedOut: "Signed out of {name}",
     userRemovedFromDevice: "Removed {name} from this device",

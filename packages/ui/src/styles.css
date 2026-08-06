@@ -1,0 +1,218 @@
+.lp-vault-search {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.lp-vault-search-icon {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  width: 16px;
+  height: 16px;
+  color: var(--app-muted);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.lp-vault-search-input {
+  width: 100%;
+  height: 34px;
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+  outline: none;
+  background: var(--app-search);
+  color: var(--app-text);
+  padding: 0 32px 0 34px;
+  font-size: 13px;
+}
+
+.lp-vault-search-input::placeholder {
+  color: var(--app-search-placeholder);
+}
+
+.lp-vault-search-input:focus {
+  border-color: var(--app-primary);
+  background: var(--app-surface);
+  box-shadow: 0 0 0 4px var(--app-focus);
+}
+
+.lp-account-summary {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--app-text);
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.lp-account-summary-interactive {
+  cursor: pointer;
+}
+
+.lp-account-summary-interactive:hover,
+.lp-account-summary-interactive:focus-visible {
+  border-color: var(--app-border);
+  outline: none;
+  background: var(--app-surface);
+}
+
+.lp-account-avatar {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--app-brand);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: var(--app-shadow-sm);
+}
+
+.lp-account-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.lp-account-copy strong,
+.lp-account-status span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lp-account-copy strong {
+  font-size: 14px;
+  line-height: 1.15;
+}
+
+.lp-account-status {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  color: var(--app-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.lp-account-status-warning {
+  color: #be123c;
+}
+
+.lp-status-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--app-primary);
+}
+
+.lp-account-trailing {
+  display: inline-flex;
+  align-items: center;
+  color: var(--app-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.lp-vault-item-row {
+  display: grid;
+  width: 100%;
+  min-height: 56px;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--app-divider);
+  border-radius: 6px;
+  background: var(--app-item-row);
+  color: var(--app-text);
+  padding: 6px 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lp-vault-item-row:hover,
+.lp-vault-item-row:focus-visible {
+  border-color: var(--app-border-strong);
+  outline: none;
+  background: var(--app-surface-muted);
+}
+
+.lp-vault-item-row-active {
+  border-color: var(--app-primary-border);
+  background: var(--app-primary-soft);
+  box-shadow: inset 2px 0 0 var(--app-primary);
+}
+
+.lp-vault-item-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--app-tabs);
+  color: var(--app-nav-text);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.lp-vault-item-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.lp-vault-item-copy strong,
+.lp-vault-item-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lp-vault-item-copy strong {
+  font-size: 13px;
+}
+
+.lp-vault-item-copy small {
+  color: var(--app-muted);
+  font-size: 11px;
+}
+
+.lp-vault-item-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lp-vault-item-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 6px;
+  background: var(--app-surface-muted);
+  color: var(--app-muted);
+  padding: 4px 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.lp-vault-item-action-icon,
+.lp-vault-item-favorite {
+  width: 13px;
+  height: 13px;
+}
+
+.lp-vault-item-favorite {
+  color: #d97706;
+  fill: #fbbf24;
+}

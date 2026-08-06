@@ -15,8 +15,13 @@ const rustBackend = read("../../../src-tauri/src/lib.rs");
 
 assert.match(
   lockOverlay,
-  /const unlockStep = ref<[^>]+>\("account"\)/,
-  "trusted-device unlock should start with the local account picker",
+  /const unlockStep = ref<[^>]+>\([\s\S]*selectedUserId\.value[\s\S]*\? "password"[\s\S]*: "account"/,
+  "trusted-device unlock should open the master password prompt for the selected local account",
+);
+assert.match(
+  lockOverlay,
+  /@click="unlockStep = 'account'"/,
+  "the master password prompt should still allow switching local accounts",
 );
 assert.match(
   lockOverlay,

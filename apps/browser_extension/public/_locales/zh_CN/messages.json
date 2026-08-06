@@ -1,0 +1,11 @@
+{
+  "extensionName": {
+    "message": "LockPass 密码管理器"
+  },
+  "extensionDescription": {
+    "message": "在网页中安全填写并保存 LockPass 登录信息。"
+  },
+  "openVault": {
+    "message": "打开 LockPass 保险库"
+  }
+}

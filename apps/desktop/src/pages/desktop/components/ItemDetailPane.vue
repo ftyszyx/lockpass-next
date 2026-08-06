@@ -93,13 +93,13 @@ onBeforeUnmount(revokePreviewUrl)
 </script>
 
 <template>
-  <section class="min-h-0 overflow-auto bg-[#f7f8fa] p-6">
-    <div v-if="selectedItem" class="mx-auto max-w-3xl">
+  <section class="app-detail-panel min-h-0 overflow-auto p-5">
+    <div v-if="selectedItem" class="mx-auto max-w-[780px]">
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div class="min-w-0">
-          <span class="mb-2 inline-flex rounded-md bg-white px-2 py-1 text-xs font-bold text-slate-500 ring-1 ring-slate-200">{{ typeLabel(t, selectedItem.type) }}</span>
-          <h1 class="text-2xl font-black tracking-normal">{{ selectedItem.title }}</h1>
-          <p class="mt-1 text-sm text-slate-500">{{ selectedItem.subtitle }}</p>
+          <span class="mb-1.5 inline-flex rounded-md border border-[var(--app-border)] bg-[var(--app-surface)] px-2 py-0.5 text-xs font-semibold text-[var(--app-muted)]">{{ typeLabel(t, selectedItem.type) }}</span>
+          <h1 class="text-xl font-bold tracking-normal text-[var(--app-text)]">{{ selectedItem.title }}</h1>
+          <p class="mt-1 text-sm text-[var(--app-muted)]">{{ selectedItem.subtitle }}</p>
         </div>
         <div class="flex shrink-0 flex-wrap justify-end gap-2">
           <button class="plain-button whitespace-nowrap" @click="emit('update:showSensitive', !showSensitive)">
@@ -113,32 +113,32 @@ onBeforeUnmount(revokePreviewUrl)
         </div>
       </div>
 
-      <div class="mt-6 flex gap-1 rounded-lg bg-slate-200/70 p-1">
+      <div class="detail-tabs mt-4 flex w-fit gap-1 rounded-md p-1">
         <button
           v-for="tab in detailTabs"
           :key="tab"
-          class="rounded-md px-3 py-1.5 text-sm font-bold"
-          :class="activeTab === tab ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-500 hover:text-slate-950'"
+          class="rounded px-3 py-1.5 text-sm font-semibold"
+          :class="activeTab === tab ? 'detail-tab-active' : 'detail-tab-inactive'"
           @click="emit('update:activeTab', tab)"
         >
           {{ tab === 'details' ? t('detail.details') : tab === 'history' ? t('detail.history') : t('detail.security') }}
         </button>
       </div>
 
-      <div v-if="activeTab === 'details'" class="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div v-if="activeTab === 'details'" class="detail-surface mt-4 overflow-hidden rounded-md border">
         <div
           v-for="field in detailFields(t, selectedItem)"
           :key="field.id"
-          class="border-b border-slate-100 last:border-b-0"
+          class="detail-field-row border-b last:border-b-0"
         >
-          <div v-if="field.kind === 'group'" class="grid gap-1 bg-slate-50 px-3 py-3">
-            <span class="text-sm font-black text-slate-700">{{ fieldLabel(t, field.kind, field.label) }}</span>
+          <div v-if="field.kind === 'group'" class="grid gap-1.5 bg-[var(--app-surface-muted)] px-3 py-2.5">
+            <span class="detail-label text-sm font-semibold">{{ fieldLabel(t, field.kind, field.label) }}</span>
             <div
               v-for="child in field.children ?? []"
               :key="child.id"
-              class="grid min-h-10 grid-cols-[124px_minmax(0,1fr)_40px] items-center gap-3 rounded-md bg-white px-2 py-1"
+              class="grid min-h-10 grid-cols-[116px_minmax(0,1fr)_34px] items-center gap-3 rounded-md border border-[var(--app-field-border)] bg-[var(--app-surface)] px-2 py-1"
             >
-              <span class="text-sm font-bold text-slate-500">{{ fieldLabel(t, child.kind, child.label) }}</span>
+              <span class="detail-label text-sm font-semibold">{{ fieldLabel(t, child.kind, child.label) }}</span>
               <span class="break-words" :class="{ 'font-mono': child.sensitive }">{{ displayValue(child, showSensitive) }}</span>
               <button class="icon-button" @click="onFieldAction(child)">
                 <Eye v-if="child.sensitive && !showSensitive" class="size-4" />
@@ -146,8 +146,8 @@ onBeforeUnmount(revokePreviewUrl)
               </button>
             </div>
           </div>
-          <div v-else class="grid min-h-12 grid-cols-[140px_minmax(0,1fr)_40px] items-center gap-3 px-3 py-2">
-            <span class="text-sm font-bold text-slate-500">{{ fieldLabel(t, field.kind, field.label) }}</span>
+          <div v-else class="grid min-h-11 grid-cols-[124px_minmax(0,1fr)_34px] items-center gap-3 px-3 py-1.5">
+            <span class="detail-label text-sm font-semibold">{{ fieldLabel(t, field.kind, field.label) }}</span>
             <span class="break-words" :class="{ 'font-mono': field.sensitive }">{{ displayValue(field, showSensitive) }}</span>
             <button class="icon-button" @click="onFieldAction(field)">
               <Eye v-if="field.sensitive && !showSensitive" class="size-4" />
@@ -156,23 +156,23 @@ onBeforeUnmount(revokePreviewUrl)
           </div>
         </div>
 
-        <div v-if="notesText" class="grid min-h-12 grid-cols-[140px_minmax(0,1fr)] gap-3 border-b border-slate-100 px-3 py-3 last:border-b-0">
-          <span class="text-sm font-bold text-slate-500">{{ t('editor.notes') }}</span>
+        <div v-if="notesText" class="detail-field-row grid min-h-11 grid-cols-[124px_minmax(0,1fr)] gap-3 border-b px-3 py-2.5 last:border-b-0">
+          <span class="detail-label text-sm font-semibold">{{ t('editor.notes') }}</span>
           <span class="whitespace-pre-wrap break-words text-sm leading-6">{{ notesText }}</span>
         </div>
 
         <div
           v-for="field in noteFields"
           :key="field.id"
-          class="grid min-h-12 grid-cols-[140px_minmax(0,1fr)] gap-3 border-b border-slate-100 px-3 py-3 last:border-b-0"
+          class="detail-field-row grid min-h-11 grid-cols-[124px_minmax(0,1fr)] gap-3 border-b px-3 py-2.5 last:border-b-0"
         >
-          <span class="text-sm font-bold text-slate-500">{{ fieldLabel(t, field.kind, field.label) }}</span>
+          <span class="detail-label text-sm font-semibold">{{ fieldLabel(t, field.kind, field.label) }}</span>
           <span class="whitespace-pre-wrap break-words text-sm leading-6">{{ field.value }}</span>
         </div>
       </div>
 
-      <div v-if="activeTab === 'details' && attachments.length" class="mt-5 grid gap-3">
-        <div class="flex items-center gap-2 font-bold">
+      <div v-if="activeTab === 'details' && attachments.length" class="mt-4 grid gap-2.5">
+        <div class="flex items-center gap-2 font-semibold">
           <Paperclip class="size-4" />
           {{ t('detail.attachments') }}
         </div>
@@ -180,7 +180,7 @@ onBeforeUnmount(revokePreviewUrl)
           <div
             v-for="attachment in attachments"
             :key="attachment.id"
-            class="grid grid-cols-[42px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-slate-200 bg-white p-2"
+            class="detail-surface grid grid-cols-[38px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-md border p-2"
             :class="{ 'cursor-pointer hover:border-teal-200 hover:bg-teal-50/40': isImageAttachment(attachment) }"
             @click="previewImage(attachment)"
           >
@@ -208,8 +208,8 @@ onBeforeUnmount(revokePreviewUrl)
         </div>
       </div>
 
-      <div v-else-if="activeTab === 'history'" class="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <div class="grid grid-cols-[160px_minmax(0,1fr)] gap-3 border-b border-slate-100 p-3">
+      <div v-else-if="activeTab === 'history'" class="detail-surface mt-4 overflow-hidden rounded-md border">
+        <div class="detail-field-row grid grid-cols-[160px_minmax(0,1fr)] gap-3 border-b p-3">
           <time class="text-xs text-slate-500">{{ new Date(selectedItem.updatedAt).toLocaleString(vaultStore.settings.locale) }}</time>
           <span>{{ t('detail.updatedLocal') }}</span>
         </div>
@@ -219,13 +219,13 @@ onBeforeUnmount(revokePreviewUrl)
         </div>
       </div>
 
-      <div v-else class="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <div class="grid grid-cols-[150px_minmax(0,1fr)_auto] items-center gap-3 border-b border-slate-100 p-3">
+      <div v-else class="detail-surface mt-4 overflow-hidden rounded-md border">
+        <div class="detail-field-row grid grid-cols-[150px_minmax(0,1fr)_auto] items-center gap-3 border-b p-3">
           <span class="text-sm font-bold text-slate-500">{{ t('detail.strength') }}</span>
           <div class="h-2 overflow-hidden rounded-full bg-slate-200">
-            <span class="block h-full w-3/4 bg-gradient-to-r from-amber-600 to-green-700"></span>
+            <span class="block h-full w-3/4 bg-[var(--app-primary)]"></span>
           </div>
-          <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">{{ t('detail.strong') }}</span>
+          <span class="rounded-full bg-[var(--app-tabs)] px-2 py-1 text-xs font-bold text-[var(--app-nav-text)]">{{ t('detail.strong') }}</span>
         </div>
         <div class="grid grid-cols-[150px_minmax(0,1fr)_auto] items-center gap-3 p-3">
           <span class="text-sm font-bold text-slate-500">{{ t('detail.breachCheck') }}</span>
@@ -239,7 +239,7 @@ onBeforeUnmount(revokePreviewUrl)
 
     <div v-else class="grid h-full place-items-center text-center">
       <div class="grid max-w-[300px] gap-3">
-        <span class="mx-auto grid size-11 place-items-center rounded-lg bg-slate-100 text-slate-500">
+        <span class="mx-auto grid size-10 place-items-center rounded-md bg-[var(--app-tabs)] text-[var(--app-muted)]">
           <FolderLock class="size-5" />
         </span>
         <strong>{{ t('detail.noSelectionTitle') }}</strong>

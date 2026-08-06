@@ -28,5 +28,5 @@ tauri-plugin-deep-link = "2.4.9"
 tauri-plugin-process = "2.3.0"
 tauri-plugin-single-instance = { version = "2.4.2", features = ["deep-link"] }
 tauri-plugin-updater = "2.10.1"
-windows-sys = { version = "0.61.2", features = ["Win32_Security_Cryptography", "Win32_System_Registry", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Graphics_Gdi", "Win32_Security_Cryptography", "Win32_System_LibraryLoader", "Win32_System_Registry", "Win32_System_RemoteDesktop", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 zip = { version = "2", default-features = false, features = ["deflate"] }
