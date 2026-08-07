@@ -13,6 +13,7 @@ import VaultItemList from './components/VaultItemList.vue'
 import { setExtensionLocale } from '@/i18n'
 import {
   ExtensionRuntimeUnavailableError,
+  keepExtensionRuntimeAlive,
   loadExtensionPanelState,
   lockPanel,
   onExtensionStateChanged,
@@ -36,6 +37,7 @@ const itemActionError = ref('')
 const permissionBusy = ref(false)
 const accountActionBusy = ref(false)
 let stopStateListener: () => void = () => undefined
+let stopRuntimeKeepAlive: () => void = () => undefined
 
 const activeItems = computed(() => {
   if (!state.value) return []
@@ -73,11 +75,15 @@ const connectionLabel = computed(() => {
 })
 
 onMounted(() => {
+  stopRuntimeKeepAlive = keepExtensionRuntimeAlive()
   void refreshState()
   stopStateListener = onExtensionStateChanged(() => void refreshState(false))
 })
 
-onBeforeUnmount(() => stopStateListener())
+onBeforeUnmount(() => {
+  stopStateListener()
+  stopRuntimeKeepAlive()
+})
 
 async function refreshState(showLoading = true): Promise<void> {
   if (showLoading) loading.value = true

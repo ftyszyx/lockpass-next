@@ -780,6 +780,8 @@ textarea.extension-field-value {
 }
 
 .extension-editor-error {
+  flex: none;
+  margin: 0 10px 8px;
   border: 1px solid #fecdd3;
   border-radius: 6px;
   background: #fff1f2;

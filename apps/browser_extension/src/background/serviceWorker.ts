@@ -1,7 +1,11 @@
 import { syncContentScriptRegistration } from './contentScripts'
 import { authorizeAccount } from './accountAuthorization'
 import { saveExtensionVaultItem } from './itemMutations'
-import { closeExtensionVaultSession, unlockExtensionVault } from './vaultUnlock'
+import {
+  closeExtensionVaultSession,
+  hasActiveExtensionVaultSession,
+  unlockExtensionVault
+} from './vaultUnlock'
 import {
   credentialMatches,
   loadFillCredential,
@@ -38,6 +42,11 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) =>
   return true
 })
 
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'lockpass-panel') return
+  port.onMessage.addListener(() => undefined)
+})
+
 async function initializeExtension(): Promise<void> {
   await syncContentScriptRegistration()
 }
@@ -46,7 +55,7 @@ async function handleRequest(message: ExtensionRequest, sender: chrome.runtime.M
   switch (message.type) {
     case 'panel.state.get':
       assertExtensionPageSender(sender)
-      return { ok: true, state: await loadPanelState() }
+      return { ok: true, state: await loadConsistentPanelState() }
     case 'panel.selection.set':
       assertExtensionPageSender(sender)
       await updateSelection({ vaultId: message.vaultId, itemId: message.itemId })
@@ -83,16 +92,29 @@ async function handleRequest(message: ExtensionRequest, sender: chrome.runtime.M
     }
     case 'content.menu.get': {
       assertPageSender(sender, message.origin)
+      const state = await loadConsistentPanelState()
+      if (!state.unlocked) return { ok: true, matches: [], locked: true }
       const result = await credentialMatches(message.origin)
       return { ok: true, ...result }
     }
     case 'content.credential.get': {
       assertPageSender(sender, message.origin)
+      const state = await loadConsistentPanelState()
+      if (!state.unlocked) return { ok: false, error: 'vault locked' }
       const credential = await loadFillCredential(message.itemId, message.origin)
       if (!credential) return { ok: false, error: 'credential unavailable' }
       return { ok: true, credential }
     }
   }
+}
+
+async function loadConsistentPanelState() {
+  const state = await loadPanelState()
+  if (!state.unlocked) return state
+  if (state.account && hasActiveExtensionVaultSession(state.account.id)) return state
+
+  await lockExtension()
+  return loadPanelState()
 }
 
 function assertExtensionPageSender(sender: chrome.runtime.MessageSender): void {

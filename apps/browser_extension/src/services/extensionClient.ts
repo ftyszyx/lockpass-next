@@ -2,6 +2,7 @@ import type { ExtensionItemSaveInput, ExtensionPanelState } from '@/shared/model
 import { request, type ExtensionResponse } from '@/shared/messages'
 
 const SITE_ORIGINS = ['http://*/*', 'https://*/*']
+const PANEL_KEEP_ALIVE_INTERVAL_MS = 20_000
 
 export class ExtensionRuntimeUnavailableError extends Error {
   constructor() {
@@ -90,6 +91,42 @@ export function onExtensionStateChanged(handler: () => void): () => void {
     chrome.storage.onChanged.removeListener(storageListener)
     window.removeEventListener('focus', focusListener)
     document.removeEventListener('visibilitychange', visibilityListener)
+  }
+}
+
+export function keepExtensionRuntimeAlive(): () => void {
+  if (!isExtensionRuntime()) return () => undefined
+
+  let stopped = false
+  let port: chrome.runtime.Port | null = null
+  let reconnectTimer: number | null = null
+
+  const connect = () => {
+    if (stopped) return
+    const nextPort = chrome.runtime.connect({ name: 'lockpass-panel' })
+    port = nextPort
+    nextPort.onDisconnect.addListener(() => {
+      if (port === nextPort) port = null
+      if (!stopped) reconnectTimer = window.setTimeout(connect, 1_000)
+    })
+    nextPort.postMessage({ type: 'panel.keepAlive' })
+  }
+
+  connect()
+  const keepAliveTimer = window.setInterval(() => {
+    try {
+      port?.postMessage({ type: 'panel.keepAlive' })
+    } catch {
+      port = null
+    }
+  }, PANEL_KEEP_ALIVE_INTERVAL_MS)
+
+  return () => {
+    stopped = true
+    window.clearInterval(keepAliveTimer)
+    if (reconnectTimer !== null) window.clearTimeout(reconnectTimer)
+    port?.disconnect()
+    port = null
   }
 }
 

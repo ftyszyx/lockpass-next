@@ -106,6 +106,10 @@ export function requireActiveExtensionVaultSession(accountId: string): ActiveExt
   return activeVaultSession
 }
 
+export function hasActiveExtensionVaultSession(accountId: string): boolean {
+  return activeVaultSession?.accountId === accountId
+}
+
 export async function encryptExtensionVaultObject(
   accountId: string,
   metadata: {

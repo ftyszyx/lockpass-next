@@ -32,18 +32,24 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const draft = reactive<ExtensionItemSaveInput>(createItemEditorDraft(t, props.item, props.defaultVaultId))
 const newFieldKind = ref<VaultItemFieldKind>('text')
+const validationError = ref('')
 
 const typeOptions = computed(() => {
   if (props.item?.type === 'attachment') return [...creatableItemTypes, 'attachment' as const]
   return creatableItemTypes
 })
-const canSave = computed(() => Boolean(draft.title.trim() && draft.vaultId && !props.busy))
+const saveDisabled = computed(() => Boolean(!draft.vaultId || props.busy))
+const displayedError = computed(() => validationError.value || props.error)
 
 watch(
   () => [props.item, props.defaultVaultId] as const,
   () => Object.assign(draft, createItemEditorDraft(t, props.item, props.defaultVaultId)),
   { deep: true }
 )
+
+watch(() => draft.title, () => {
+  if (draft.title.trim()) validationError.value = ''
+})
 
 function changeType(type: VaultItemType): void {
   draft.type = type
@@ -63,7 +69,12 @@ function removeField(fieldId: string, parent?: VaultItemField): void {
 }
 
 function submit(): void {
-  if (!canSave.value) return
+  if (props.busy || !draft.vaultId) return
+  if (!draft.title.trim()) {
+    validationError.value = t('error.itemTitleRequired')
+    return
+  }
+  validationError.value = ''
   emit('save', {
     ...draft,
     fields: cloneVaultItemFields(draft.fields)
@@ -156,12 +167,13 @@ function submit(): void {
         <textarea v-model="draft.notes" class="form-input extension-editor-notes"></textarea>
       </label>
 
-      <div v-if="error" class="extension-editor-error">{{ error }}</div>
     </div>
+
+    <div v-if="displayedError" class="extension-editor-error" role="alert">{{ displayedError }}</div>
 
     <footer class="extension-editor-footer">
       <button class="plain-button" type="button" :disabled="busy" @click="emit('cancel')">{{ t('editor.cancel') }}</button>
-      <button class="primary-button" type="submit" :disabled="!canSave">
+      <button class="primary-button" type="submit" :disabled="saveDisabled">
         <Save />
         {{ busy ? t('editor.saving') : t('editor.save') }}
       </button>
