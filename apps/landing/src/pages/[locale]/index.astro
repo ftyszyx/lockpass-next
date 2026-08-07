@@ -167,7 +167,10 @@ const screenshots = [
       <strong>{t.footer.product}</strong>
       <p>{t.footer.tagline}</p>
     </div>
-    <span>{currentYear} {t.footer.copyright}</span>
+    <div class="footer-meta">
+      <a href={`/${locale}/privacy/`}>{t.footer.privacy}</a>
+      <span>{currentYear} {t.footer.copyright}</span>
+    </div>
   </footer>
   <script
     is:inline

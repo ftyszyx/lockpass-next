@@ -163,7 +163,8 @@ export const messages = {
     footer: {
       product: 'LockPass',
       tagline: '本地优先、端到端加密、可自部署的密码管理器。',
-      copyright: 'LockPass Next 项目'
+      copyright: 'LockPass Next 项目',
+      privacy: '隐私政策'
     }
   },
   'en-US': {
@@ -319,7 +320,8 @@ export const messages = {
     footer: {
       product: 'LockPass',
       tagline: 'A local-first, end-to-end encrypted, self-hostable password manager.',
-      copyright: 'LockPass Next project'
+      copyright: 'LockPass Next project',
+      privacy: 'Privacy Policy'
     }
   }
 } as const

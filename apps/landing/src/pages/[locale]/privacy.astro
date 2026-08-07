@@ -1,0 +1,72 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { localeLabels, locales, type Locale } from '../../i18n'
+import { privacyContactHref, privacyMessages } from '../../i18n/privacy'
+
+export function getStaticPaths() {
+  return locales.map((locale) => ({ params: { locale } }))
+}
+
+const locale = Astro.params.locale as Locale
+const t = privacyMessages[locale]
+const alternateLocale: Locale = locale === 'zh-CN' ? 'en-US' : 'zh-CN'
+const currentYear = new Date().getFullYear()
+---
+
+<BaseLayout locale={locale} title={t.meta.title} description={t.meta.description}>
+  <header class="site-header legal-site-header" aria-label="LockPass">
+    <a class="brand" href={`/${locale}/`} aria-label="LockPass">
+      <span class="brand-mark" aria-hidden="true">L</span>
+      <span>LockPass</span>
+    </a>
+    <nav class="legal-header-actions" aria-label={t.title}>
+      <a class="legal-home-link" href={`/${locale}/`}>{t.backHome}</a>
+      <a
+        class="language-link"
+        href={`/${alternateLocale}/privacy/`}
+        aria-label={localeLabels[alternateLocale]}
+      >
+        {t.language}
+      </a>
+    </nav>
+  </header>
+
+  <main class="legal-main">
+    <header class="legal-hero">
+      <p class="eyebrow">{t.eyebrow}</p>
+      <h1 class="legal-title" aria-label={t.title}>
+        <span>{t.titleProduct}</span>{' '}<span>{t.titleSubject}</span>
+      </h1>
+      <p class="legal-summary">{t.summary}</p>
+      <p class="legal-date"><strong>{t.effectiveDateLabel}</strong> {t.effectiveDate}</p>
+    </header>
+
+    <article class="legal-content">
+      {
+        t.sections.map((section) => (
+          <section id={section.id} class="legal-section">
+            <h2>{section.title}</h2>
+            {section.paragraphs?.map((paragraph) => <p>{paragraph}</p>)}
+            {section.items && (
+              <ul>
+                {section.items.map((item) => <li>{item}</li>)}
+              </ul>
+            )}
+          </section>
+        ))
+      }
+
+      <section class="legal-section legal-contact">
+        <h2>{t.contact.title}</h2>
+        <p>{t.contact.body}</p>
+        <a href={privacyContactHref} rel="noreferrer" target="_blank">{t.contact.linkLabel}</a>
+        <p class="legal-warning">{t.contact.warning}</p>
+      </section>
+    </article>
+  </main>
+
+  <footer class="site-footer legal-footer">
+    <a href={`/${locale}/`}>LockPass</a>
+    <span>{currentYear} LockPass Next</span>
+  </footer>
+</BaseLayout>
