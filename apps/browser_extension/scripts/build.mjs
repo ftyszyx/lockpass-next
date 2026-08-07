@@ -1,4 +1,4 @@
-import { cp, mkdir } from 'node:fs/promises'
+import { cp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build, loadEnv } from 'vite'
@@ -7,10 +7,17 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const distDir = resolve(root, 'dist')
 const env = loadEnv('production', root, 'VITE_')
 
-requireHttpUrl(env.VITE_LOCKPASS_OFFICIAL_SERVER_URL, 'VITE_LOCKPASS_OFFICIAL_SERVER_URL')
-requireHttpUrl(env.VITE_LOCKPASS_OFFICIAL_API_URL, 'VITE_LOCKPASS_OFFICIAL_API_URL')
+requireHttpUrl(
+  process.env.VITE_LOCKPASS_OFFICIAL_SERVER_URL || env.VITE_LOCKPASS_OFFICIAL_SERVER_URL,
+  'VITE_LOCKPASS_OFFICIAL_SERVER_URL'
+)
+requireHttpUrl(
+  process.env.VITE_LOCKPASS_OFFICIAL_API_URL || env.VITE_LOCKPASS_OFFICIAL_API_URL,
+  'VITE_LOCKPASS_OFFICIAL_API_URL'
+)
 
 await build({ configFile: resolve(root, 'vite.config.ts') })
+await syncManifestVersion()
 
 await buildWorker('background', resolve(root, 'src/background/serviceWorker.ts'), 'es')
 await buildWorker('content', resolve(root, 'src/content/contentScript.ts'), 'iife')
@@ -39,6 +46,14 @@ async function buildWorker(name, entry, format) {
       }
     }
   })
+}
+
+async function syncManifestVersion() {
+  const packageJson = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'))
+  const manifestPath = resolve(distDir, 'manifest.json')
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  manifest.version = packageJson.version
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
 }
 
 function requireHttpUrl(value, name) {

@@ -6,9 +6,7 @@
   "default_locale": "zh_CN",
   "minimum_chrome_version": "127",
   "permissions": [
-    "alarms",
     "identity",
-    "idle",
     "scripting",
     "storage"
   ],

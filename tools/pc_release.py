@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build and optionally publish the LockPass Windows desktop release."""
+"""Build and optionally publish LockPass desktop and browser releases."""
 
 from __future__ import annotations
 
@@ -21,6 +21,9 @@ from urllib.parse import quote
 ROOT = Path(__file__).resolve().parents[1]
 DESKTOP_DIR = ROOT / "apps" / "desktop"
 DESKTOP_PACKAGE_JSON = DESKTOP_DIR / "package.json"
+BROWSER_EXTENSION_DIR = ROOT / "apps" / "browser_extension"
+BROWSER_EXTENSION_PACKAGE_JSON = BROWSER_EXTENSION_DIR / "package.json"
+BROWSER_EXTENSION_OUTPUT_DIR = ROOT / "tools" / "dist" / "browser_extension"
 TAURI_DIR = DESKTOP_DIR / "src-tauri"
 TAURI_CONFIG = TAURI_DIR / "tauri.conf.json5"
 TAURI_CARGO_TOML = TAURI_DIR / "Cargo.toml"
@@ -30,6 +33,7 @@ DEFAULT_KEY_PATH = Path.home() / ".tauri" / "lockpass.key"
 DEFAULT_PUBLIC_BASE_URL = "https://updates.lockpass.example.com"
 DEFAULT_LATEST_NAME = "latest.json"
 DEFAULT_OSS_APPS_DIR = "apps"
+CHROME_STORE_PLATFORM = "chrome-store"
 IMMUTABLE_ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable"
 LATEST_JSON_CACHE_CONTROL = "no-cache"
 VERSION_TAG_PATTERN = re.compile(
@@ -49,6 +53,12 @@ class ReleaseArtifact:
     latest_json_path: Path
 
 
+@dataclass(frozen=True)
+class BrowserExtensionArtifact:
+    version: str
+    package_path: Path
+
+
 def main() -> int:
     parser = build_arg_parser()
     args = parser.parse_args()
@@ -58,14 +68,18 @@ def main() -> int:
     env = {**os.environ, **file_env}
 
     config = read_tauri_config()
+    app_id = config_string(config, "identifier")
+    platform = normalize_platform(args.platform)
+    channel = normalize_channel(args.channel)
+
+    if platform == CHROME_STORE_PLATFORM:
+        return build_chrome_store_release(app_id, channel, platform, args.upload, env)
+
     config_version = config_string(config, "version")
     version = release_version_for_build(config_version, env)
     sync_desktop_release_versions(version)
     if version != config_version:
         config = merge_dicts(config, {"version": version})
-    app_id = config_string(config, "identifier")
-    platform = args.platform
-    channel = normalize_channel(args.channel)
     latest_name = DEFAULT_LATEST_NAME
 
     signing_private_key = resolve_signing_private_key(None, env)
@@ -75,7 +89,16 @@ def main() -> int:
     build_release(signing_private_key, env, release_config)
 
     dist_dir = resolve_dist_dir()
-    artifact = collect_artifact(version, app_id, channel, dist_dir, args.notes, platform, env, latest_name)
+    artifact = collect_artifact(
+        version,
+        app_id,
+        channel,
+        dist_dir,
+        args.notes,
+        platform,
+        env,
+        latest_name,
+    )
 
     print(f"Release version: {artifact.version}")
     print(f"App ID: {app_id}")
@@ -92,10 +115,20 @@ def main() -> int:
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Build LockPass Windows NSIS release and optionally upload to OSS.")
+    parser = argparse.ArgumentParser(
+        description="Build a LockPass release for the selected platform and optionally upload it to OSS."
+    )
     parser.add_argument("--channel", required=True, help="Release channel, for example web.")
-    parser.add_argument("--platform", required=True, help="Tauri updater platform key, for example windows-x86_64.")
-    parser.add_argument("--upload", action="store_true", help="Upload installer, signature and latest.json to OSS.")
+    parser.add_argument(
+        "--platform",
+        required=True,
+        help="Release platform, for example windows-x86_64 or chrome-store.",
+    )
+    parser.add_argument(
+        "--upload",
+        action="store_true",
+        help="Upload the selected platform artifacts to OSS.",
+    )
     parser.add_argument("--notes", default=None, help="Release notes written to latest.json.")
     return parser
 
@@ -121,6 +154,15 @@ def normalize_channel(value: str) -> str:
     normalized = value.strip().lower()
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", normalized):
         raise SystemExit(f"Invalid release channel {value!r}. Use lowercase letters, numbers and hyphens.")
+    return normalized
+
+
+def normalize_platform(value: str) -> str:
+    normalized = value.strip().lower()
+    if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", normalized):
+        raise SystemExit(
+            f"Invalid release platform {value!r}. Use lowercase letters, numbers, hyphens and underscores."
+        )
     return normalized
 
 
@@ -150,6 +192,10 @@ def sync_desktop_release_versions(version: str) -> None:
     sync_tauri_config_version(TAURI_CONFIG, version)
 
 
+def sync_browser_extension_release_version(version: str) -> None:
+    sync_package_json_version(BROWSER_EXTENSION_PACKAGE_JSON, version)
+
+
 def sync_package_json_version(path: Path, version: str) -> None:
     package = json.loads(path.read_text(encoding="utf-8-sig"))
     if not isinstance(package, dict):
@@ -158,6 +204,14 @@ def sync_package_json_version(path: Path, version: str) -> None:
         return
     package["version"] = version
     write_text_utf8_lf(path, json.dumps(package, ensure_ascii=False, indent=2) + "\n")
+
+
+def package_json_version(path: Path) -> str:
+    package = json.loads(path.read_text(encoding="utf-8-sig"))
+    version = package.get("version") if isinstance(package, dict) else None
+    if not isinstance(version, str) or not version.strip():
+        raise SystemExit(f"Could not find non-empty package version in {path}")
+    return version.strip()
 
 
 def sync_cargo_toml_version(path: Path, version: str) -> None:
@@ -292,6 +346,41 @@ def build_release(signing_private_key: Path | None, base_env: dict[str, str], co
         config_path.unlink(missing_ok=True)
 
 
+def build_browser_extension(version: str, base_env: dict[str, str]) -> Path:
+    env = os.environ.copy()
+    env.update(base_env)
+    run(["npm", "run", "-w", "@lockpass/browser-extension", "package:store"], env=env)
+
+    package_path = BROWSER_EXTENSION_OUTPUT_DIR / f"lockpass-browser-extension-v{version}.zip"
+    if not package_path.exists():
+        raise SystemExit(f"Browser extension package not found: {package_path}")
+    return package_path
+
+
+def build_chrome_store_release(
+    app_id: str,
+    channel: str,
+    platform: str,
+    upload: bool,
+    env: dict[str, str],
+) -> int:
+    current_version = package_json_version(BROWSER_EXTENSION_PACKAGE_JSON)
+    version = release_version_for_build(current_version, env)
+    sync_browser_extension_release_version(version)
+    package = build_browser_extension(version, env)
+    artifact = collect_browser_extension_artifact(version, package, resolve_dist_dir())
+
+    print(f"Release version: {artifact.version}")
+    print(f"App ID: {app_id}")
+    print(f"Channel: {channel}")
+    print(f"Platform: {platform}")
+    print(f"Browser extension: {artifact.package_path}")
+
+    if upload:
+        upload_browser_extension_to_oss(artifact, app_id, channel, platform, env)
+    return 0
+
+
 def run(command: list[str], env: dict[str, str] | None = None) -> None:
     print("+ " + " ".join(command))
     executable = shutil.which(command[0], path=(env or os.environ).get("PATH"))
@@ -363,9 +452,7 @@ def collect_artifact(
     if not signature.exists():
         raise SystemExit(f"Signature file not found: {signature}")
 
-    if dist_dir.exists():
-        shutil.rmtree(dist_dir)
-    dist_dir.mkdir(parents=True, exist_ok=True)
+    clean_desktop_dist_dir(dist_dir)
 
     installer_copy = dist_dir / installer.name
     signature_copy = dist_dir / signature.name
@@ -389,7 +476,38 @@ def collect_artifact(
 
     latest_path = dist_dir / latest_name
     latest_path.write_text(json.dumps(latest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return ReleaseArtifact(version, installer_copy, signature_copy, latest_path)
+    return ReleaseArtifact(
+        version,
+        installer_copy,
+        signature_copy,
+        latest_path,
+    )
+
+
+def clean_desktop_dist_dir(dist_dir: Path) -> None:
+    dist_dir.mkdir(parents=True, exist_ok=True)
+    for path in dist_dir.iterdir():
+        if path.name == CHROME_STORE_PLATFORM:
+            continue
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
+
+
+def collect_browser_extension_artifact(
+    version: str,
+    package: Path,
+    dist_dir: Path,
+) -> BrowserExtensionArtifact:
+    platform_dist_dir = dist_dir / CHROME_STORE_PLATFORM
+    if platform_dist_dir.exists():
+        shutil.rmtree(platform_dist_dir)
+    platform_dist_dir.mkdir(parents=True, exist_ok=True)
+
+    package_copy = platform_dist_dir / package.name
+    shutil.copy2(package, package_copy)
+    return BrowserExtensionArtifact(version, package_copy)
 
 
 def newest_file(files: Iterable[Path]) -> Path:
@@ -429,29 +547,28 @@ def upload_to_oss(
     latest_name: str,
     env: dict[str, str],
 ) -> None:
+    release_prefix = release_prefix_for(app_id, channel, platform, env)
+    upload_files_to_oss(release_uploads(artifact, release_prefix, latest_name), env)
+
+
+def upload_browser_extension_to_oss(
+    artifact: BrowserExtensionArtifact,
+    app_id: str,
+    channel: str,
+    platform: str,
+    env: dict[str, str],
+) -> None:
+    release_prefix = release_prefix_for(app_id, channel, platform, env)
+    upload_files_to_oss(browser_extension_uploads(artifact, release_prefix), env)
+
+
+def upload_files_to_oss(
+    uploads: list[tuple[Path, str, str]],
+    env: dict[str, str],
+) -> None:
     endpoint = required_env(env, "OSS_ENDPOINT")
     bucket_name = required_env(env, "OSS_BUCKET")
-    release_prefix = release_prefix_for(app_id, channel, platform, env)
-    latest_key = normalize_key(join_key(release_prefix, latest_name))
     public_read = parse_bool(env.get("OSS_PUBLIC_READ", "true"))
-
-    uploads = [
-        (
-            artifact.installer_path,
-            normalize_key(join_key(release_prefix, artifact.installer_path.name)),
-            IMMUTABLE_ASSET_CACHE_CONTROL,
-        ),
-        (
-            artifact.signature_path,
-            normalize_key(join_key(release_prefix, artifact.signature_path.name)),
-            IMMUTABLE_ASSET_CACHE_CONTROL,
-        ),
-        (
-            artifact.latest_json_path,
-            latest_key,
-            LATEST_JSON_CACHE_CONTROL,
-        ),
-    ]
 
     print(f"OSS bucket: {bucket_name}")
     print(f"OSS endpoint: {endpoint}")
@@ -470,6 +587,43 @@ def upload_to_oss(
         bucket.put_object_from_file(key, str(source), headers={"Cache-Control": cache_control})
         if public_read:
             bucket.put_object_acl(key, oss2.OBJECT_ACL_PUBLIC_READ)
+
+
+def release_uploads(
+    artifact: ReleaseArtifact,
+    release_prefix: str,
+    latest_name: str,
+) -> list[tuple[Path, str, str]]:
+    return [
+        (
+            artifact.installer_path,
+            normalize_key(join_key(release_prefix, artifact.installer_path.name)),
+            IMMUTABLE_ASSET_CACHE_CONTROL,
+        ),
+        (
+            artifact.signature_path,
+            normalize_key(join_key(release_prefix, artifact.signature_path.name)),
+            IMMUTABLE_ASSET_CACHE_CONTROL,
+        ),
+        (
+            artifact.latest_json_path,
+            normalize_key(join_key(release_prefix, latest_name)),
+            LATEST_JSON_CACHE_CONTROL,
+        ),
+    ]
+
+
+def browser_extension_uploads(
+    artifact: BrowserExtensionArtifact,
+    release_prefix: str,
+) -> list[tuple[Path, str, str]]:
+    return [
+        (
+            artifact.package_path,
+            normalize_key(join_key(release_prefix, artifact.package_path.name)),
+            IMMUTABLE_ASSET_CACHE_CONTROL,
+        )
+    ]
 
 
 def required_env(env: dict[str, str], key: str) -> str:

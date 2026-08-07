@@ -16,7 +16,7 @@ if (!window.__lockpassContentScriptReady) {
 }
 
 function startFieldOverlay(): void {
-  const labels = contentLabels()
+  let labels = contentLabels()
   const host = document.createElement('div')
   host.style.cssText = 'position:fixed;inset:0;z-index:2147483646;pointer-events:none;'
   const shadow = host.attachShadow({ mode: 'open' })
@@ -36,8 +36,23 @@ function startFieldOverlay(): void {
   document.addEventListener('pointerdown', (event) => {
     if (!event.composedPath().includes(host)) hideMenu()
   }, true)
+  chrome.storage.onChanged.addListener((_changes, areaName) => {
+    if (areaName === 'local') void refreshLabels()
+  })
 
   scanFields()
+  void refreshLabels()
+
+  async function refreshLabels(): Promise<void> {
+    const response = await sendMessage(request('content.locale.get', {}))
+    if (!response?.ok || !('locale' in response)) return
+    labels = contentLabels(response.locale)
+    for (const marker of markers.values()) {
+      marker.title = labels.openQuickPanel
+      marker.setAttribute('aria-label', labels.openQuickPanel)
+    }
+    if (!menu.hidden) hideMenu()
+  }
 
   function scheduleScan(): void {
     window.requestAnimationFrame(() => {

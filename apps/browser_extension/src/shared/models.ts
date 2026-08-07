@@ -1,10 +1,18 @@
 import type { Vault, VaultItem, VaultItemField, VaultItemType } from '@lockpass/core'
+import type { ExtensionLocale } from '../locales/registry'
+
+export type { ExtensionLocale } from '../locales/registry'
 
 export const EXTENSION_SCHEMA_VERSION = 1 as const
 
-export type ExtensionLocale = 'zh-CN' | 'en-US'
 export type ExtensionTheme = 'system' | 'light' | 'dark'
 export type ExtensionConnectionStatus = 'offline' | 'online' | 'serverUnavailable'
+export type ExtensionServerMode = 'official' | 'selfhost'
+
+export interface ExtensionServerSettings {
+  mode: ExtensionServerMode
+  selfHostUrl: string
+}
 
 export interface ExtensionAccountSummary {
   id: string
@@ -37,6 +45,7 @@ export interface ExtensionPersistentState {
   schemaVersion: typeof EXTENSION_SCHEMA_VERSION
   locale: ExtensionLocale
   theme: ExtensionTheme
+  serverSettings: ExtensionServerSettings
   account: ExtensionAccountSummary | null
 }
 
@@ -53,6 +62,7 @@ export interface ExtensionSessionState {
 export interface ExtensionPanelState {
   locale: ExtensionLocale
   theme: ExtensionTheme
+  serverSettings: ExtensionServerSettings
   account: ExtensionAccountSummary | null
   requiresSecretKey: boolean
   unlocked: boolean

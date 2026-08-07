@@ -1,4 +1,9 @@
-import type { ExtensionItemSaveInput, ExtensionPanelState } from '@/shared/models'
+import type {
+  ExtensionItemSaveInput,
+  ExtensionLocale,
+  ExtensionPanelState,
+  ExtensionServerSettings
+} from '@/shared/models'
 import { request, type ExtensionResponse } from '@/shared/messages'
 
 const SITE_ORIGINS = ['http://*/*', 'https://*/*']
@@ -56,6 +61,22 @@ export async function unlockPanel(input: {
 export async function lockPanel(): Promise<ExtensionPanelState> {
   assertExtensionRuntime()
   const response = await send(request('panel.lock', {}))
+  if (!response.ok || !('state' in response)) throw new Error(response.ok ? 'missing state' : response.error)
+  return response.state
+}
+
+export async function setPanelLocale(locale: ExtensionLocale): Promise<ExtensionPanelState> {
+  assertExtensionRuntime()
+  const response = await send(request('panel.locale.set', { locale }))
+  if (!response.ok || !('state' in response)) throw new Error(response.ok ? 'missing state' : response.error)
+  return response.state
+}
+
+export async function setExtensionServer(
+  settings: ExtensionServerSettings
+): Promise<ExtensionPanelState> {
+  assertExtensionRuntime()
+  const response = await send(request('panel.server.set', { settings }))
   if (!response.ok || !('state' in response)) throw new Error(response.ok ? 'missing state' : response.error)
   return response.state
 }

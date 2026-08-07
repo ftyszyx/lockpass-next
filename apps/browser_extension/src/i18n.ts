@@ -1,16 +1,18 @@
 import { createI18n } from 'vue-i18n'
 import enUS from './locales/en-US'
 import zhCN from './locales/zh-CN'
-import type { ExtensionLocale } from './shared/models'
+import { resolveExtensionLocale, type ExtensionLocale } from './locales/registry'
+
+const messages: Record<ExtensionLocale, typeof zhCN> = {
+  'zh-CN': zhCN,
+  'en-US': enUS
+}
 
 export const i18n = createI18n({
   legacy: false,
   locale: detectLocale(),
   fallbackLocale: 'en-US',
-  messages: {
-    'zh-CN': zhCN,
-    'en-US': enUS
-  }
+  messages
 })
 
 export function setExtensionLocale(locale: ExtensionLocale): void {
@@ -19,5 +21,5 @@ export function setExtensionLocale(locale: ExtensionLocale): void {
 }
 
 function detectLocale(): ExtensionLocale {
-  return navigator.language.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en-US'
+  return resolveExtensionLocale(navigator.language)
 }

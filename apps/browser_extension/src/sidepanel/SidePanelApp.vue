@@ -20,13 +20,21 @@ import {
   openAccountWebPage,
   requestSiteAccess,
   savePanelItem,
+  setPanelLocale,
+  setExtensionServer,
   setPanelSelection,
   unlockPanel
 } from '@/services/extensionClient'
 import { applyExtensionTheme } from '@/services/theme'
-import type { ExtensionItemSaveInput, ExtensionPanelState } from '@/shared/models'
+import { defaultExtensionServerSettings } from '@/services/extensionServer'
+import type {
+  ExtensionItemSaveInput,
+  ExtensionLocale,
+  ExtensionPanelState,
+  ExtensionServerSettings
+} from '@/shared/models'
 
-const { t } = useI18n()
+const { locale, t } = useI18n()
 const state = ref<ExtensionPanelState | null>(null)
 const loading = ref(true)
 const error = ref('')
@@ -36,6 +44,7 @@ const itemActionBusy = ref(false)
 const itemActionError = ref('')
 const permissionBusy = ref(false)
 const accountActionBusy = ref(false)
+const localeActionBusy = ref(false)
 let stopStateListener: () => void = () => undefined
 let stopRuntimeKeepAlive: () => void = () => undefined
 
@@ -73,6 +82,12 @@ const connectionLabel = computed(() => {
   if (state.value?.connectionStatus === 'serverUnavailable') return t('app.serverUnavailable')
   return t('app.offline')
 })
+const loginServerSettings = computed(() => (
+  state.value?.serverSettings ?? defaultExtensionServerSettings()
+))
+const selectedLocale = computed<ExtensionLocale>(() => (
+  state.value?.locale ?? locale.value as ExtensionLocale
+))
 
 onMounted(() => {
   stopRuntimeKeepAlive = keepExtensionRuntimeAlive()
@@ -161,6 +176,22 @@ async function lockVault(): Promise<void> {
   }
 }
 
+async function changeLocale(nextLocale: ExtensionLocale): Promise<void> {
+  if (!state.value || localeActionBusy.value || nextLocale === state.value.locale) return
+  const previousLocale = state.value.locale
+  localeActionBusy.value = true
+  error.value = ''
+  setExtensionLocale(nextLocale)
+  try {
+    applyPanelState(await setPanelLocale(nextLocale))
+  } catch {
+    setExtensionLocale(previousLocale)
+    error.value = t('error.actionFailed')
+  } finally {
+    localeActionBusy.value = false
+  }
+}
+
 async function enableSiteAccess(): Promise<void> {
   if (!state.value || permissionBusy.value) return
   permissionBusy.value = true
@@ -184,9 +215,28 @@ async function openAccountPage(page: 'login' | 'register'): Promise<void> {
     if (cause instanceof Error && cause.message === 'authorization-cancelled') return
     error.value = cause instanceof Error && cause.message === 'official-web-url-missing'
       ? t('error.officialWebUrlMissing')
+      : cause instanceof Error && cause.message === 'server-url-required'
+        ? t('error.serverUrlRequired')
+        : cause instanceof Error && cause.message === 'server-url-invalid'
+          ? t('error.serverUrlInvalid')
       : cause instanceof Error && cause.message.startsWith('authorization-')
         ? t('error.authorizationFailed')
         : t('error.openWebFailed')
+  } finally {
+    accountActionBusy.value = false
+  }
+}
+
+async function changeLoginServer(settings: ExtensionServerSettings): Promise<void> {
+  if (accountActionBusy.value) return
+  accountActionBusy.value = true
+  error.value = ''
+  try {
+    applyPanelState(await setExtensionServer(settings))
+  } catch (cause) {
+    error.value = cause instanceof Error && cause.message === 'server-url-required'
+      ? t('error.serverUrlRequired')
+      : t('error.serverUrlInvalid')
   } finally {
     accountActionBusy.value = false
   }
@@ -254,9 +304,13 @@ function applyPanelState(nextState: ExtensionPanelState): void {
     <PanelHeader
       :search-enabled="Boolean(state?.account && state.unlocked)"
       :create-enabled="Boolean(state?.vaults.length)"
+      :locale="selectedLocale"
+      :locale-enabled="Boolean(state)"
+      :locale-busy="localeActionBusy"
       v-model:query="query"
       @create="createItem"
       @lock="lockVault"
+      @locale-change="changeLocale"
     />
 
     <main v-if="loading" class="loading-view">{{ t('app.loading') }}</main>
@@ -271,10 +325,12 @@ function applyPanelState(nextState: ExtensionPanelState): void {
       v-else-if="!state?.account || !state.unlocked"
       :signed-out="!state?.account"
       :requires-secret-key="state?.requiresSecretKey ?? false"
+      :server-settings="loginServerSettings"
       :busy="accountActionBusy"
       :error="error"
       @login="openAccountPage('login')"
       @register="openAccountPage('register')"
+      @server-change="changeLoginServer"
       @unlock="unlockVault"
     />
 

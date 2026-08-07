@@ -17,6 +17,7 @@
     "dev:admin_web": "npm run -w @lockpass/admin_web dev",
     "build:web": "npm run -w @lockpass/web build",
     "build:extension": "npm run -w @lockpass/browser-extension build",
+    "package:extension": "npm run -w @lockpass/browser-extension package:store",
     "build:desktop": "npm run -w @lockpass/desktop build",
     "build:landing": "npm run -w @lockpass/landing build",
     "build:mobile": "npm run -w @lockpass/mobile build",

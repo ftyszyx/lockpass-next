@@ -1,13 +1,20 @@
 import type { Vault, VaultItem, VaultItemField } from '@lockpass/core'
 import { saveEncryptedDeviceToken } from './deviceTokenStorage'
 import { hasTrustedSecretKey } from './trustedSecretStorage'
+import {
+  createExtensionServerSettings,
+  normalizeStoredExtensionServerSettings,
+  normalizeSelfHostServerUrl
+} from '@/services/extensionServer'
 import { itemsMatchingOrigin } from '@/services/originMatcher'
+import { isExtensionLocale, resolveExtensionLocale } from '@/locales/registry'
 import {
   EXTENSION_SCHEMA_VERSION,
   type ExtensionLocale,
   type ExtensionDeviceAuthorization,
   type ExtensionPanelState,
   type ExtensionPersistentState,
+  type ExtensionServerSettings,
   type ExtensionSessionState,
   type FillCredentialPayload
 } from '@/shared/models'
@@ -92,6 +99,12 @@ export async function saveDeviceAuthorization(authorization: ExtensionDeviceAuth
   await chrome.storage.local.set({
     [PERSISTENT_STATE_KEY]: {
       ...persistent,
+      serverSettings: {
+        mode: authorization.mode,
+        selfHostUrl: authorization.mode === 'selfhost'
+          ? normalizeSelfHostServerUrl(authorization.serverUrl)
+          : persistent.serverSettings.selfHostUrl
+      },
       account: {
         id: authorization.account.id,
         displayName: authorization.account.displayName,
@@ -103,6 +116,31 @@ export async function saveDeviceAuthorization(authorization: ExtensionDeviceAuth
     } satisfies ExtensionPersistentState
   })
   await saveSessionState(createDefaultSessionState({ connectionStatus: 'online' }))
+}
+
+export async function saveExtensionServerSettings(
+  input: ExtensionServerSettings
+): Promise<ExtensionPanelState> {
+  const persistent = await loadPersistentState()
+  await chrome.storage.local.set({
+    [PERSISTENT_STATE_KEY]: {
+      ...persistent,
+      serverSettings: createExtensionServerSettings(input)
+    } satisfies ExtensionPersistentState
+  })
+  return loadPanelState()
+}
+
+export async function saveExtensionLocale(locale: ExtensionLocale): Promise<ExtensionPanelState> {
+  if (!isExtensionLocale(locale)) throw new Error('unsupported extension locale')
+  const persistent = await loadPersistentState()
+  await chrome.storage.local.set({
+    [PERSISTENT_STATE_KEY]: {
+      ...persistent,
+      locale
+    } satisfies ExtensionPersistentState
+  })
+  return loadPanelState()
 }
 
 export async function lockExtension(): Promise<void> {
@@ -147,6 +185,7 @@ async function loadPersistentState(): Promise<ExtensionPersistentState> {
     schemaVersion: EXTENSION_SCHEMA_VERSION,
     locale: normalizeLocale(candidate?.locale),
     theme: candidate?.theme === 'light' || candidate?.theme === 'dark' ? candidate.theme : 'system',
+    serverSettings: normalizeStoredExtensionServerSettings(candidate?.serverSettings),
     account: normalizeAccount(candidate?.account)
   }
 }
@@ -190,8 +229,7 @@ function createDefaultSessionState(input: Partial<ExtensionSessionState> = {}): 
 }
 
 function normalizeLocale(locale: unknown): ExtensionLocale {
-  if (locale === 'en-US' || locale === 'zh-CN') return locale
-  return navigator.language.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en-US'
+  return isExtensionLocale(locale) ? locale : resolveExtensionLocale(navigator.language)
 }
 
 function fieldValue(fields: VaultItemField[], kinds: VaultItemField['kind'][]): string {

@@ -11,6 +11,8 @@ import {
   loadFillCredential,
   loadPanelState,
   lockExtension,
+  saveExtensionLocale,
+  saveExtensionServerSettings,
   setActiveOrigin,
   updateSelection
 } from './repository'
@@ -77,6 +79,12 @@ async function handleRequest(message: ExtensionRequest, sender: chrome.runtime.M
       await closeExtensionVaultSession()
       await lockExtension()
       return { ok: true, state: await loadPanelState() }
+    case 'panel.locale.set':
+      assertExtensionPageSender(sender)
+      return { ok: true, state: await saveExtensionLocale(message.locale) }
+    case 'panel.server.set':
+      assertExtensionPageSender(sender)
+      return { ok: true, state: await saveExtensionServerSettings(message.settings) }
     case 'panel.web.open':
       assertExtensionPageSender(sender)
       return { ok: true, state: await authorizeAccount(message.page) }
@@ -90,6 +98,9 @@ async function handleRequest(message: ExtensionRequest, sender: chrome.runtime.M
       await chrome.action.openPopup()
       return { ok: true }
     }
+    case 'content.locale.get':
+      assertContentScriptSender(sender)
+      return { ok: true, locale: (await loadPanelState()).locale }
     case 'content.menu.get': {
       assertPageSender(sender, message.origin)
       const state = await loadConsistentPanelState()
@@ -127,6 +138,12 @@ function assertPageSender(sender: chrome.runtime.MessageSender, claimedOrigin: s
   if (!sender.tab?.id || !sender.url) throw new Error('page sender is missing')
   const senderOrigin = new URL(sender.url).origin
   if (senderOrigin !== claimedOrigin) throw new Error('page origin mismatch')
+}
+
+function assertContentScriptSender(sender: chrome.runtime.MessageSender): void {
+  if (!sender.tab?.id || !sender.url) throw new Error('page sender is missing')
+  const protocol = new URL(sender.url).protocol
+  if (protocol !== 'http:' && protocol !== 'https:') throw new Error('page sender is invalid')
 }
 
 function errorMessage(error: unknown): string {

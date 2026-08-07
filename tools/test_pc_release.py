@@ -1,5 +1,6 @@
 import importlib.util
 import io
+import json
 import sys
 import tempfile
 import unittest
@@ -93,6 +94,162 @@ class PcReleaseTests(unittest.TestCase):
             self.assertIn('"version": "1.2.3"', package_json.read_text(encoding="utf-8"))
             self.assertIn('version = "1.2.3"', cargo_toml.read_text(encoding="utf-8"))
             self.assertIn("version: '1.2.3'", tauri_config.read_text(encoding="utf-8"))
+
+    def test_sync_browser_extension_release_version_updates_package_version(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            browser_package_json = Path(temp_dir) / "package.json"
+            browser_package_json.write_text(
+                '{"name":"browser-extension","version":"0.1.0"}\n',
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(pc_release, "BROWSER_EXTENSION_PACKAGE_JSON", browser_package_json):
+                pc_release.sync_browser_extension_release_version("1.2.3")
+
+            package = json.loads(browser_package_json.read_text(encoding="utf-8"))
+            self.assertEqual(package["version"], "1.2.3")
+
+    def test_normalize_platform_supports_chrome_store(self):
+        self.assertEqual(pc_release.normalize_platform("CHROME-STORE"), "chrome-store")
+        with self.assertRaises(SystemExit):
+            pc_release.normalize_platform("../chrome-store")
+
+    def test_build_browser_extension_uses_release_environment_and_version(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir)
+            expected_package = output_dir / "lockpass-browser-extension-v1.2.3.zip"
+            base_env = {
+                "VITE_LOCKPASS_OFFICIAL_SERVER_URL": "https://lockpass.example.com",
+                "VITE_LOCKPASS_OFFICIAL_API_URL": "https://lockpass.example.com",
+            }
+
+            def fake_run(command, env=None):
+                self.assertEqual(
+                    command,
+                    ["npm", "run", "-w", "@lockpass/browser-extension", "package:store"],
+                )
+                self.assertEqual(env["VITE_LOCKPASS_OFFICIAL_SERVER_URL"], base_env["VITE_LOCKPASS_OFFICIAL_SERVER_URL"])
+                self.assertEqual(env["VITE_LOCKPASS_OFFICIAL_API_URL"], base_env["VITE_LOCKPASS_OFFICIAL_API_URL"])
+                expected_package.write_bytes(b"extension")
+
+            with mock.patch.object(pc_release, "BROWSER_EXTENSION_OUTPUT_DIR", output_dir), mock.patch.object(
+                pc_release, "run", side_effect=fake_run
+            ):
+                package = pc_release.build_browser_extension("1.2.3", base_env)
+
+            self.assertEqual(package, expected_package)
+
+    def test_collect_desktop_artifact_contains_desktop_files(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            nsis_dir = root / "nsis"
+            nsis_dir.mkdir()
+            installer = nsis_dir / "LockPass_1.2.3_x64-setup.exe"
+            installer.write_bytes(b"installer")
+            Path(f"{installer}.sig").write_text("signature\n", encoding="utf-8")
+            chrome_store_dir = root / "dist" / "chrome-store"
+            chrome_store_dir.mkdir(parents=True)
+            existing_browser_package = chrome_store_dir / "existing.zip"
+            existing_browser_package.write_bytes(b"extension")
+            with mock.patch.object(pc_release, "NSIS_DIR", nsis_dir):
+                artifact = pc_release.collect_artifact(
+                    version="1.2.3",
+                    app_id="com.lockpass.next",
+                    channel="web",
+                    dist_dir=root / "dist",
+                    notes="release",
+                    platform="windows-x86_64",
+                    env={"OSS_PUBLIC_BASE_URL": "https://updates.example.com"},
+                    latest_name="latest.json",
+                )
+
+            self.assertTrue(artifact.installer_path.exists())
+            self.assertTrue(artifact.signature_path.exists())
+            self.assertTrue(artifact.latest_json_path.exists())
+            self.assertTrue(existing_browser_package.exists())
+
+    def test_desktop_release_uploads_exclude_browser_extension(self):
+        root = Path("dist")
+        artifact = pc_release.ReleaseArtifact(
+            version="1.2.3",
+            installer_path=root / "LockPass-setup.exe",
+            signature_path=root / "LockPass-setup.exe.sig",
+            latest_json_path=root / "latest.json",
+        )
+
+        uploads = pc_release.release_uploads(
+            artifact,
+            "apps/com.lockpass.next/web/windows-x86_64",
+            "latest.json",
+        )
+
+        self.assertEqual(
+            [source.name for source, _, _ in uploads],
+            [
+                "LockPass-setup.exe",
+                "LockPass-setup.exe.sig",
+                "latest.json",
+            ],
+        )
+
+    def test_collect_and_upload_browser_extension_artifact(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            package = root / "lockpass-browser-extension-v1.2.3.zip"
+            package.write_bytes(b"extension")
+
+            artifact = pc_release.collect_browser_extension_artifact(
+                "1.2.3",
+                package,
+                root / "dist",
+            )
+            uploads = pc_release.browser_extension_uploads(
+                artifact,
+                "apps/com.lockpass.next/web/chrome-store",
+            )
+
+            self.assertEqual(
+                artifact.package_path,
+                root / "dist" / "chrome-store" / package.name,
+            )
+            self.assertEqual(artifact.package_path.read_bytes(), b"extension")
+            self.assertEqual([source.name for source, _, _ in uploads], [package.name])
+            self.assertEqual(
+                uploads[0][1],
+                "apps/com.lockpass.next/web/chrome-store/lockpass-browser-extension-v1.2.3.zip",
+            )
+
+    def test_build_chrome_store_release_uses_release_tag_without_desktop_build(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            package_json = root / "package.json"
+            package_json.write_text(
+                '{"name":"browser-extension","version":"0.1.0"}\n',
+                encoding="utf-8",
+            )
+            package = root / "lockpass-browser-extension-v1.2.3.zip"
+            package.write_bytes(b"extension")
+
+            with mock.patch.object(pc_release, "BROWSER_EXTENSION_PACKAGE_JSON", package_json), mock.patch.object(
+                pc_release, "build_browser_extension", return_value=package
+            ) as build_extension, mock.patch.object(
+                pc_release, "resolve_dist_dir", return_value=root / "dist"
+            ), mock.patch.object(pc_release, "build_release") as build_desktop, mock.patch.object(
+                pc_release, "upload_browser_extension_to_oss"
+            ) as upload_extension:
+                result = pc_release.build_chrome_store_release(
+                    "com.lockpass.next",
+                    "web",
+                    "chrome-store",
+                    False,
+                    {"RELEASE_TAG": "v1.2.3"},
+                )
+
+            self.assertEqual(result, 0)
+            self.assertEqual(json.loads(package_json.read_text(encoding="utf-8"))["version"], "1.2.3")
+            build_extension.assert_called_once_with("1.2.3", {"RELEASE_TAG": "v1.2.3"})
+            build_desktop.assert_not_called()
+            upload_extension.assert_not_called()
 
     def test_resolve_channel_rejects_invalid_names(self):
         with self.assertRaises(SystemExit):

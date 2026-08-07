@@ -1,3 +1,5 @@
+import { resolveExtensionLocale, type ExtensionLocale } from '../locales/registry.ts'
+
 export interface ContentLabels {
   openQuickPanel: string
   loading: string
@@ -8,7 +10,7 @@ export interface ContentLabels {
   openVault: string
 }
 
-const messages: Record<'zh-CN' | 'en-US', ContentLabels> = {
+const messages: Record<ExtensionLocale, ContentLabels> = {
   'zh-CN': {
     openQuickPanel: '打开 LockPass 快捷面板',
     loading: '正在查找登录信息...',
@@ -29,6 +31,8 @@ const messages: Record<'zh-CN' | 'en-US', ContentLabels> = {
   }
 }
 
-export function contentLabels(language = navigator.language): ContentLabels {
-  return messages[language.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en-US']
+export function contentLabels(
+  locale: ExtensionLocale = resolveExtensionLocale(navigator.language)
+): ContentLabels {
+  return messages[locale]
 }

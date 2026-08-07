@@ -1,8 +1,8 @@
 # Tools
 
-## Windows Release
+## PC Release
 
-`pc_release.py` builds the Tauri NSIS installer, copies release artifacts to `tools/dist/pc_release`, creates `latest.json`, and can upload the installer, signature, and manifest to Aliyun OSS.
+`pc_release.py` builds one release platform at a time and can upload that platform's artifacts to Aliyun OSS.
 
 ```powershell
 python -m pip install -r tools/requirements.txt
@@ -14,44 +14,6 @@ Generate an updater signing key:
 ```powershell
 npm exec -w @lockpass/desktop tauri signer generate -- --write-keys "$env:USERPROFILE\.tauri\lockpass.key" --ci --force
 ```
-
-Build locally:
-
-```powershell
-python tools/pc_release.py --channel web --platform windows-x86_64
-```
-
-Upload to OSS:
-
-```powershell
-python tools/pc_release.py --channel web --platform windows-x86_64 --upload --notes "Release notes"
-```
-
-Useful options:
-
-```text
---channel     Required release channel, for example web.
---platform    Required Tauri updater platform key, for example windows-x86_64.
---upload      Upload installer, signature, and latest.json.
---notes       Override RELEASE_NOTES for latest.json.
-```
-
-The script always rebuilds the desktop installer before collecting artifacts. Release files are uploaded under:
-
-```text
-<OSS_APPS_DIR>/<Tauri identifier>/<channel>/<platform>/
-```
-
-Uploads overwrite existing OSS objects by default.
-
-Set the release version in `tools/pc_release.env` with a semantic version tag:
-
-```text
-RELEASE_TAG=v0.1.3
-```
-
-The script also accepts Git tag references such as `refs/tags/v0.1.3`. Before building, it synchronizes the version without the leading `v` to the desktop `package.json`, Rust `Cargo.toml`, Tauri config, and generated `latest.json`.
-
 Signing configuration distinguishes private and public keys explicitly:
 
 ```text
@@ -62,17 +24,53 @@ LOCKPASS_SIGNING_PRIVATE_KEY_PATH=tools/keys/lockpass.key
 LOCKPASS_SIGNING_PUBLIC_KEY_PATH=tools/keys/lockpass.key.pub
 ```
 
-CI can provide the key contents through the `TAURI_*` variables. Local releases normally use the two `LOCKPASS_*_PATH` variables. The public key must match `plugins.updater.pubkey` in the Tauri config.
-
-Advanced settings such as signing key paths, OSS app directory, bucket, endpoint, and public URL live in `tools/pc_release.env`. To use another env file, set:
+Build locally:
 
 ```powershell
-$env:LOCKPASS_RELEASE_ENV = "tools\pc_release.prod.env"
+python tools/pc_release.py --channel web --platform windows-x86_64
 ```
 
-Upload cache policy:
+Build a standalone Chrome Web Store package:
+
+```powershell
+python tools/pc_release.py --channel web --platform chrome-store
+```
+
+Upload to OSS:
+
+```powershell
+python tools/pc_release.py --channel web --platform windows-x86_64 --upload --notes "Release notes"
+```
+
+Upload the Chrome Store package to the configured OSS release directory:
+
+```powershell
+python tools/pc_release.py --channel web --platform chrome-store --upload
+```
+
+Useful options:
 
 ```text
-installer / .sig  Cache-Control: public, max-age=31536000, immutable
-latest.json       Cache-Control: no-cache
+--channel     Required release channel, for example web.
+--platform    Required release platform: windows-x86_64 or chrome-store.
+--upload      Upload the selected platform artifacts to OSS.
+--notes       Override RELEASE_NOTES for desktop latest.json.
 ```
+
+
+Set the release version in `tools/pc_release.env` with a semantic version tag:
+
+```text
+RELEASE_TAG=v0.1.3
+```
+
+The version parsed from `RELEASE_TAG` is synchronized only to the selected platform. Desktop builds update the desktop app, Rust crate, Tauri config, and `latest.json`. `chrome-store` builds update the browser extension package and generated manifest without building or signing the desktop app.
+
+Chrome Store builds require production HTTPS addresses:
+
+```text
+VITE_LOCKPASS_OFFICIAL_SERVER_URL=https://your-domain.example
+VITE_LOCKPASS_OFFICIAL_API_URL=https://your-domain.example
+```
+
+Desktop artifacts are written to `tools/dist/pc_release`. Chrome Store packages are written separately to `tools/dist/pc_release/chrome-store/lockpass-browser-extension-v0.1.3.zip` and use the OSS platform prefix `chrome-store`.

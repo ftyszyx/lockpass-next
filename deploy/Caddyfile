@@ -1,0 +1,22 @@
+{$LOCKPASS_DOMAIN} {
+	encode zstd gzip
+
+	@api path /health /auth/* /devices/* /sync/* /console/* /admin/*
+	handle @api {
+		reverse_proxy server:8080
+	}
+
+	handle {
+		root * /srv/web
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+{$LOCKPASS_ADMIN_DOMAIN} {
+	encode zstd gzip
+
+	root * /srv/admin_web
+	try_files {path} /index.html
+	file_server
+}

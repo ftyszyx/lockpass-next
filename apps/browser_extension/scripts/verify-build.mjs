@@ -16,7 +16,9 @@ const requiredFiles = [
 await Promise.all(requiredFiles.map((file) => access(resolve(root, file))))
 
 const manifest = JSON.parse(await readFile(resolve(root, 'dist/manifest.json'), 'utf8'))
+const packageJson = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'))
 if (manifest.manifest_version !== 3) throw new Error('manifest must use version 3')
+if (manifest.version !== packageJson.version) throw new Error('manifest and package versions must match')
 if (manifest.action?.default_popup !== 'popup.html') throw new Error('popup entry is missing')
 if (manifest.background?.service_worker !== 'background.js') throw new Error('background worker entry is missing')
 
