@@ -1,4 +1,4 @@
-{$LOCKPASS_PUBLIC_URL} {
+http://:80 {
 	encode zstd gzip
 
 	@api path /health /auth/* /devices/* /sync/* /console/* /admin/*
@@ -13,7 +13,7 @@
 	}
 }
 
-{$LOCKPASS_ADMIN_URL} {
+http://:8081 {
 	encode zstd gzip
 
 	root * /srv/admin_web

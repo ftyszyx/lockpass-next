@@ -6,6 +6,7 @@ tools/dist/
 build/
 .turbo/
 *.local
+!deploy/Caddyfile.local
 .DS_Store
 *.log
 __pycache__/
@@ -27,6 +28,7 @@ apps/mobile/ios/
 *.key
 *.vault
 .env
+.env.deploy
 .codex-logs/
 .codex/
 

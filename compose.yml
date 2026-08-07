@@ -4,13 +4,17 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: lockpass
-      POSTGRES_USER: lockpass
+      POSTGRES_DB: ${POSTGRES_DB:-lockpass}
+      POSTGRES_USER: ${POSTGRES_USER:-lockpass}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the deployment env file}
+      PGPORT: ${POSTGRES_PORT:-5432}
+    command: ["postgres", "-p", "${POSTGRES_PORT:-5432}"]
+    ports:
+      - "${POSTGRES_BIND_ADDRESS:-127.0.0.1}:${POSTGRES_HOST_PORT:-5432}:${POSTGRES_PORT:-5432}"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U lockpass -d lockpass"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p $${PGPORT} -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -23,8 +27,8 @@ services:
       context: ./server
     environment:
       LOCKPASS_SERVER_ADDR: 0.0.0.0:8080
-      DATABASE_URL: postgres://lockpass:${POSTGRES_PASSWORD}@postgres:5432/lockpass
-      LOCKPASS_CORS_ORIGIN: https://${LOCKPASS_DOMAIN},https://${LOCKPASS_ADMIN_DOMAIN},http://tauri.localhost
+      DATABASE_URL: "postgres://${POSTGRES_USER:-lockpass}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-lockpass}"
+      LOCKPASS_CORS_ORIGIN: "${LOCKPASS_PUBLIC_URL:-http://localhost},${LOCKPASS_ADMIN_URL:-http://localhost:8081},http://tauri.localhost"
       LOCKPASS_BOOTSTRAP_ADMIN_USERNAME: ${LOCKPASS_ADMIN_USERNAME:?Set LOCKPASS_ADMIN_USERNAME in the deployment env file}
       LOCKPASS_BOOTSTRAP_ADMIN_PASSWORD: ${LOCKPASS_ADMIN_PASSWORD:?Set LOCKPASS_ADMIN_PASSWORD in the deployment env file}
       RUST_LOG: ${LOCKPASS_RUST_LOG:-lockpass_sync_server=info,tower_http=info}
@@ -42,15 +46,20 @@ services:
       context: .
       dockerfile: deploy/Dockerfile
       args:
-        VITE_LOCKPASS_OFFICIAL_SERVER_URL: https://${LOCKPASS_DOMAIN:?Set LOCKPASS_DOMAIN in the deployment env file}
-        VITE_LOCKPASS_OFFICIAL_API_URL: https://${LOCKPASS_DOMAIN:?Set LOCKPASS_DOMAIN in the deployment env file}
-        VITE_LOCKPASS_API_BASE_URL: https://${LOCKPASS_DOMAIN:?Set LOCKPASS_DOMAIN in the deployment env file}
+        VITE_LOCKPASS_OFFICIAL_SERVER_URL: ${LOCKPASS_PUBLIC_URL:-http://localhost}
+        VITE_LOCKPASS_OFFICIAL_API_URL: ${LOCKPASS_PUBLIC_URL:-http://localhost}
+        VITE_LOCKPASS_API_BASE_URL: ${LOCKPASS_PUBLIC_URL:-http://localhost}
+        LOCKPASS_DEPLOY_MODE: ${LOCKPASS_DEPLOY_MODE:-local}
+        LOCKPASS_PUBLIC_URL: ${LOCKPASS_PUBLIC_URL:-http://localhost}
+        LOCKPASS_ADMIN_URL: ${LOCKPASS_ADMIN_URL:-http://localhost:8081}
     environment:
-      LOCKPASS_DOMAIN: ${LOCKPASS_DOMAIN:?Set LOCKPASS_DOMAIN in the deployment env file}
-      LOCKPASS_ADMIN_DOMAIN: ${LOCKPASS_ADMIN_DOMAIN:?Set LOCKPASS_ADMIN_DOMAIN in the deployment env file}
+      LOCKPASS_DEPLOY_MODE: ${LOCKPASS_DEPLOY_MODE:-local}
+      LOCKPASS_PUBLIC_URL: ${LOCKPASS_PUBLIC_URL:-http://localhost}
+      LOCKPASS_ADMIN_URL: ${LOCKPASS_ADMIN_URL:-http://localhost:8081}
     ports:
-      - "${HTTP_PORT:-80}:80"
-      - "${HTTPS_PORT:-443}:443"
+      - "${GATEWAY_BIND_ADDRESS:-127.0.0.1}:${HTTP_PORT:-80}:80"
+      - "${GATEWAY_BIND_ADDRESS:-127.0.0.1}:${HTTPS_PORT:-443}:443"
+      - "${ADMIN_BIND_ADDRESS:-127.0.0.1}:${ADMIN_HTTP_PORT:-8081}:8081"
     volumes:
       - caddy-data:/data
       - caddy-config:/config

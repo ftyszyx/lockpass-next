@@ -24,8 +24,22 @@ RUN test -n "${VITE_LOCKPASS_OFFICIAL_SERVER_URL}" \
 
 FROM caddy:2-alpine AS gateway
 
-COPY deploy/Caddyfile /etc/caddy/Caddyfile
+ARG LOCKPASS_DEPLOY_MODE=local
+ARG LOCKPASS_PUBLIC_URL=http://localhost
+ARG LOCKPASS_ADMIN_URL=http://localhost:8081
+
+ENV LOCKPASS_DEPLOY_MODE=${LOCKPASS_DEPLOY_MODE}
+ENV LOCKPASS_PUBLIC_URL=${LOCKPASS_PUBLIC_URL}
+ENV LOCKPASS_ADMIN_URL=${LOCKPASS_ADMIN_URL}
+
+COPY deploy/Caddyfile /etc/caddy/Caddyfile.production
+COPY deploy/Caddyfile.local /etc/caddy/Caddyfile.local
+COPY deploy/gateway-entrypoint.sh /usr/bin/lockpass-gateway-entrypoint
 COPY --from=frontend-builder /app/apps/web/dist /srv/web
 COPY --from=frontend-builder /app/apps/admin_web/dist /srv/admin_web
 
-EXPOSE 80 443
+RUN chmod +x /usr/bin/lockpass-gateway-entrypoint
+
+EXPOSE 80 443 8081
+
+ENTRYPOINT ["/usr/bin/lockpass-gateway-entrypoint"]

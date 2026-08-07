@@ -4,15 +4,6 @@ LockPass Next 是 LockPass 的全新重写版本。当前阶段优先实现桌�
 
 当前开发重点是桌面端、用户 Web 端、本地缓存模型、安全边界、同步协议、开源服务器端和管理员后台。移动端、浏览器插件、多人共享保险库和完整托管商业化能力仍属于后续阶段。
 
-## 目标
-
-1. 桌面端优先：当前阶段使用 Tauri 2 覆盖 Windows、macOS 和 Linux。
-2. 本地优先：默认离线可用，本地数据库保存密文数据。
-3. 端到端加密：同步服务器和数据库只能看到密文、版本号和必要元数据。
-4. 可同步：提供开源服务器端和服务器后台，用户可以自部署；官方托管同步服务仍按同一协议后续演进。
-5. 可迁移：数据库 schema、密文格式、同步协议和备份格式都必须版本化。
-6. 可审计：安全模型、迁移策略、服务器边界和关键威胁写入文档。
-
 ## 技术方向
 
 | 模块 | 技术栈 | 说明 |
@@ -23,8 +14,6 @@ LockPass Next 是 LockPass 的全新重写版本。当前阶段优先实现桌�
 | Server | 开源 API 服务 + PostgreSQL | 保存账户、设备、同步元数据和密文数据，不保存明文和可解密密钥 |
 | Admin Web | Vue + Tailwind CSS + TypeScript | 管理员后台，只允许管理员查看和管理实例元数据 |
 | Database | SQLite / PostgreSQL | 桌面端使用本地 SQLite，服务器端使用 PostgreSQL |
-
-后端框架先不与产品协议强绑定。实现时优先选择能稳定交付、方便自部署、便于共享 TypeScript 类型的方案。
 
 ## 仓库结构
 
@@ -40,12 +29,8 @@ packages/
   sync/      同步协议、冲突处理、远端 adapter 类型
   ui/        Vue 组件约定、设计 token、Tailwind preset
 docs/
-  architecture.md
-  product-vision.md
   security-model.md
 ```
-
-
 
 ## 本地开发
 
@@ -54,12 +39,6 @@ docs/
 ```bash
 npm install
 npm run dev:desktop
-```
-
-需要调试 Tauri WebView 时使用：
-
-```bash
-npm run dev:desktop:debug
 ```
 
 ### 服务器端
@@ -86,12 +65,9 @@ npm run dev:admin_web
 
 ```bash
 npm run dev:landing
-npm run build:landing
 ```
 
 ### web extension
-
-
 先构建
 ```
 npm run build:extension
@@ -103,5 +79,34 @@ npm run build:extension
 选择：
 E:\opensource\mywork\lockpass-next\apps\browser_extension\dist
 点击浏览器工具栏中的 LockPass 图标
-Chrome 应打开密码库侧边栏
 
+
+## 服务端部署
+
+### 本地docker部署
+```
+Copy-Item .env.deploy.example .env.deploy
+docker compose --env-file .env.deploy up -d --build
+```
+
+访问：
+用户端/API：http://localhost
+管理后台：http://localhost:8081
+
+### 生产环境部署
+
+```
+Copy-Item .env.deploy.production.example .env.deploy
+```
+
+修改对应的域名,需要在 DNS 中配置 CNAME 记录指向服务器 IP 地址
+LOCKPASS_PUBLIC_URL=https://lockpass.example.com
+LOCKPASS_ADMIN_URL=https://admin.lockpass.example.com
+
+### 启动
+
+``` 
+docker compose --env-file .env.deploy up -d --build
+```
+
+生产模式会校验 HTTPS 地址，Caddy 自动申请和续期证书。

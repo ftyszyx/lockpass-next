@@ -1,3 +1,11 @@
+## Build Docker images
+## 需要配置  secrets
+## DOCKERHUB_USERNAME
+## DOCKERHUB_TOKEN
+##  variables
+## LOCKPASS_PUBLIC_URL: 用户web和api的公网访问地址，必须是https开头https://vault.lockpass.cn
+## LOCKPASS_ADMIN_URL: 管理员web，必须是https开头https://admin.lockpass.cn
+
 name: Build Docker images
 
 on:
@@ -9,6 +17,10 @@ on:
     inputs:
       public_url:
         description: Public user Web and API URL used by the gateway image
+        required: false
+        type: string
+      admin_url:
+        description: Public administrator Web URL used by the gateway image
         required: false
         type: string
 
@@ -76,6 +88,7 @@ jobs:
       packages: write
     env:
       PUBLIC_URL: ${{ inputs.public_url || vars.LOCKPASS_PUBLIC_URL }}
+      ADMIN_URL: ${{ inputs.admin_url || vars.LOCKPASS_ADMIN_URL }}
 
     steps:
       - name: Checkout
@@ -87,10 +100,22 @@ jobs:
             echo "Set the LOCKPASS_PUBLIC_URL repository variable or provide public_url when running the workflow manually."
             exit 1
           fi
+          if [ -z "$ADMIN_URL" ]; then
+            echo "Set the LOCKPASS_ADMIN_URL repository variable or provide admin_url when running the workflow manually."
+            exit 1
+          fi
           case "$PUBLIC_URL" in
             https://*) ;;
             *) echo "LOCKPASS_PUBLIC_URL must start with https://"; exit 1 ;;
           esac
+          case "$ADMIN_URL" in
+            https://*) ;;
+            *) echo "LOCKPASS_ADMIN_URL must start with https://"; exit 1 ;;
+          esac
+          if [ "$PUBLIC_URL" = "$ADMIN_URL" ]; then
+            echo "LOCKPASS_PUBLIC_URL and LOCKPASS_ADMIN_URL must be different."
+            exit 1
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -123,5 +148,8 @@ jobs:
             VITE_LOCKPASS_OFFICIAL_SERVER_URL=${{ env.PUBLIC_URL }}
             VITE_LOCKPASS_OFFICIAL_API_URL=${{ env.PUBLIC_URL }}
             VITE_LOCKPASS_API_BASE_URL=${{ env.PUBLIC_URL }}
+            LOCKPASS_DEPLOY_MODE=production
+            LOCKPASS_PUBLIC_URL=${{ env.PUBLIC_URL }}
+            LOCKPASS_ADMIN_URL=${{ env.ADMIN_URL }}
           cache-from: type=gha,scope=gateway
           cache-to: type=gha,mode=max,scope=gateway
