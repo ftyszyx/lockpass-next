@@ -1,9 +1,10 @@
 # LockPass Web App
 
-设置环境变量 VITE_LOCKPASS_OFFICIAL_API_URL: http://api.lockpass.cn
+## 环境变量
 
-编译
+生产构建需要配置用户 Web 地址和 API 地址：
 
 ```bash
-npm run build:web
+VITE_LOCKPASS_OFFICIAL_SERVER_URL=https://vault.lockpass.cn
+VITE_LOCKPASS_OFFICIAL_API_URL=https://api.lockpass.cn
 ```
