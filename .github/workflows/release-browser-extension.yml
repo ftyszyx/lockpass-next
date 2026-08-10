@@ -1,0 +1,77 @@
+# Required GitHub repository variables:
+# - LOCKPASS_PUBLIC_URL, for example https://vault.lockpass.example.com
+
+name: Release browser extension
+
+on:
+  push:
+    tags:
+      - "v*"
+      - "[0-9]*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build and release browser extension ZIP
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+      VITE_LOCKPASS_OFFICIAL_SERVER_URL: ${{ vars.LOCKPASS_PUBLIC_URL }}
+      VITE_LOCKPASS_OFFICIAL_API_URL: ${{ vars.LOCKPASS_PUBLIC_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Validate release configuration
+        shell: bash
+        run: |
+          case "$VITE_LOCKPASS_OFFICIAL_SERVER_URL" in
+            https://*) ;;
+            *) echo "Set LOCKPASS_PUBLIC_URL to the production HTTPS user Web/API origin."; exit 1 ;;
+          esac
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          python -m pip install --disable-pip-version-check -r tools/requirements.txt
+
+      - name: Test release tooling
+        run: python -m unittest tools/test_pc_release.py
+
+      - name: Build browser extension package
+        run: python tools/pc_release.py --channel web --platform chrome-store
+
+      - name: Create GitHub Release and upload browser package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$GITHUB_REF_NAME"
+          if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            if ! gh release create "$tag" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$tag" --generate-notes; then
+              sleep 3
+              gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null
+            fi
+          fi
+
+          files=(tools/dist/pc_release/chrome-store/*.zip)
+          if [ ! -f "${files[0]}" ]; then
+            echo "Browser extension ZIP was not created."
+            exit 1
+          fi
+          gh release upload "$tag" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
