@@ -139,7 +139,7 @@ class PcReleaseTests(unittest.TestCase):
 
             self.assertEqual(package, expected_package)
 
-    def test_collect_desktop_artifact_contains_desktop_files(self):
+    def test_collect_desktop_artifact_generates_single_platform_latest_json(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             nsis_dir = root / "nsis"
@@ -167,6 +167,18 @@ class PcReleaseTests(unittest.TestCase):
             self.assertTrue(artifact.signature_path.exists())
             self.assertTrue(artifact.latest_json_path.exists())
             self.assertTrue(existing_browser_package.exists())
+
+            latest = json.loads(artifact.latest_json_path.read_text(encoding="utf-8"))
+            self.assertEqual(latest["version"], "1.2.3")
+            self.assertEqual(latest["channel"], "web")
+            self.assertEqual(latest["platform"], "windows-x86_64")
+            self.assertEqual(latest["notes"], "release")
+            self.assertEqual(latest["signature"], "signature")
+            self.assertEqual(
+                latest["url"],
+                "https://updates.example.com/apps/com.lockpass.next/web/windows-x86_64/LockPass_1.2.3_x64-setup.exe",
+            )
+            self.assertNotIn("platforms", latest)
 
     def test_desktop_release_uploads_exclude_browser_extension(self):
         root = Path("dist")

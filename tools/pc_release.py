@@ -464,14 +464,12 @@ def collect_artifact(
     installer_url = join_url(base_url, asset_prefix, installer_copy.name)
     latest = {
         "version": version,
+        "channel": channel,
+        "platform": platform,
         "notes": notes if notes is not None else env.get("RELEASE_NOTES", ""),
         "pub_date": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-        "platforms": {
-            platform: {
-                "signature": signature_copy.read_text(encoding="utf-8").strip(),
-                "url": installer_url,
-            }
-        },
+        "url": installer_url,
+        "signature": signature_copy.read_text(encoding="utf-8").strip(),
     }
 
     latest_path = dist_dir / latest_name

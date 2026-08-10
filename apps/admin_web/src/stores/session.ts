@@ -39,6 +39,14 @@ export const useSessionStore = defineStore('session', () => {
     return result
   }
 
+  async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    if (!token.value) throw new Error('unauthorized')
+    await withLoading(async () => {
+      const result = await api.changeAdminPassword(token.value!, currentPassword, newPassword)
+      setAuth(result.token, result.account)
+    })
+  }
+
   async function logout() {
     if (token.value) {
       try {
@@ -60,6 +68,10 @@ export const useSessionStore = defineStore('session', () => {
     token.value = null
     account.value = null
     localStorage.removeItem(tokenStorageKey)
+  }
+
+  function clearError() {
+    error.value = null
   }
 
   async function withLoading(task: () => Promise<void>) {
@@ -86,6 +98,8 @@ export const useSessionStore = defineStore('session', () => {
     refreshHealth,
     restore,
     adminLogin,
-    logout
+    changePassword,
+    logout,
+    clearError
   }
 })

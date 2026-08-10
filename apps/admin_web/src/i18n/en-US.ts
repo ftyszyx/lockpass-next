@@ -65,6 +65,7 @@ const enUS: ServerWebMessages = {
     systemQuota: 'Quotas',
     audit: 'Audit logs',
     accountMenu: 'Account menu',
+    changePassword: 'Change password',
     logout: 'Log out',
     userOverview: 'User console overview',
     userLocalAccounts: 'User console data spaces',
@@ -123,9 +124,22 @@ const enUS: ServerWebMessages = {
     smsLogin: 'SMS login',
     googleLogin: 'Google login',
     wechatLogin: 'WeChat login',
-    defaultDesktopDeviceName: 'LockPass Desktop',
     adminRequired: 'Admin access required',
     adminRequiredBody: 'This account is not an administrator and cannot view the admin console. Use the LockPass user web app or desktop app instead.'
+  },
+  changePassword: {
+    title: 'Change password',
+    currentPassword: 'Current password',
+    newPassword: 'New password',
+    confirmPassword: 'Confirm new password',
+    submit: 'Change password',
+    cancel: 'Cancel',
+    close: 'Close',
+    saved: 'Password changed',
+    required: 'Complete all password fields',
+    minimumLength: 'The new password must be at least 8 characters',
+    mismatch: 'The new passwords do not match',
+    unchanged: 'The new password must differ from the current password'
   },
   consoleOverview: {
     usageSummary: 'Usage summary',
@@ -191,7 +205,7 @@ const enUS: ServerWebMessages = {
     sections: {
       general: {
         title: 'General settings',
-        summary: 'Configure the public instance URL and standard user account creation.'
+        summary: 'Configure standard account creation. The admin console never provides a registration entry point.'
       },
       email: {
         title: 'Email codes',
@@ -208,8 +222,8 @@ const enUS: ServerWebMessages = {
     },
     configItem: 'Config item',
     value: 'Value',
-    registrationEnabled: 'Registration',
-    publicBaseUrl: 'Public base URL',
+    registrationEnabled: 'Allow user self-registration',
+    registrationScope: 'Only affects server account creation in the user web app and clients. Existing accounts can still sign in when disabled.',
     smsEnabled: 'SMS login',
     googleEnabled: 'Google login',
     wechatEnabled: 'WeChat login',
@@ -321,6 +335,8 @@ const enUS: ServerWebMessages = {
     summary: 'View technical spaces used to save encrypted data under this server account. The first version usually has only the default space.'
   },
   errors: {
+    currentPasswordIncorrect: 'The current password is incorrect.',
+    passwordUnchanged: 'The new password must differ from the current password.',
     unauthorized: 'Invalid email or password.',
     forbidden: 'This account does not have permission for this action.',
     conflict: 'The data already exists or has changed. Refresh and try again.',

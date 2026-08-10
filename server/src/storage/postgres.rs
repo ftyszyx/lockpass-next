@@ -1582,6 +1582,96 @@ impl PostgresStore {
         })
     }
 
+    pub fn admin_change_password(
+        &self,
+        actor: &AuthPrincipal,
+        current_password: &str,
+        new_password: &str,
+    ) -> AppResult<AuthResponse> {
+        let pool = self.pool.clone();
+        let auth = self.auth.clone();
+        let account_id = actor.account_id;
+        let current_password = current_password.to_string();
+        let new_password = new_password.to_string();
+
+        run_blocking(async move {
+            let mut tx = pool.begin().await?;
+            let mut account = fetch_account_required_for_update(&mut tx, account_id).await?;
+            let password_hash = account
+                .password_hash
+                .as_deref()
+                .ok_or(AppError::Unauthorized)?;
+
+            auth.passwords()
+                .verify(password_hash, &current_password)
+                .map_err(|_| AppError::UnauthorizedCode {
+                    code: "current_password_incorrect",
+                    message: "current password is incorrect".to_string(),
+                })?;
+
+            if auth
+                .passwords()
+                .verify(password_hash, &new_password)
+                .is_ok()
+            {
+                return Err(AppError::BadRequestCode {
+                    code: "password_unchanged",
+                    message: "new password must be different from the current password".to_string(),
+                });
+            }
+
+            let new_password_hash = auth.passwords().hash(&new_password)?;
+            let now = Utc::now();
+            account.password_hash = Some(new_password_hash.clone());
+            account.updated_at = now;
+
+            sqlx::query("update accounts set password_hash = $1, updated_at = $2 where id = $3")
+                .bind(&new_password_hash)
+                .bind(now)
+                .bind(account_id)
+                .execute(&mut *tx)
+                .await?;
+
+            let revoked_sessions = sqlx::query("delete from auth_sessions where account_id = $1")
+                .bind(account_id)
+                .execute(&mut *tx)
+                .await?
+                .rows_affected();
+
+            let session = auth.secrets().issue(SESSION_TOKEN_PREFIX);
+            sqlx::query(
+                "insert into auth_sessions (token_hash, account_id, expires_at, created_at) values ($1, $2, $3, $4)",
+            )
+            .bind(session.hash())
+            .bind(account_id)
+            .bind(now + Duration::days(30))
+            .bind(now)
+            .execute(&mut *tx)
+            .await?;
+
+            sqlx::query(
+                "insert into admin_audit_logs (actor_account_id, action, target_type, target_id, metadata, created_at) \
+                 values ($1, $2, $3, $4, $5, $6)",
+            )
+            .bind(account_id)
+            .bind("account.password.change")
+            .bind("account")
+            .bind(account_id.to_string())
+            .bind(json!({ "revokedSessions": revoked_sessions }))
+            .bind(now)
+            .execute(&mut *tx)
+            .await?;
+
+            tx.commit().await?;
+
+            Ok(AuthResponse {
+                account: account.to_view(),
+                token: session.into_value(),
+                token_type: "Bearer".to_string(),
+            })
+        })
+    }
+
     pub fn admin_account(&self, account_id: Uuid) -> AppResult<AccountView> {
         self.profile(account_id)
     }
@@ -1697,9 +1787,6 @@ impl PostgresStore {
         let actor_account_id = actor.account_id;
         run_blocking(async move {
             let mut config = load_instance_config(&pool).await?;
-            if let Some(value) = patch.public_base_url {
-                config.public_base_url = normalize_public_base_url(&value)?;
-            }
             if let Some(value) = patch.registration_enabled {
                 config.registration_enabled = value;
             }
@@ -2889,21 +2976,6 @@ async fn save_instance_config_if_missing(
     .execute(connection)
     .await?;
     Ok(())
-}
-
-fn normalize_public_base_url(value: &str) -> AppResult<String> {
-    let value = value.trim().trim_end_matches('/');
-    if value.is_empty() {
-        return Err(AppError::BadRequest(
-            "public base URL is required".to_string(),
-        ));
-    }
-    if !(value.starts_with("http://") || value.starts_with("https://")) {
-        return Err(AppError::BadRequest(
-            "public base URL must start with http:// or https://".to_string(),
-        ));
-    }
-    Ok(value.to_string())
 }
 
 async fn save_instance_config(pool: &PgPool, config: &InstanceConfig) -> AppResult<()> {

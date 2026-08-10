@@ -5,6 +5,8 @@ const errorCodeMessages: Record<string, Parameters<typeof t>[0]> = {
   unauthorized: 'errors.unauthorized',
   forbidden: 'errors.forbidden',
   conflict: 'errors.conflict',
+  current_password_incorrect: 'errors.currentPasswordIncorrect',
+  password_unchanged: 'errors.passwordUnchanged',
   cannot_disable_current_account: 'errors.cannotDisableCurrentAccount',
   cannot_disable_last_enabled_admin: 'errors.cannotDisableLastEnabledAdmin',
   cannot_remove_current_admin_role: 'errors.cannotRemoveCurrentAdminRole',

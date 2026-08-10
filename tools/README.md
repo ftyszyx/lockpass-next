@@ -2,7 +2,7 @@
 
 ## PC Release
 
-`pc_release.py` builds one release platform at a time and can upload that platform's artifacts to Aliyun OSS.
+`pc_release.py` builds one release platform at a time, creates a single-platform Tauri updater `latest.json`, and can upload that platform's artifacts to Aliyun OSS.
 
 ```powershell
 python -m pip install -r tools/requirements.txt
@@ -65,6 +65,14 @@ RELEASE_TAG=v0.1.3
 ```
 
 The version parsed from `RELEASE_TAG` is synchronized only to the selected platform. Desktop builds update the desktop app, Rust crate, Tauri config, and `latest.json`. `chrome-store` builds update the browser extension package and generated manifest without building or signing the desktop app.
+
+Each desktop platform publishes its own updater manifest:
+
+```text
+apps/com.lockpass.next/<channel>/<platform>/latest.json
+```
+
+The manifest contains top-level `channel`, `platform`, `url`, and `signature` fields. It does not contain a multi-platform `platforms` object.
 
 Chrome Store builds require production HTTPS addresses:
 

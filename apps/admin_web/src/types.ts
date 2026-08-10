@@ -61,13 +61,6 @@ export interface EmailVerifyResponse {
   expiresAt: string
 }
 
-export interface DeviceBindResponse {
-  account: AccountView
-  device: DeviceView
-  deviceToken: string
-  tokenType: string
-}
-
 export interface MeResponse {
   account: AccountView
   device?: DeviceView | null
@@ -83,7 +76,6 @@ export interface HealthResponse {
 }
 
 export interface InstanceConfig {
-  publicBaseUrl: string
   registrationEnabled: boolean
   smsEnabled: boolean
   googleEnabled: boolean

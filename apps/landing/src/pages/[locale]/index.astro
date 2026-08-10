@@ -1,7 +1,9 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro'
+import DownloadRuntime from '../../components/DownloadRuntime.astro'
+import DownloadSection from '../../components/DownloadSection.astro'
+import { loadDownloadPlatforms, preferredDownload } from '../../downloads'
 import { localeLabels, locales, messages, type Locale } from '../../i18n'
-import { loadWindowsDownload, updateFeedHref } from '../../site'
 
 export function getStaticPaths() {
   return locales.map((locale) => ({ params: { locale } }))
@@ -12,7 +14,8 @@ const t = messages[locale]
 const alternateLocale: Locale = locale === 'zh-CN' ? 'en-US' : 'zh-CN'
 const alternateHref = `/${alternateLocale}/`
 const currentYear = new Date().getFullYear()
-const download = await loadWindowsDownload()
+const downloads = await loadDownloadPlatforms(locale)
+const recommendedDownload = preferredDownload(downloads)
 const screenshots = [
   {
     src: '/screenshots/desktop-vault.png',
@@ -36,7 +39,7 @@ const screenshots = [
     <nav class="nav-links" aria-label="Primary">
       <a href="#features">{t.nav.features}</a>
       <a href="#workflow">{t.nav.workflow}</a>
-      <a href={download.href} data-download-link>{t.nav.download}</a>
+      <a href="#download">{t.nav.download}</a>
       <a href="#guide">{t.nav.guide}</a>
     </nav>
     <a class="language-link" href={alternateHref} aria-label={localeLabels[alternateLocale]}>
@@ -53,11 +56,11 @@ const screenshots = [
         <h1>{t.hero.title}</h1>
         <p class="hero-subtitle">{t.hero.subtitle}</p>
         <div class="hero-actions">
-          <a class="button button-primary" href={download.href} data-download-link>{t.hero.primaryCta}</a>
+          <a class="button button-primary" href={recommendedDownload.href} download data-recommended-download>{t.hero.primaryCta}</a>
           <a class="button button-secondary" href="#guide">{t.hero.secondaryCta}</a>
         </div>
         <div class="hero-meta" aria-label={t.hero.platformNote}>
-          <span>{t.hero.versionPrefix} <span data-download-version>{download.version}</span></span>
+          <span>{t.hero.versionPrefix} <span data-recommended-version>{recommendedDownload.version}</span></span>
           <span>{t.hero.platformNote}</span>
         </div>
         <ul class="trust-list" aria-label={t.featureSection.eyebrow}>
@@ -107,6 +110,8 @@ const screenshots = [
         }
       </div>
     </section>
+
+    <DownloadSection locale={locale} downloads={downloads} recommendedId={recommendedDownload.id} />
 
     <section id="workflow" class="section">
       <div class="section-heading">
@@ -172,45 +177,5 @@ const screenshots = [
       <span>{currentYear} {t.footer.copyright}</span>
     </div>
   </footer>
-  <script
-    is:inline
-    define:vars={{
-      fallbackDownload: download,
-      updateFeedHref
-    }}
-  >
-    const applyDownload = (download) => {
-      if (!download || typeof download.href !== 'string' || !download.href) return
-      document.querySelectorAll('[data-download-link]').forEach((link) => {
-        link.setAttribute('href', download.href)
-      })
-      document.querySelectorAll('[data-download-version]').forEach((version) => {
-        version.textContent = download.version || fallbackDownload.version
-      })
-    }
-
-    const fileNameFromUrl = (value) => {
-      try {
-        const pathname = new URL(value).pathname
-        return decodeURIComponent(pathname.split('/').filter(Boolean).pop() || fallbackDownload.fileName)
-      } catch {
-        return fallbackDownload.fileName
-      }
-    }
-
-    fetch(`${updateFeedHref}?t=${Date.now()}`)
-      .then((response) => (response.ok ? response.json() : null))
-      .then((manifest) => {
-        const href = manifest?.platforms?.['windows-x86_64']?.url
-        const version = typeof manifest?.version === 'string' && manifest.version.trim() ? manifest.version.trim() : fallbackDownload.version
-        if (typeof href !== 'string' || !href.trim()) return
-        applyDownload({
-          ...fallbackDownload,
-          version,
-          fileName: fileNameFromUrl(href),
-          href
-        })
-      })
-      .catch(() => {})
-  </script>
+  <DownloadRuntime locale={locale} />
 </BaseLayout>

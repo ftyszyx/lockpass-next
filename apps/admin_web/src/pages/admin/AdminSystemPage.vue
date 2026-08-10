@@ -115,13 +115,12 @@ async function save() {
         </p>
         <template v-if="config">
           <div v-if="activeSection === 'general'" class="grid max-w-3xl gap-4">
-            <label class="lp-label">
-              {{ t('adminSystem.publicBaseUrl') }}
-              <input v-model.trim="config.publicBaseUrl" class="lp-input" type="url" />
-            </label>
-            <label class="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
-              <input v-model="config.registrationEnabled" type="checkbox" class="size-4 accent-teal-700" />
-              {{ t('adminSystem.registrationEnabled') }}
+            <label class="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 text-slate-800">
+              <input v-model="config.registrationEnabled" type="checkbox" class="mt-0.5 size-4 shrink-0 accent-teal-700" />
+              <span class="grid gap-1">
+                <strong class="text-sm">{{ t('adminSystem.registrationEnabled') }}</strong>
+                <span class="text-xs font-medium leading-5 text-slate-500">{{ t('adminSystem.registrationScope') }}</span>
+              </span>
             </label>
           </div>
 

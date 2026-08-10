@@ -63,6 +63,7 @@ const zhCN = {
     systemQuota: '配额限制',
     audit: '审计日志',
     accountMenu: '账号菜单',
+    changePassword: '修改密码',
     logout: '退出',
     userOverview: '用户后台概览',
     userLocalAccounts: '用户后台数据空间',
@@ -121,9 +122,22 @@ const zhCN = {
     smsLogin: '手机短信登录',
     googleLogin: 'Google 登录',
     wechatLogin: '微信登录',
-    defaultDesktopDeviceName: 'LockPass 桌面端',
     adminRequired: '需要管理员权限',
     adminRequiredBody: '当前账号不是管理员，无法查看管理员后台。普通用户请使用 LockPass 用户 Web 端或桌面端。'
+  },
+  changePassword: {
+    title: '修改密码',
+    currentPassword: '当前密码',
+    newPassword: '新密码',
+    confirmPassword: '确认新密码',
+    submit: '修改密码',
+    cancel: '取消',
+    close: '关闭',
+    saved: '密码已修改',
+    required: '请填写全部密码字段',
+    minimumLength: '新密码至少需要 8 个字符',
+    mismatch: '两次输入的新密码不一致',
+    unchanged: '新密码不能与当前密码相同'
   },
   consoleOverview: {
     usageSummary: '用量汇总',
@@ -189,7 +203,7 @@ const zhCN = {
     sections: {
       general: {
         title: '基础设置',
-        summary: '配置实例公开地址和普通用户账号创建开关。'
+        summary: '配置普通账号创建策略；管理员后台始终不提供注册入口。'
       },
       email: {
         title: '邮件验证码',
@@ -206,8 +220,8 @@ const zhCN = {
     },
     configItem: '配置项',
     value: '值',
-    registrationEnabled: '开放注册',
-    publicBaseUrl: '公开访问地址',
+    registrationEnabled: '允许普通账号自助注册',
+    registrationScope: '仅影响用户 Web 端和客户端创建服务器账号；关闭后，已有账号仍可正常登录。',
     smsEnabled: '手机短信登录',
     googleEnabled: 'Google 登录',
     wechatEnabled: '微信登录',
@@ -319,6 +333,8 @@ const zhCN = {
     summary: '查看服务器账号下用于保存密文数据的技术空间。第一版通常只有 default 空间。'
   },
   errors: {
+    currentPasswordIncorrect: '当前密码不正确。',
+    passwordUnchanged: '新密码不能与当前密码相同。',
     unauthorized: '邮箱或密码不正确。',
     forbidden: '当前账号没有权限执行此操作。',
     conflict: '数据已存在或状态冲突，请刷新后重试。',

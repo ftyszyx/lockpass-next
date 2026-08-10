@@ -12,8 +12,12 @@ pub type AppResult<T> = Result<T, AppError>;
 pub enum AppError {
     #[error("{0}")]
     BadRequest(String),
+    #[error("{message}")]
+    BadRequestCode { code: &'static str, message: String },
     #[error("unauthorized")]
     Unauthorized,
+    #[error("{message}")]
+    UnauthorizedCode { code: &'static str, message: String },
     #[error("forbidden")]
     Forbidden,
     #[error("{0}")]
@@ -53,7 +57,9 @@ impl IntoResponse for AppError {
         };
         let (status, code) = match &self {
             AppError::BadRequest(_) => (StatusCode::BAD_REQUEST, "bad_request"),
+            AppError::BadRequestCode { code, .. } => (StatusCode::BAD_REQUEST, *code),
             AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "unauthorized"),
+            AppError::UnauthorizedCode { code, .. } => (StatusCode::UNAUTHORIZED, *code),
             AppError::Forbidden => (StatusCode::FORBIDDEN, "forbidden"),
             AppError::NotFound(_) => (StatusCode::NOT_FOUND, "not_found"),
             AppError::Conflict(_) => (StatusCode::CONFLICT, "conflict"),

@@ -142,7 +142,7 @@ router.beforeEach(async (to) => {
   if (!to.meta.public && !session.isAdmin) {
     return { name: 'admin-required' }
   }
-  if (to.meta.public && session.token && to.name !== 'admin-required' && to.query.desktopBind !== '1') {
+  if (to.meta.public && session.token && to.name !== 'admin-required') {
     return { path: session.isAdmin ? String(to.query.redirect || '/admin/accounts') : '/admin-required' }
   }
   return true

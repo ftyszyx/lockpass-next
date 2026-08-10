@@ -1,0 +1,101 @@
+---
+import { getLocalizedDownloadPlatforms } from '@/downloads'
+import { messages, type Locale } from '@/i18n'
+
+interface Props {
+  locale: Locale
+}
+
+const { locale } = Astro.props
+const labels = messages[locale].downloadSection
+const platforms = getLocalizedDownloadPlatforms(locale)
+---
+
+<script
+  is:inline
+  data-download-runtime
+  data-labels={JSON.stringify(labels)}
+  data-platforms={JSON.stringify(platforms)}
+>
+  (function () {
+    const currentScript = document.currentScript
+    if (!currentScript || window.__lockPassDownloadRuntime) return
+    window.__lockPassDownloadRuntime = true
+
+    const labels = JSON.parse(currentScript.dataset.labels || '{}')
+    const platforms = JSON.parse(currentScript.dataset.platforms || '[]')
+    const pickString = (...values) => values.find((value) => typeof value === 'string' && value.trim())
+    const formatVersion = (value) => {
+      const version = String(value || '').trim()
+      if (!version) return labels.unavailable
+      return version.toLowerCase().startsWith('v') ? version : `v${version}`
+    }
+    const fileNameFromUrl = (value) => {
+      try {
+        return decodeURIComponent(new URL(value).pathname.split('/').filter(Boolean).pop() || '')
+      } catch {
+        return ''
+      }
+    }
+
+    const loadPlatform = async (platform) => {
+      try {
+        const response = await fetch(platform.manifestUrl, { cache: 'no-store' })
+        if (!response.ok) throw new Error(String(response.status))
+        const manifest = await response.json()
+        if (typeof manifest.platform === 'string' && manifest.platform !== platform.id) {
+          throw new Error('platform mismatch')
+        }
+        return {
+          ...platform,
+          version: pickString(manifest.version, platform.fallbackVersion),
+          href: pickString(manifest.url, platform.fallbackDownloadUrl)
+        }
+      } catch {
+        return {
+          ...platform,
+          version: platform.fallbackVersion,
+          href: platform.fallbackDownloadUrl
+        }
+      }
+    }
+
+    const detectRecommendedPlatform = (availablePlatforms) => {
+      const userAgent = String(navigator.userAgent || '').toLowerCase()
+      if (userAgent.includes('win')) {
+        return availablePlatforms.find((platform) => platform.id === 'windows-x86_64')?.id || null
+      }
+      return availablePlatforms[0]?.id || null
+    }
+
+    const updatePlatformCard = (platform, recommendedId) => {
+      const card = document.querySelector(`[data-download-platform="${platform.id}"]`)
+      if (!card) return
+      card.setAttribute('href', platform.href)
+      card.classList.toggle('download-card-recommended', platform.id === recommendedId)
+      const version = card.querySelector('[data-platform-version]')
+      const file = card.querySelector('[data-platform-file]')
+      const badge = card.querySelector('[data-recommended-badge]')
+      if (version) version.textContent = formatVersion(platform.version)
+      if (file) file.textContent = fileNameFromUrl(platform.href)
+      if (badge) badge.hidden = platform.id !== recommendedId
+    }
+
+    const updateRecommendedDownload = (platform) => {
+      if (!platform?.href) return
+      document.querySelectorAll('[data-recommended-download]').forEach((link) => {
+        link.setAttribute('href', platform.href)
+        link.setAttribute('download', '')
+      })
+      document.querySelectorAll('[data-recommended-version]').forEach((version) => {
+        version.textContent = platform.version || ''
+      })
+    }
+
+    Promise.all(platforms.map(loadPlatform)).then((results) => {
+      const recommendedId = detectRecommendedPlatform(results)
+      results.forEach((platform) => updatePlatformCard(platform, recommendedId))
+      updateRecommendedDownload(results.find((platform) => platform.id === recommendedId) || results[0])
+    })
+  })()
+</script>

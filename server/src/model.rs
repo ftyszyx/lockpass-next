@@ -315,8 +315,6 @@ pub struct AuditLogView {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InstanceConfig {
-    #[serde(default = "default_public_base_url")]
-    pub public_base_url: String,
     pub registration_enabled: bool,
     pub sms_enabled: bool,
     pub google_enabled: bool,
@@ -331,7 +329,6 @@ pub struct InstanceConfig {
 impl Default for InstanceConfig {
     fn default() -> Self {
         Self {
-            public_base_url: default_public_base_url(),
             registration_enabled: true,
             sms_enabled: false,
             google_enabled: false,
@@ -347,7 +344,6 @@ impl Default for InstanceConfig {
 impl InstanceConfig {
     pub fn to_admin_view(&self) -> AdminInstanceConfigView {
         AdminInstanceConfigView {
-            public_base_url: self.public_base_url.clone(),
             registration_enabled: self.registration_enabled,
             sms_enabled: self.sms_enabled,
             google_enabled: self.google_enabled,
@@ -363,7 +359,6 @@ impl InstanceConfig {
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AdminInstanceConfigView {
-    pub public_base_url: String,
     pub registration_enabled: bool,
     pub sms_enabled: bool,
     pub google_enabled: bool,
@@ -372,10 +367,6 @@ pub struct AdminInstanceConfigView {
     pub official_hosted: bool,
     pub max_devices_per_account: i64,
     pub max_storage_bytes: i64,
-}
-
-fn default_public_base_url() -> String {
-    "http://127.0.0.1:1480".to_string()
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -485,6 +476,13 @@ pub struct EmailLoginRequest {
 pub struct AdminLoginRequest {
     pub username: String,
     pub password: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminPasswordChangeRequest {
+    pub current_password: String,
+    pub new_password: String,
 }
 
 #[derive(Deserialize)]
@@ -938,7 +936,6 @@ pub struct AdminAccountPatchRequest {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AdminConfigPatchRequest {
-    pub public_base_url: Option<String>,
     pub registration_enabled: Option<bool>,
     pub sms_enabled: Option<bool>,
     pub google_enabled: Option<bool>,

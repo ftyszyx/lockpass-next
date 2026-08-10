@@ -1,0 +1,71 @@
+---
+import type { Locale } from '@/i18n'
+import { downloadGroups, type ResolvedDownload } from '@/downloads'
+import { messages } from '@/i18n'
+
+interface Props {
+  locale: Locale
+  downloads: ResolvedDownload[]
+  recommendedId: string
+}
+
+const { locale, downloads, recommendedId } = Astro.props
+const labels = messages[locale].downloadSection
+
+function formatVersion(version: string): string {
+  return version.toLowerCase().startsWith('v') ? version : `v${version}`
+}
+---
+
+<section id="download" class="download-band">
+  <div class="download-inner">
+    <div class="download-heading">
+      <p class="eyebrow">{labels.eyebrow}</p>
+      <h2>{labels.title}</h2>
+      <p>{labels.intro}</p>
+    </div>
+
+    <div class="download-groups" data-download-platforms>
+      {
+        downloadGroups.map((group) => {
+          const groupDownloads = downloads.filter((download) => download.group === group)
+          if (!groupDownloads.length) return null
+          return (
+            <section class="download-group" data-download-group={group}>
+              <h3 class="download-group-title">
+                <span class="windows-mark" aria-hidden="true">
+                  <i></i><i></i><i></i><i></i>
+                </span>
+                {labels.groups[group]}
+              </h3>
+              <div class="download-list">
+                {groupDownloads.map((download) => (
+                  <a
+                    class:list={['download-card', { 'download-card-recommended': download.id === recommendedId }]}
+                    href={download.href}
+                    download
+                    rel="noopener noreferrer"
+                    data-download-platform={download.id}
+                    aria-label={`${labels.download} ${download.label}`}
+                  >
+                    <span class="download-card-main">
+                      <strong>{download.label}</strong>
+                      <span class="download-extension">{download.extension}</span>
+                      <span class="download-recommended" data-recommended-badge hidden={download.id !== recommendedId}>
+                        {labels.recommended}
+                      </span>
+                    </span>
+                    <span class="download-card-meta">
+                      <span data-platform-version>{formatVersion(download.version)}</span>
+                      <small data-platform-file>{download.fileName}</small>
+                    </span>
+                  </a>
+                ))}
+              </div>
+            </section>
+          )
+        })
+      }
+    </div>
+  </div>
+</section>

@@ -10,7 +10,10 @@ use uuid::Uuid;
 use crate::{
     api::{auth_principal, ensure_admin, ok},
     error::AppResult,
-    model::{AdminAccountPatchRequest, AdminConfigPatchRequest, AdminRoleGrantRequest},
+    model::{
+        AdminAccountPatchRequest, AdminConfigPatchRequest, AdminPasswordChangeRequest,
+        AdminRoleGrantRequest,
+    },
     state::AppState,
 };
 
@@ -22,10 +25,28 @@ pub fn router() -> Router<AppState> {
         .route("/accounts/:id/roles/:role", delete(revoke_role))
         .route("/devices", get(devices))
         .route("/devices/:id", delete(revoke_device))
+        .route("/password", post(change_password))
         .route("/config", get(config).patch(patch_config))
         .route("/roles", get(roles))
         .route("/sync-data", get(sync_data))
         .route("/audit-logs", get(audit_logs))
+}
+
+async fn change_password(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<AdminPasswordChangeRequest>,
+) -> AppResult<Json<Value>> {
+    let principal = auth_principal(&state, &headers)?;
+    ensure_admin(&principal)?;
+    if principal.device_id.is_some() {
+        return Err(crate::error::AppError::Unauthorized);
+    }
+    Ok(Json(json!(state.store.admin_change_password(
+        &principal,
+        &payload.current_password,
+        &payload.new_password
+    )?)))
 }
 
 async fn accounts(State(state): State<AppState>, headers: HeaderMap) -> AppResult<Json<Value>> {

@@ -27,7 +27,7 @@ export const messages = {
       eyebrow: '桌面密码管理器',
       title: 'LockPass',
       subtitle:
-        '本地优先保存保险库数据，使用主密码与恢复密钥保护条目，并通过端到端加密同步连接多台受信任设备。',
+        '本地优先保存保险库数据，使用主密码与安全密钥保护条目，并通过端到端加密同步连接多台受信任设备。',
       primaryCta: '下载 Windows 版',
       secondaryCta: '查看使用说明',
       versionPrefix: '当前版本',
@@ -46,9 +46,9 @@ export const messages = {
             '保险库、条目和附件默认保存在本机数据库中。没有网络时也可以查看和编辑，恢复联网后再同步。'
         },
         {
-          title: '主密码与恢复密钥',
+          title: '主密码与安全密钥',
           body:
-            '主密码用于日常解锁，恢复密钥用于新设备恢复和长期备份。受信任设备可把恢复密钥保存到系统安全存储。'
+            '主密码用于日常解锁，安全密钥用于新设备恢复和长期备份。受信任设备可把安全密钥保存到系统安全存储。'
         },
         {
           title: '端到端加密同步',
@@ -80,16 +80,18 @@ export const messages = {
     },
     downloadSection: {
       eyebrow: '软件下载',
-      title: '先从 Windows 桌面端开始',
-      intro:
-        '当前公开包优先提供 Windows x64 安装程序。安装后可以离线创建保险库，也可以连接同步服务器。',
-      button: '下载安装包',
-      urlLabel: '下载地址',
-      fileLabel: '文件名',
-      versionLabel: '版本',
-      platformLabel: '平台',
-      updateLabel: '更新源',
-      updateCopy: '应用内自动更新会读取更新源并校验签名。'
+      title: '选择适合你的安装包',
+      intro: '当前提供 Windows 64 位版本，后续平台会在这里继续增加。',
+      download: '下载',
+      loading: '正在读取...',
+      unavailable: '暂不可用',
+      recommended: '推荐',
+      groups: {
+        windows: 'Windows'
+      },
+      platforms: {
+        windowsX64: 'Windows 64 位'
+      }
     },
     workflowSection: {
       eyebrow: '使用流程',
@@ -103,7 +105,7 @@ export const messages = {
         {
           title: '创建本地身份',
           body:
-            '设置主密码并生成恢复密钥。请把恢复密钥保存在安全位置，它是新设备恢复的重要凭据。'
+            '设置主密码并生成安全密钥。请把安全密钥保存在安全位置，它是新设备恢复的重要凭据。'
         },
         {
           title: '建立保险库和条目',
@@ -127,7 +129,7 @@ export const messages = {
       title: '推荐的第一套使用习惯',
       items: [
         '主密码只用于你本人记忆，不要和服务器登录密码混用。',
-        '恢复密钥离线保存一份，受信任设备可以额外保存到系统安全存储。',
+        '安全密钥离线保存一份，受信任设备可以额外保存到系统安全存储。',
         '每台设备绑定服务器账号后，后台设备列表会显示本机设备 ID、最近活动时间和最近 IP。',
         '同步失败或服务器数据被重置时，先检查服务器连接状态，再决定是否重新绑定设备。',
         '导入备份和手动同步前，留意进度弹窗与完成后的文件路径提示。'
@@ -154,9 +156,9 @@ export const messages = {
             '可以。LockPass 是本地优先应用，离线也能管理保险库。同步只是多设备使用时的增强能力。'
         },
         {
-          question: '恢复密钥和主密码有什么区别？',
+          question: '安全密钥和主密码有什么区别？',
           answer:
-            '主密码用于日常解锁；恢复密钥是高熵凭据，用于恢复保险库或在新设备上建立信任。'
+            '主密码用于日常解锁；安全密钥是高熵凭据，用于恢复保险库或在新设备上建立信任。'
         }
       ]
     },
@@ -237,16 +239,18 @@ export const messages = {
     },
     downloadSection: {
       eyebrow: 'Download',
-      title: 'Start with the Windows desktop app',
-      intro:
-        'The first public package targets Windows x64. After installation you can create an offline vault or connect to a sync server.',
-      button: 'Download installer',
-      urlLabel: 'Download URL',
-      fileLabel: 'File name',
-      versionLabel: 'Version',
-      platformLabel: 'Platform',
-      updateLabel: 'Update feed',
-      updateCopy: 'In-app auto update reads the feed and verifies the package signature.'
+      title: 'Choose your installer',
+      intro: 'Windows x64 is available now. Additional platforms will appear here as they are released.',
+      download: 'Download',
+      loading: 'Loading...',
+      unavailable: 'Unavailable',
+      recommended: 'Recommended',
+      groups: {
+        windows: 'Windows'
+      },
+      platforms: {
+        windowsX64: 'Windows x64'
+      }
     },
     workflowSection: {
       eyebrow: 'Workflow',

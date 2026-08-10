@@ -16,6 +16,7 @@ import {
 import { computed, onBeforeUnmount, onMounted, ref, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ToastHost from '@/components/ToastHost.vue'
+import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue'
 import { t, useI18n, type AdminWebLocale } from '@/i18n'
 import { useSessionStore } from '@/stores/session'
 
@@ -25,6 +26,7 @@ const session = useSessionStore()
 const { locale, setLocale, supportedLocales } = useI18n()
 const toast = ref<string | null>(null)
 const accountMenuOpen = ref(false)
+const changePasswordOpen = ref(false)
 const accountMenuRef = ref<HTMLElement | null>(null)
 
 interface NavItem {
@@ -82,6 +84,16 @@ async function logout() {
   accountMenuOpen.value = false
   await session.logout()
   await router.push('/login')
+}
+
+function openChangePassword() {
+  accountMenuOpen.value = false
+  changePasswordOpen.value = true
+}
+
+function passwordChanged() {
+  changePasswordOpen.value = false
+  showToast(t('changePassword.saved'))
 }
 
 function closeAccountMenuOnOutsideClick(event: PointerEvent) {
@@ -190,6 +202,14 @@ function isNavItemActive(item: NavItem): boolean {
               <button
                 class="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-bold text-slate-700 hover:bg-slate-50"
                 type="button"
+                @click="openChangePassword"
+              >
+                <KeyRound class="size-4 text-slate-500" />
+                {{ t('layout.changePassword') }}
+              </button>
+              <button
+                class="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-bold text-slate-700 hover:bg-slate-50"
+                type="button"
                 @click="logout"
               >
                 <LogOut class="size-4 text-slate-500" />
@@ -205,5 +225,10 @@ function isNavItemActive(item: NavItem): boolean {
       </div>
     </main>
   </div>
+  <ChangePasswordDialog
+    :open="changePasswordOpen"
+    @close="changePasswordOpen = false"
+    @saved="passwordChanged"
+  />
   <ToastHost :message="toast" />
 </template>

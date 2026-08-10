@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { KeyRound, ServerCog, ShieldCheck } from '@lucide/vue'
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { api } from '@/api/client'
 import { useI18n, type AdminWebLocale } from '@/i18n'
-import { userFacingErrorMessage } from '@/services/errorMessage'
 import { useSessionStore } from '@/stores/session'
 
 const route = useRoute()
@@ -15,75 +13,19 @@ const { locale, setLocale, supportedLocales, t } = useI18n()
 const username = ref('')
 const password = ref('')
 const submitting = ref(false)
-const desktopBindError = ref('')
-const desktopBind = computed(() => route.query.desktopBind === '1')
-const desktopDeviceName = computed(() => String(route.query.deviceName || t('auth.defaultDesktopDeviceName')))
-const desktopClientDeviceId = computed(() => String(route.query.clientDeviceId || ''))
-const desktopMode = computed(() => route.query.mode === 'official' ? 'official' : 'selfhost')
-const desktopServerUrl = computed(() => String(route.query.serverUrl || import.meta.env.VITE_LOCKPASS_API_BASE_URL || 'http://127.0.0.1:1480'))
 
 onMounted(() => {
   session.refreshHealth().catch(() => undefined)
-  if (desktopBind.value && session.token) {
-    void bindCurrentSessionToDesktop()
-  }
 })
 
 async function submit() {
   submitting.value = true
-  desktopBindError.value = ''
   try {
-    const auth = await session.adminLogin(username.value, password.value)
-    if (desktopBind.value) {
-      await completeDesktopBind(auth.token)
-      return
-    }
+    await session.adminLogin(username.value, password.value)
     await router.push(String(route.query.redirect || '/admin/accounts'))
   } finally {
     submitting.value = false
   }
-}
-
-async function redirectDesktopBinding(exchange: Awaited<ReturnType<typeof api.bindDevice>>): Promise<void> {
-  const payload = base64UrlEncode(JSON.stringify({
-    mode: desktopMode.value,
-    serverUrl: desktopServerUrl.value,
-    account: exchange.account,
-    device: exchange.device,
-    deviceToken: exchange.deviceToken,
-    tokenType: exchange.tokenType
-  }))
-  window.location.href = `lockpass://auth/callback?payload=${encodeURIComponent(payload)}`
-}
-
-async function bindCurrentSessionToDesktop(): Promise<void> {
-  if (!session.token) return
-  submitting.value = true
-  desktopBindError.value = ''
-  try {
-    await completeDesktopBind(session.token)
-  } catch (error) {
-    desktopBindError.value = userFacingErrorMessage(error)
-  } finally {
-    submitting.value = false
-  }
-}
-
-async function completeDesktopBind(token: string): Promise<void> {
-  await bindDesktopDevice(token)
-  await router.replace(String(route.query.redirect || '/admin/accounts'))
-}
-
-async function bindDesktopDevice(token: string): Promise<void> {
-  const exchange = await api.bindDevice(token, desktopDeviceName.value, desktopClientDeviceId.value || undefined)
-  await redirectDesktopBinding(exchange)
-}
-
-function base64UrlEncode(value: string): string {
-  const bytes = new TextEncoder().encode(value)
-  let binary = ''
-  for (const byte of bytes) binary += String.fromCharCode(byte)
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 </script>
 
@@ -149,8 +91,8 @@ function base64UrlEncode(value: string): string {
             <input v-model="password" class="lp-input" autocomplete="current-password" required type="password" />
           </label>
 
-          <p v-if="session.error || desktopBindError" class="m-0 rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">
-            {{ session.error || desktopBindError }}
+          <p v-if="session.error" class="m-0 rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">
+            {{ session.error }}
           </p>
 
           <button class="lp-button-primary" type="submit" :disabled="submitting">

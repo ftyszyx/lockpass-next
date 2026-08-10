@@ -5,7 +5,6 @@ import type {
   AuditLogView,
   AuthResponse,
   DeviceView,
-  DeviceBindResponse,
   HealthResponse,
   IdentityView,
   InstanceConfig,
@@ -60,6 +59,13 @@ export class ApiClient {
     })
   }
 
+  async changeAdminPassword(token: string, currentPassword: string, newPassword: string) {
+    return this.request<AuthResponse>('/admin/password', {
+      token,
+      body: { currentPassword, newPassword }
+    })
+  }
+
   async me(token: string) {
     return this.request<MeResponse>('/auth/me', { token })
   }
@@ -93,13 +99,6 @@ export class ApiClient {
 
   async updateDeviceRemark(token: string, id: string, remark: string) {
     return this.request<DeviceView>(`/devices/${id}`, { token, method: 'PATCH', body: { remark } })
-  }
-
-  async bindDevice(token: string, deviceName: string, clientDeviceId?: string) {
-    return this.request<DeviceBindResponse>('/auth/device/bind', {
-      token,
-      body: { deviceName, clientDeviceId }
-    })
   }
 
   async syncSpaces(token: string) {
