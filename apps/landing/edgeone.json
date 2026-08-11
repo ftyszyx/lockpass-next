@@ -1,0 +1,6 @@
+{
+  "installCommand": "cd ../.. && npm ci",
+  "buildCommand": "cd ../.. && npm run build:landing",
+  "outputDirectory": "dist",
+  "nodeVersion": "22.11.0"
+}
