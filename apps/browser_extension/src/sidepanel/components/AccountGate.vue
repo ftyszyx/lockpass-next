@@ -155,7 +155,7 @@ function submitUnlock(): void {
       <p v-if="error" class="gate-error">{{ error }}</p>
     </div>
 
-    <div v-if="serverDialogOpen" class="server-dialog-backdrop" @click.self="closeServerDialog">
+    <div v-if="serverDialogOpen" class="server-dialog-backdrop" @pointerdown.self="closeServerDialog">
       <section class="server-dialog" role="dialog" aria-modal="true" :aria-label="t('auth.customServerTitle')">
         <header class="server-dialog-header">
           <strong>{{ t('auth.customServerTitle') }}</strong>

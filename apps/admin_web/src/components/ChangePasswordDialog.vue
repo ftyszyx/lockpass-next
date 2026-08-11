@@ -84,7 +84,7 @@ function validate(): string {
       role="dialog"
       aria-modal="true"
       :aria-label="t('changePassword.title')"
-      @click.self="close"
+      @pointerdown.self="close"
       @keydown.esc="close"
     >
       <form class="w-full max-w-md rounded-lg border border-slate-200 bg-white shadow-xl" @submit.prevent="submit">

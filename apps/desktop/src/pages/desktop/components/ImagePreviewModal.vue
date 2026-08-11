@@ -17,7 +17,7 @@ const emit = defineEmits<{
 
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="fixed inset-0 z-[120] grid place-items-center bg-slate-950/75 p-6" @click.self="emit('close')">
+    <div v-if="visible" class="fixed inset-0 z-[120] grid place-items-center bg-slate-950/75 p-6" @pointerdown.self="emit('close')">
       <section class="flex max-h-[92vh] w-[min(980px,94vw)] flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-950 shadow-2xl">
         <div class="flex min-h-12 items-center justify-between gap-3 border-b border-white/10 px-4 text-white">
           <strong class="truncate">{{ title }}</strong>
