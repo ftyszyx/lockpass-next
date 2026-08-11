@@ -7,6 +7,7 @@ const zhCN = {
     subtitle: "Desktop App",
     unlocked: "本地保险库已解锁",
     locked: "已锁定",
+    serverConnected: "服务器已经连接",
     offline: "离线使用中",
     serverUnavailable: "账号离线",
     searchPlaceholder: "搜索条目、网址、标签",

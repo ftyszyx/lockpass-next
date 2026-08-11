@@ -9,10 +9,12 @@ use uuid::Uuid;
 
 use crate::{
     api::{auth_principal, ensure_admin, ok},
+    email_template::{self, EmailTemplateVariables},
     error::AppResult,
     model::{
-        AdminAccountPatchRequest, AdminConfigPatchRequest, AdminPasswordChangeRequest,
-        AdminRoleGrantRequest,
+        AdminAccountPatchRequest, AdminConfigPatchRequest, AdminEmailTemplatePreviewRequest,
+        AdminEmailTemplateUpdateRequest, AdminEmailTestConnectionRequest,
+        AdminEmailTestSendRequest, AdminPasswordChangeRequest, AdminRoleGrantRequest,
     },
     state::AppState,
 };
@@ -27,6 +29,18 @@ pub fn router() -> Router<AppState> {
         .route("/devices/:id", delete(revoke_device))
         .route("/password", post(change_password))
         .route("/config", get(config).patch(patch_config))
+        .route("/email/test-connection", post(test_email_connection))
+        .route("/email/send-test", post(send_test_email))
+        .route("/email/templates", get(email_templates))
+        .route("/email/templates/preview", post(preview_email_template))
+        .route(
+            "/email/templates/:template_id",
+            get(email_template).put(update_email_template),
+        )
+        .route(
+            "/email/templates/:template_id/restore",
+            post(restore_email_template),
+        )
         .route("/roles", get(roles))
         .route("/sync-data", get(sync_data))
         .route("/audit-logs", get(audit_logs))
@@ -111,6 +125,106 @@ async fn patch_config(
     Ok(Json(json!(state
         .store
         .admin_patch_config(&principal, payload)?)))
+}
+
+async fn test_email_connection(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<AdminEmailTestConnectionRequest>,
+) -> AppResult<Json<Value>> {
+    let principal = auth_principal(&state, &headers)?;
+    ensure_admin(&principal)?;
+    let config = state.store.admin_email_config_with_patch(payload.email)?;
+    state.mailer.test_connection(&config).await?;
+    Ok(ok())
+}
+
+async fn send_test_email(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<AdminEmailTestSendRequest>,
+) -> AppResult<Json<Value>> {
+    let principal = auth_principal(&state, &headers)?;
+    ensure_admin(&principal)?;
+    let config = state.store.admin_email_config_with_patch(payload.email)?;
+    let recipient = payload.recipient.trim().to_string();
+    let rendered = email_template::render_by_id(
+        &config,
+        &payload.template_id,
+        EmailTemplateVariables {
+            display_name: None,
+            email: &recipient,
+            code: "123456",
+            expires_minutes: 10,
+        },
+    )?;
+    state
+        .mailer
+        .send_rendered_email(&config, &recipient, rendered)
+        .await?;
+    Ok(ok())
+}
+
+async fn email_templates(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> AppResult<Json<Value>> {
+    let principal = auth_principal(&state, &headers)?;
+    ensure_admin(&principal)?;
+    Ok(Json(json!(state.store.admin_email_templates()?)))
+}
+
+async fn email_template(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(template_id): Path<String>,
+) -> AppResult<Json<Value>> {
+    let principal = auth_principal(&state, &headers)?;
+    ensure_admin(&principal)?;
+    Ok(Json(json!(state
+        .store
+        .admin_email_template(template_id)?)))
+}
+
+async fn update_email_template(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(template_id): Path<String>,
+    Json(payload): Json<AdminEmailTemplateUpdateRequest>,
+) -> AppResult<Json<Value>> {
+    let principal = auth_principal(&state, &headers)?;
+    ensure_admin(&principal)?;
+    Ok(Json(json!(state.store.admin_update_email_template(
+        &principal,
+        template_id,
+        payload,
+    )?)))
+}
+
+async fn restore_email_template(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(template_id): Path<String>,
+) -> AppResult<Json<Value>> {
+    let principal = auth_principal(&state, &headers)?;
+    ensure_admin(&principal)?;
+    Ok(Json(json!(state
+        .store
+        .admin_restore_email_template(&principal, template_id)?)))
+}
+
+async fn preview_email_template(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<AdminEmailTemplatePreviewRequest>,
+) -> AppResult<Json<Value>> {
+    let principal = auth_principal(&state, &headers)?;
+    ensure_admin(&principal)?;
+    Ok(Json(json!(email_template::preview_template(
+        &payload.template_id,
+        &payload.subject,
+        &payload.html,
+    )?)))
 }
 
 async fn roles(State(state): State<AppState>, headers: HeaderMap) -> AppResult<Json<Value>> {

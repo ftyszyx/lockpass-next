@@ -78,6 +78,7 @@ async fn email_start(
             (response.expires_at - chrono::Utc::now())
                 .num_minutes()
                 .max(1),
+            payload.locale.as_deref(),
         )
         .await?;
     Ok(Json(json!(response)))

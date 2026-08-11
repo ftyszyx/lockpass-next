@@ -61,7 +61,7 @@ Useful options:
 Set the release version in `tools/pc_release.env` with a semantic version tag:
 
 ```text
-RELEASE_TAG=v0.1.3
+RELEASE_TAG=v0.0.106
 ```
 
 The version parsed from `RELEASE_TAG` is synchronized only to the selected platform. Desktop builds update the desktop app, Rust crate, Tauri config, and `latest.json`. `chrome-store` builds update the browser extension package and generated manifest without building or signing the desktop app.

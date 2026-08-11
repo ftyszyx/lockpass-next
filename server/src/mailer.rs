@@ -3,9 +3,11 @@ use lettre::{
     transport::smtp::authentication::Credentials,
     AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
 };
-use tracing::info;
+use std::time::Duration;
+use tracing::{info, warn};
 
 use crate::{
+    email_template::{render_verification_code, EmailTemplateVariables, RenderedEmail},
     error::{AppError, AppResult},
     model::{EmailServiceConfig, EmailServiceMode},
 };
@@ -13,7 +15,37 @@ use crate::{
 #[derive(Clone, Default)]
 pub struct Mailer;
 
+const SMTP_TIMEOUT: Duration = Duration::from_secs(15);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SmtpSecurity {
+    ImplicitTls,
+    StartTls,
+}
+
 impl Mailer {
+    pub async fn test_connection(&self, config: &EmailServiceConfig) -> AppResult<()> {
+        ensure_smtp_mode(config)?;
+        let connected = smtp_transport(config)?
+            .test_connection()
+            .await
+            .map_err(|error| {
+                smtp_service_error(
+                    "smtp_connection_failed",
+                    "SMTP connection test failed",
+                    config,
+                    error,
+                )
+            })?;
+        if !connected {
+            return Err(AppError::BadGatewayCode {
+                code: "smtp_connection_failed",
+                message: "SMTP server rejected the connection test".to_string(),
+            });
+        }
+        Ok(())
+    }
+
     pub async fn send_email_code(
         &self,
         config: &EmailServiceConfig,
@@ -21,53 +53,86 @@ impl Mailer {
         display_name: Option<&str>,
         code: &str,
         expires_minutes: i64,
+        locale: Option<&str>,
+    ) -> AppResult<()> {
+        let rendered = render_verification_code(
+            config,
+            locale,
+            EmailTemplateVariables {
+                display_name,
+                email,
+                code,
+                expires_minutes,
+            },
+        )?;
+        self.send_rendered_email(config, email, rendered).await
+    }
+
+    pub async fn send_rendered_email(
+        &self,
+        config: &EmailServiceConfig,
+        recipient: &str,
+        rendered: RenderedEmail,
     ) -> AppResult<()> {
         match config.mode {
             EmailServiceMode::Log => {
                 info!(
                     target: "lockpass_sync_server::mailer",
-                    email,
+                    recipient,
                     from = config.from,
-                    code,
-                    expires_minutes,
-                    "development email verification code"
+                    subject = rendered.subject,
+                    "development email"
                 );
                 Ok(())
             }
             EmailServiceMode::Smtp => {
                 let from = parse_mailbox(&config.from, "email.from")?;
-                let transport = smtp_transport(config)?;
-                let to = parse_mailbox(email, "email")?;
-                let subject = "Your LockPass verification code";
-                let text = email_code_text(display_name, code, expires_minutes);
-                let html = email_code_html(display_name, code, expires_minutes);
+                let to = parse_mailbox(recipient, "recipient")?;
                 let message = Message::builder()
-                    .from(from.clone())
+                    .from(from)
                     .to(to)
-                    .subject(subject)
+                    .subject(rendered.subject)
                     .multipart(
                         MultiPart::alternative()
                             .singlepart(
                                 SinglePart::builder()
                                     .header(ContentType::TEXT_PLAIN)
-                                    .body(text),
+                                    .body(rendered.text),
                             )
                             .singlepart(
                                 SinglePart::builder()
                                     .header(ContentType::TEXT_HTML)
-                                    .body(html),
+                                    .body(rendered.html),
                             ),
                     )
                     .map_err(|error| {
                         AppError::Internal(format!("failed to build email message: {error}"))
                     })?;
 
-                transport.send(message).await.map_err(|error| {
-                    AppError::Internal(format!("failed to send email code: {error}"))
-                })?;
+                smtp_transport(config)?
+                    .send(message)
+                    .await
+                    .map_err(|error| {
+                        smtp_service_error(
+                            "smtp_send_failed",
+                            "Failed to send email",
+                            config,
+                            error,
+                        )
+                    })?;
                 Ok(())
             }
         }
+    }
+}
+
+fn ensure_smtp_mode(config: &EmailServiceConfig) -> AppResult<()> {
+    if matches!(config.mode, EmailServiceMode::Smtp) {
+        Ok(())
+    } else {
+        Err(AppError::BadRequest(
+            "SMTP delivery must be enabled for this operation".to_string(),
+        ))
     }
 }
 
@@ -91,14 +156,42 @@ fn smtp_transport(config: &EmailServiceConfig) -> AppResult<AsyncSmtpTransport<T
         .ok_or_else(|| AppError::BadRequest("SMTP password is required".to_string()))?;
 
     let credentials = Credentials::new(username.to_string(), password.to_string());
-    AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(host)
-        .map_err(|error| AppError::Internal(format!("invalid SMTP host configuration: {error}")))
-        .map(|builder| {
-            builder
-                .port(config.smtp_port)
-                .credentials(credentials)
-                .build()
-        })
+    let builder = match smtp_security(config.smtp_port) {
+        SmtpSecurity::ImplicitTls => AsyncSmtpTransport::<Tokio1Executor>::relay(host),
+        SmtpSecurity::StartTls => AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(host),
+    }
+    .map_err(|error| AppError::Internal(format!("invalid SMTP host configuration: {error}")))?;
+    Ok(builder
+        .port(config.smtp_port)
+        .credentials(credentials)
+        .timeout(Some(SMTP_TIMEOUT))
+        .build())
+}
+
+fn smtp_security(port: u16) -> SmtpSecurity {
+    if port == 465 {
+        SmtpSecurity::ImplicitTls
+    } else {
+        SmtpSecurity::StartTls
+    }
+}
+
+fn smtp_service_error(
+    code: &'static str,
+    action: &str,
+    config: &EmailServiceConfig,
+    error: lettre::transport::smtp::Error,
+) -> AppError {
+    warn!(
+        smtp_host = config.smtp_host.as_deref().unwrap_or_default(),
+        smtp_port = config.smtp_port,
+        error = %error,
+        "{action}"
+    );
+    AppError::BadGatewayCode {
+        code,
+        message: format!("{action}: {error}"),
+    }
 }
 
 fn parse_mailbox(value: &str, field: &str) -> AppResult<Mailbox> {
@@ -107,42 +200,17 @@ fn parse_mailbox(value: &str, field: &str) -> AppResult<Mailbox> {
     })
 }
 
-fn email_code_text(display_name: Option<&str>, code: &str, expires_minutes: i64) -> String {
-    let greeting = display_name
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(|value| format!("Hi {value},"))
-        .unwrap_or_else(|| "Hi,".to_string());
-    format!(
-        "{greeting}\n\nYour LockPass verification code is:\n\n{code}\n\nThis code expires in {expires_minutes} minutes. If you did not request this code, you can ignore this email.\n\nLockPass"
-    )
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-fn email_code_html(display_name: Option<&str>, code: &str, expires_minutes: i64) -> String {
-    let greeting = display_name
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(|value| format!("Hi {},", html_escape(value)))
-        .unwrap_or_else(|| "Hi,".to_string());
-    format!(
-        r#"<!doctype html>
-<html>
-  <body style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.5;">
-    <p>{greeting}</p>
-    <p>Your LockPass verification code is:</p>
-    <p style="font-size: 28px; font-weight: 700; letter-spacing: 4px;">{code}</p>
-    <p>This code expires in {expires_minutes} minutes. If you did not request this code, you can ignore this email.</p>
-    <p>LockPass</p>
-  </body>
-</html>"#
-    )
-}
+    #[test]
+    fn selects_implicit_tls_for_smtps_port() {
+        assert_eq!(smtp_security(465), SmtpSecurity::ImplicitTls);
+    }
 
-fn html_escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&#39;")
+    #[test]
+    fn selects_starttls_for_submission_port() {
+        assert_eq!(smtp_security(587), SmtpSecurity::StartTls);
+    }
 }

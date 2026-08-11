@@ -109,6 +109,18 @@
   color: #be123c;
 }
 
+.lp-account-status-success {
+  color: #047857;
+  font-weight: 800;
+}
+
+.lp-account-status-success .lp-status-dot {
+  width: 7px;
+  height: 7px;
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.16);
+}
+
 .lp-status-dot {
   width: 6px;
   height: 6px;

@@ -17,6 +17,12 @@ const errorCodeMessages: Record<string, Parameters<typeof t>[0]> = {
 
 export function userFacingErrorMessage(cause: unknown): string {
   if (cause instanceof ApiError) {
+    if (cause.errorCode === 'smtp_connection_failed') {
+      return t('errors.smtpConnectionFailed', { detail: cause.message })
+    }
+    if (cause.errorCode === 'smtp_send_failed') {
+      return t('errors.smtpSendFailed', { detail: cause.message })
+    }
     const key = cause.errorCode ? errorCodeMessages[cause.errorCode] : undefined
     if (key) return t(key)
     if (cause.status >= 500) return t('errors.internalError')

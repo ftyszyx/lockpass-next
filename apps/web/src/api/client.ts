@@ -49,9 +49,9 @@ export class WebApiError extends Error {
 export class WebApiClient {
   constructor(private readonly baseUrl = configuredOfficialApiUrl()) {}
 
-  async startEmail(email: string, purpose: EmailChallengePurpose, displayName?: string): Promise<WebEmailStartResponse> {
+  async startEmail(email: string, purpose: EmailChallengePurpose, displayName?: string, locale?: string): Promise<WebEmailStartResponse> {
     return this.request('/auth/email/start', {
-      body: { email, purpose, displayName }
+      body: { email, purpose, displayName, locale }
     })
   }
 

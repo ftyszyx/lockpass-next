@@ -78,7 +78,12 @@ async function submit(): Promise<void> {
   busy.value = true
   try {
     if (step.value === 'email') {
-      const challenge = await session.startEmail(email.value, mode.value, mode.value === 'register' ? displayName.value : undefined)
+      const challenge = await session.startEmail(
+        email.value,
+        mode.value,
+        mode.value === 'register' ? displayName.value : undefined,
+        locale.value
+      )
       challengeId.value = challenge.challengeId
       code.value = ''
       step.value = 'code'
@@ -342,9 +347,7 @@ function changeLocale(event: Event): void {
     <section class="grid content-start gap-6 p-6 sm:p-8 lg:p-10">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-3">
-          <div class="grid size-10 place-items-center rounded-lg bg-slate-950 text-white">
-            <KeyRound class="size-5" />
-          </div>
+          <img class="size-11 shrink-0" src="/favicon.svg" alt="" aria-hidden="true" />
           <div>
             <strong class="block text-lg">LockPass</strong>
             <small class="font-semibold text-slate-500">{{ t('webAuth.subtitle') }}</small>

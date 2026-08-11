@@ -118,7 +118,7 @@ function flattenNavItems(items: NavItem[]): NavItem[] {
 }
 
 function isNavItemActive(item: NavItem): boolean {
-  if (route.path === item.to) return true
+  if (route.path === item.to || route.path.startsWith(`${item.to}/`)) return true
   return Boolean(item.children?.some((child) => isNavItemActive(child)))
 }
 </script>
@@ -156,7 +156,7 @@ function isNavItemActive(item: NavItem): boolean {
                 :to="child.to"
                 :aria-label="child.ariaLabel"
                 class="grid h-8 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-md px-2 text-xs font-bold text-slate-600 hover:bg-white hover:text-slate-950"
-                :class="route.path === child.to ? 'bg-white text-teal-700 shadow-sm shadow-slate-900/5' : ''"
+                :class="isNavItemActive(child) ? 'bg-white text-teal-700 shadow-sm shadow-slate-900/5' : ''"
               >
                 <component :is="child.icon" class="size-3.5" />
                 <span>{{ child.label }}</span>

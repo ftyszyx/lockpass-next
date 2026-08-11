@@ -3,7 +3,7 @@ withDefaults(defineProps<{
   name: string
   initials: string
   statusLabel: string
-  statusTone?: 'normal' | 'warning'
+  statusTone?: 'normal' | 'success' | 'warning'
   countLabel?: string
   interactive?: boolean
 }>(), {
@@ -29,7 +29,7 @@ const emit = defineEmits<{
     <span class="lp-account-copy">
       <strong>{{ name }}</strong>
       <span class="lp-account-status" :class="`lp-account-status-${statusTone}`">
-        <span v-if="statusTone === 'normal'" class="lp-status-dot" aria-hidden="true"></span>
+        <span v-if="statusTone !== 'warning'" class="lp-status-dot" aria-hidden="true"></span>
         <span>{{ statusLabel }}</span>
       </span>
     </span>

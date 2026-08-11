@@ -5,6 +5,7 @@ const enUS: LocaleMessages = {
     subtitle: "Desktop App",
     unlocked: "Local vault unlocked",
     locked: "Locked",
+    serverConnected: "Server connected",
     offline: "Working offline",
     serverUnavailable: "Account offline",
     searchPlaceholder: "Search items, URLs, tags",

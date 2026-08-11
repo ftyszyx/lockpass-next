@@ -61,7 +61,7 @@
       // 公钥来自本机生成的 updater 签名密钥；私钥不要提交到仓库。
       pubkey: 'dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE4NjgwNTIwQjY4REUyN0MKUldSODRvMjJJQVZvR0o5N0w2TkorcFBqaThJYmpGM2FqRWdFUVY2cmxxcy9oZkhoMW5qTFlIOXoK',
       endpoints: [
-        'https://bytefuse.oss-cn-guangzhou.aliyuncs.com/lockpass/latest.json',
+        'https://oss.bytefuse.cn/apps/com.lockpass.next/web/windows-x86_64/latest.json',
       ],
       windows: {
         // passive 会显示安装进度，但尽量减少用户操作。

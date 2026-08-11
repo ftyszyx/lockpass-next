@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { Save } from '@lucide/vue'
-import { PasswordInput } from '@lockpass/ui'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '@/api/client'
+import AdminEmailSettings from '@/components/admin/email/AdminEmailSettings.vue'
 import { t } from '@/i18n'
 import { userFacingErrorMessage } from '@/services/errorMessage'
 import { useSessionStore } from '@/stores/session'
-import type { InstanceConfig } from '@/types'
+import type { InstanceConfig, InstanceConfigPatch } from '@/types'
 
 type ConfigSection = 'general' | 'email' | 'auth' | 'quota'
+type EmailPanel = 'smtp' | 'test' | 'templates'
 
 const route = useRoute()
 const session = useSessionStore()
@@ -20,6 +21,10 @@ const saved = ref(false)
 const activeSection = computed<ConfigSection>(() => {
   const section = route.meta.configSection
   return section === 'email' || section === 'auth' || section === 'quota' ? section : 'general'
+})
+const activeEmailPanel = computed<EmailPanel>(() => {
+  const panel = route.meta.emailPanel
+  return panel === 'test' || panel === 'templates' ? panel : 'smtp'
 })
 
 onMounted(load)
@@ -44,7 +49,7 @@ function normalizeReservedLoginConfig(nextConfig: InstanceConfig): InstanceConfi
   }
 }
 
-function buildPatchConfig(nextConfig: InstanceConfig): Partial<InstanceConfig> {
+function buildPatchConfig(nextConfig: InstanceConfig): InstanceConfigPatch {
   const email: Partial<InstanceConfig['email']> = {
     mode: nextConfig.email.mode,
     from: nextConfig.email.from,
@@ -61,7 +66,7 @@ function buildPatchConfig(nextConfig: InstanceConfig): Partial<InstanceConfig> {
 
   return {
     ...nextConfig,
-    email: email as InstanceConfig['email'],
+    email,
     smsEnabled: false,
     googleEnabled: false,
     wechatEnabled: false
@@ -94,11 +99,22 @@ async function save() {
     saving.value = false
   }
 }
+
+function emailSaved(email: InstanceConfig['email']) {
+  if (!config.value) return
+  config.value.email = email
+}
 </script>
 
 <template>
   <div class="grid grid-cols-1 gap-4">
-    <section class="lp-panel">
+    <AdminEmailSettings
+      v-if="activeSection === 'email' && config"
+      :config="config.email"
+      :active-panel="activeEmailPanel"
+      @saved="emailSaved"
+    />
+    <section v-else class="lp-panel">
       <div class="lp-panel-head">
         <div>
           <h2 class="m-0 text-base font-black">{{ t(`adminSystem.sections.${activeSection}.title`) }}</h2>
@@ -122,66 +138,6 @@ async function save() {
                 <strong class="text-sm">{{ t('adminSystem.registrationEnabled') }}</strong>
                 <span class="text-xs font-medium leading-5 text-slate-500">{{ t('adminSystem.registrationScope') }}</span>
               </span>
-            </label>
-          </div>
-
-          <div v-else-if="activeSection === 'email'" class="grid max-w-3xl gap-4">
-            <label class="lp-label">
-              {{ t('adminSystem.emailMode') }}
-              <select v-model="config.email.mode" class="lp-input max-w-xs">
-                <option value="log">{{ t('adminSystem.emailModeLog') }}</option>
-                <option value="smtp">{{ t('adminSystem.emailModeSmtp') }}</option>
-              </select>
-            </label>
-            <label class="lp-label">
-              {{ t('adminSystem.emailFrom') }}
-              <input v-model.trim="config.email.from" class="lp-input" type="text" />
-            </label>
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
-              <label class="lp-label">
-                {{ t('adminSystem.smtpHost') }}
-                <input v-model.trim="config.email.smtpHost" class="lp-input" type="text" />
-              </label>
-              <label class="lp-label">
-                {{ t('adminSystem.smtpPort') }}
-                <input v-model.number="config.email.smtpPort" class="lp-input" type="number" min="1" />
-              </label>
-            </div>
-            <label class="lp-label">
-              {{ t('adminSystem.smtpUsername') }}
-              <input v-model.trim="config.email.smtpUsername" class="lp-input" type="text" />
-            </label>
-            <label class="lp-label">
-              {{ t('adminSystem.smtpPassword') }}
-              <div class="flex flex-wrap items-center gap-2">
-                <PasswordInput
-                  v-model="config.email.smtpPassword"
-                  class="lp-input"
-                  container-class="w-full max-w-sm"
-                  autocomplete="new-password"
-                  :show-label="t('common.showPassword')"
-                  :hide-label="t('common.hidePassword')"
-                />
-                <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">
-                  {{ config.email.smtpPasswordSet ? t('adminSystem.secretSet') : t('adminSystem.secretNotSet') }}
-                </span>
-              </div>
-            </label>
-            <label class="lp-label">
-              {{ t('adminSystem.emailCodeSecret') }}
-              <div class="flex flex-wrap items-center gap-2">
-                <PasswordInput
-                  v-model="config.email.codeSecret"
-                  class="lp-input"
-                  container-class="w-full max-w-sm"
-                  autocomplete="new-password"
-                  :show-label="t('common.showPassword')"
-                  :hide-label="t('common.hidePassword')"
-                />
-                <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">
-                  {{ config.email.codeSecretSet ? t('adminSystem.secretSet') : t('adminSystem.secretNotSet') }}
-                </span>
-              </div>
             </label>
           </div>
 

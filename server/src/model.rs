@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -388,6 +388,8 @@ pub struct EmailServiceConfig {
     pub smtp_password_set: bool,
     #[serde(default = "default_email_code_secret")]
     pub code_secret: String,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub templates: BTreeMap<String, EmailTemplateOverride>,
 }
 
 impl Default for EmailServiceConfig {
@@ -401,6 +403,7 @@ impl Default for EmailServiceConfig {
             smtp_password: None,
             smtp_password_set: false,
             code_secret: default_email_code_secret(),
+            templates: BTreeMap::new(),
         }
     }
 }
@@ -431,17 +434,59 @@ pub struct AdminEmailServiceConfigView {
     pub code_secret_set: bool,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub enum EmailServiceMode {
-    Log,
-    Smtp,
+pub struct EmailTemplateOverride {
+    pub subject: String,
+    pub html: String,
+    pub updated_at: DateTime<Utc>,
 }
 
-impl Default for EmailServiceMode {
-    fn default() -> Self {
-        Self::Log
-    }
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmailTemplateSummaryView {
+    pub id: String,
+    pub event: String,
+    pub locale: String,
+    pub name: String,
+    pub subject: String,
+    pub is_custom: bool,
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmailTemplateDetailView {
+    pub id: String,
+    pub event: String,
+    pub locale: String,
+    pub name: String,
+    pub subject: String,
+    pub html: String,
+    pub is_custom: bool,
+    pub updated_at: Option<DateTime<Utc>>,
+    pub placeholders: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmailTemplateListResponse {
+    pub templates: Vec<EmailTemplateSummaryView>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmailTemplatePreviewResponse {
+    pub subject: String,
+    pub html: String,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum EmailServiceMode {
+    #[default]
+    Log,
+    Smtp,
 }
 
 fn default_mailer_from() -> String {
@@ -491,6 +536,8 @@ pub struct EmailStartRequest {
     pub email: String,
     pub display_name: Option<String>,
     pub purpose: EmailChallengePurpose,
+    #[serde(default)]
+    pub locale: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -946,7 +993,7 @@ pub struct AdminConfigPatchRequest {
     pub max_storage_bytes: Option<i64>,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AdminEmailServicePatchRequest {
     pub mode: Option<EmailServiceMode>,
@@ -956,6 +1003,37 @@ pub struct AdminEmailServicePatchRequest {
     pub smtp_username: Option<String>,
     pub smtp_password: Option<String>,
     pub code_secret: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminEmailTestConnectionRequest {
+    #[serde(default)]
+    pub email: AdminEmailServicePatchRequest,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminEmailTestSendRequest {
+    pub recipient: String,
+    pub template_id: String,
+    #[serde(default)]
+    pub email: AdminEmailServicePatchRequest,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminEmailTemplateUpdateRequest {
+    pub subject: String,
+    pub html: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminEmailTemplatePreviewRequest {
+    pub template_id: String,
+    pub subject: String,
+    pub html: String,
 }
 
 #[derive(Deserialize)]

@@ -1,5 +1,6 @@
 pub mod api;
 pub mod config;
+pub mod email_template;
 pub mod error;
 pub mod mailer;
 pub mod model;

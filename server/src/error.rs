@@ -33,6 +33,8 @@ pub enum AppError {
     },
     #[error("{0}")]
     NotImplemented(String),
+    #[error("{message}")]
+    BadGatewayCode { code: &'static str, message: String },
     #[error("{0}")]
     Internal(String),
 }
@@ -68,6 +70,7 @@ impl IntoResponse for AppError {
                 (StatusCode::TOO_MANY_REQUESTS, "too_many_requests")
             }
             AppError::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, "not_implemented"),
+            AppError::BadGatewayCode { code, .. } => (StatusCode::BAD_GATEWAY, *code),
             AppError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal_error"),
         };
 

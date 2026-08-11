@@ -39,9 +39,9 @@ export const useWebSessionStore = defineStore('web-session', {
         this.clear()
       }
     },
-    async startEmail(email: string, purpose: EmailChallengePurpose, displayName?: string): Promise<WebEmailStartResponse> {
+    async startEmail(email: string, purpose: EmailChallengePurpose, displayName?: string, locale?: string): Promise<WebEmailStartResponse> {
       return this.withLoading(async () => {
-        return await webApi.startEmail(email, purpose, displayName)
+        return await webApi.startEmail(email, purpose, displayName, locale)
       })
     },
     async verifyEmail(challengeId: string, code: string): Promise<WebEmailVerifyResponse> {

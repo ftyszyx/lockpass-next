@@ -17,17 +17,19 @@ use tracing::info;
 use uuid::Uuid;
 
 use crate::{
+    email_template,
     error::{AppError, AppResult},
     model::{
         AccountRecord, AccountView, AdminAccountPatchRequest, AdminConfigPatchRequest,
-        AuditLogView, AuthPrincipal, AuthResponse, DeviceBindResponse, DeviceRecord, DeviceView,
-        EmailChallengePurpose, EmailServiceConfig, EmailStartResponse, EmailVerifyResponse,
-        IdentityRecord, IdentityView, InstanceConfig, MeResponse, SyncConflict, SyncEventView,
-        SyncObjectRecord, SyncObjectView, SyncPullResponse, SyncPushAccepted, SyncPushObject,
-        SyncPushRejected, SyncPushResponse, SyncSnapshotQuery, SyncSnapshotResponse,
-        SyncSpaceCreateResponse, SyncSpaceRecord, SyncSpacesResponse, UsageResponse,
-        WrappedVaultKeyCreateRequest, WrappedVaultKeyCreateResponse, WrappedVaultKeyRecord,
-        WrappedVaultKeysResponse,
+        AdminEmailServicePatchRequest, AdminEmailTemplateUpdateRequest, AuditLogView,
+        AuthPrincipal, AuthResponse, DeviceBindResponse, DeviceRecord, DeviceView,
+        EmailChallengePurpose, EmailServiceConfig, EmailStartResponse, EmailTemplateDetailView,
+        EmailTemplateListResponse, EmailVerifyResponse, IdentityRecord, IdentityView,
+        InstanceConfig, MeResponse, SyncConflict, SyncEventView, SyncObjectRecord, SyncObjectView,
+        SyncPullResponse, SyncPushAccepted, SyncPushObject, SyncPushRejected, SyncPushResponse,
+        SyncSnapshotQuery, SyncSnapshotResponse, SyncSpaceCreateResponse, SyncSpaceRecord,
+        SyncSpacesResponse, UsageResponse, WrappedVaultKeyCreateRequest,
+        WrappedVaultKeyCreateResponse, WrappedVaultKeyRecord, WrappedVaultKeysResponse,
     },
     rbac,
 };
@@ -1778,6 +1780,91 @@ impl PostgresStore {
         run_blocking(async move { Ok(load_instance_config(&pool).await?.to_admin_view()) })
     }
 
+    pub fn admin_email_config_with_patch(
+        &self,
+        patch: AdminEmailServicePatchRequest,
+    ) -> AppResult<EmailServiceConfig> {
+        let pool = self.pool.clone();
+        run_blocking(async move {
+            let mut config = load_instance_config(&pool).await?.email;
+            apply_email_service_patch(&mut config, patch)?;
+            validate_email_service_config(&config)?;
+            Ok(config)
+        })
+    }
+
+    pub fn admin_email_templates(&self) -> AppResult<EmailTemplateListResponse> {
+        let pool = self.pool.clone();
+        run_blocking(async move {
+            let config = load_instance_config(&pool).await?;
+            Ok(EmailTemplateListResponse {
+                templates: email_template::list_templates(&config.email),
+            })
+        })
+    }
+
+    pub fn admin_email_template(&self, template_id: String) -> AppResult<EmailTemplateDetailView> {
+        let pool = self.pool.clone();
+        run_blocking(async move {
+            let config = load_instance_config(&pool).await?;
+            email_template::get_template(&config.email, &template_id)
+        })
+    }
+
+    pub fn admin_update_email_template(
+        &self,
+        actor: &AuthPrincipal,
+        template_id: String,
+        payload: AdminEmailTemplateUpdateRequest,
+    ) -> AppResult<EmailTemplateDetailView> {
+        let pool = self.pool.clone();
+        let actor_account_id = actor.account_id;
+        run_blocking(async move {
+            let mut config = load_instance_config(&pool).await?;
+            let template = email_template::update_template(
+                &mut config.email,
+                &template_id,
+                payload.subject,
+                payload.html,
+            )?;
+            save_instance_config(&pool, &config).await?;
+            append_audit(
+                &pool,
+                Some(actor_account_id),
+                "email_template.update",
+                "email_template",
+                Some(template.id.clone()),
+                json!({ "locale": template.locale, "event": template.event }),
+            )
+            .await?;
+            Ok(template)
+        })
+    }
+
+    pub fn admin_restore_email_template(
+        &self,
+        actor: &AuthPrincipal,
+        template_id: String,
+    ) -> AppResult<EmailTemplateDetailView> {
+        let pool = self.pool.clone();
+        let actor_account_id = actor.account_id;
+        run_blocking(async move {
+            let mut config = load_instance_config(&pool).await?;
+            let template = email_template::restore_template(&mut config.email, &template_id)?;
+            save_instance_config(&pool, &config).await?;
+            append_audit(
+                &pool,
+                Some(actor_account_id),
+                "email_template.restore",
+                "email_template",
+                Some(template.id.clone()),
+                json!({ "locale": template.locale, "event": template.event }),
+            )
+            .await?;
+            Ok(template)
+        })
+    }
+
     pub fn admin_patch_config(
         &self,
         actor: &AuthPrincipal,
@@ -1800,40 +1887,7 @@ impl PostgresStore {
                 config.wechat_enabled = value;
             }
             if let Some(email) = patch.email {
-                if let Some(value) = email.mode {
-                    config.email.mode = value;
-                }
-                if let Some(value) = email.from {
-                    let value = value.trim();
-                    if value.is_empty() {
-                        return Err(AppError::BadRequest("email from is required".to_string()));
-                    }
-                    config.email.from = value.to_string();
-                }
-                if let Some(value) = email.smtp_host {
-                    config.email.smtp_host = normalize_optional_config_string(value);
-                }
-                if let Some(value) = email.smtp_port {
-                    config.email.smtp_port = value.max(1);
-                }
-                if let Some(value) = email.smtp_username {
-                    config.email.smtp_username = normalize_optional_config_string(value);
-                }
-                if let Some(value) = email.smtp_password {
-                    if !value.trim().is_empty() {
-                        config.email.smtp_password = Some(value);
-                        config.email.smtp_password_set = true;
-                    }
-                }
-                if let Some(value) = email.code_secret {
-                    let value = value.trim();
-                    if value.is_empty() {
-                        return Err(AppError::BadRequest(
-                            "email code secret is required".to_string(),
-                        ));
-                    }
-                    config.email.code_secret = value.to_string();
-                }
+                apply_email_service_patch(&mut config.email, email)?;
             }
             validate_email_service_config(&config.email)?;
             if let Some(value) = patch.official_hosted {
@@ -2820,6 +2874,47 @@ fn normalize_optional_config_string(value: String) -> Option<String> {
     }
 }
 
+fn apply_email_service_patch(
+    config: &mut EmailServiceConfig,
+    patch: AdminEmailServicePatchRequest,
+) -> AppResult<()> {
+    if let Some(value) = patch.mode {
+        config.mode = value;
+    }
+    if let Some(value) = patch.from {
+        let value = value.trim();
+        if value.is_empty() {
+            return Err(AppError::BadRequest("email from is required".to_string()));
+        }
+        config.from = value.to_string();
+    }
+    if let Some(value) = patch.smtp_host {
+        config.smtp_host = normalize_optional_config_string(value);
+    }
+    if let Some(value) = patch.smtp_port {
+        config.smtp_port = value.max(1);
+    }
+    if let Some(value) = patch.smtp_username {
+        config.smtp_username = normalize_optional_config_string(value);
+    }
+    if let Some(value) = patch.smtp_password {
+        if !value.trim().is_empty() {
+            config.smtp_password = Some(value);
+            config.smtp_password_set = true;
+        }
+    }
+    if let Some(value) = patch.code_secret {
+        let value = value.trim();
+        if value.is_empty() {
+            return Err(AppError::BadRequest(
+                "email code secret is required".to_string(),
+            ));
+        }
+        config.code_secret = value.to_string();
+    }
+    Ok(())
+}
+
 fn validate_email_service_config(config: &EmailServiceConfig) -> AppResult<()> {
     if config.from.trim().is_empty() {
         return Err(AppError::BadRequest("email from is required".to_string()));
@@ -3020,7 +3115,7 @@ async fn fetch_account_required_for_update(
         return Err(AppError::Unauthorized);
     };
     let roles = fetch_account_roles_in_tx(tx, account_id).await?;
-    Ok(row_to_account(row, roles)?)
+    row_to_account(row, roles)
 }
 
 async fn fetch_account(pool: &PgPool, account_id: Uuid) -> AppResult<Option<AccountRecord>> {

@@ -100,6 +100,39 @@ export interface EmailServiceConfig {
   codeSecretSet: boolean
 }
 
+export type EmailServicePatch = Partial<Pick<
+  EmailServiceConfig,
+  'mode' | 'from' | 'smtpHost' | 'smtpPort' | 'smtpUsername' | 'smtpPassword' | 'codeSecret'
+>>
+
+export type InstanceConfigPatch = Partial<Omit<InstanceConfig, 'email'>> & {
+  email?: EmailServicePatch
+}
+
+export interface EmailTemplateSummary {
+  id: string
+  event: string
+  locale: string
+  name: string
+  subject: string
+  isCustom: boolean
+  updatedAt?: string | null
+}
+
+export interface EmailTemplateDetail extends EmailTemplateSummary {
+  html: string
+  placeholders: string[]
+}
+
+export interface EmailTemplateListResponse {
+  templates: EmailTemplateSummary[]
+}
+
+export interface EmailTemplatePreviewResponse {
+  subject: string
+  html: string
+}
+
 export interface AuditLogView {
   id: number
   actorAccountId?: string | null

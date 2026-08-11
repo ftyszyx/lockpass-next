@@ -94,8 +94,24 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'admin/system/email',
-        name: 'admin-system-email',
-        meta: { titleKey: 'layout.systemEmail', requiresAdmin: true, configSection: 'email' },
+        redirect: '/admin/system/email/smtp'
+      },
+      {
+        path: 'admin/system/email/smtp',
+        name: 'admin-system-email-smtp',
+        meta: { titleKey: 'layout.systemEmail', requiresAdmin: true, configSection: 'email', emailPanel: 'smtp' },
+        component: () => import('@/pages/admin/AdminSystemPage.vue')
+      },
+      {
+        path: 'admin/system/email/test',
+        name: 'admin-system-email-test',
+        meta: { titleKey: 'layout.systemEmail', requiresAdmin: true, configSection: 'email', emailPanel: 'test' },
+        component: () => import('@/pages/admin/AdminSystemPage.vue')
+      },
+      {
+        path: 'admin/system/email/templates',
+        name: 'admin-system-email-templates',
+        meta: { titleKey: 'layout.systemEmail', requiresAdmin: true, configSection: 'email', emailPanel: 'templates' },
         component: () => import('@/pages/admin/AdminSystemPage.vue')
       },
       {

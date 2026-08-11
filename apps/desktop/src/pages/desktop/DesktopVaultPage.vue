@@ -122,7 +122,7 @@ const pendingDeleteVaultItemCount = computed(() =>
     : 0,
 );
 const connectionStatus = computed(() => {
-  if (!isOnline.value) return "offline";
+  if (!vaultStore.syncConnected || !isOnline.value) return "offline";
   if (
     vaultStore.autoSync.lastError === "syncNetworkBlocked" ||
     vaultStore.officialLogin.lastError === "syncNetworkBlocked"

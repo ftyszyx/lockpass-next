@@ -5,9 +5,14 @@ import type {
   AuditLogView,
   AuthResponse,
   DeviceView,
+  EmailServicePatch,
+  EmailTemplateDetail,
+  EmailTemplateListResponse,
+  EmailTemplatePreviewResponse,
   HealthResponse,
   IdentityView,
   InstanceConfig,
+  InstanceConfigPatch,
   MeResponse,
   SyncAckResponse,
   SyncPullResponse,
@@ -36,7 +41,7 @@ export class ApiError extends Error {
 }
 
 export interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   token?: string | null
   body?: unknown
   query?: Record<string, string | number | boolean | undefined | null>
@@ -180,8 +185,52 @@ export class ApiClient {
     return this.request<InstanceConfig>('/admin/config', { token })
   }
 
-  async patchAdminConfig(token: string, body: Partial<InstanceConfig>) {
+  async patchAdminConfig(token: string, body: InstanceConfigPatch) {
     return this.request<InstanceConfig>('/admin/config', { token, method: 'PATCH', body })
+  }
+
+  async testAdminEmailConnection(token: string, email: EmailServicePatch) {
+    return this.request<{ ok: boolean }>('/admin/email/test-connection', {
+      token,
+      body: { email }
+    })
+  }
+
+  async sendAdminTestEmail(token: string, recipient: string, templateId: string, email: EmailServicePatch) {
+    return this.request<{ ok: boolean }>('/admin/email/send-test', {
+      token,
+      body: { recipient, templateId, email }
+    })
+  }
+
+  async adminEmailTemplates(token: string) {
+    return this.request<EmailTemplateListResponse>('/admin/email/templates', { token })
+  }
+
+  async adminEmailTemplate(token: string, templateId: string) {
+    return this.request<EmailTemplateDetail>(`/admin/email/templates/${encodeURIComponent(templateId)}`, { token })
+  }
+
+  async updateAdminEmailTemplate(token: string, templateId: string, subject: string, html: string) {
+    return this.request<EmailTemplateDetail>(`/admin/email/templates/${encodeURIComponent(templateId)}`, {
+      token,
+      method: 'PUT',
+      body: { subject, html }
+    })
+  }
+
+  async restoreAdminEmailTemplate(token: string, templateId: string) {
+    return this.request<EmailTemplateDetail>(`/admin/email/templates/${encodeURIComponent(templateId)}/restore`, {
+      token,
+      method: 'POST'
+    })
+  }
+
+  async previewAdminEmailTemplate(token: string, templateId: string, subject: string, html: string) {
+    return this.request<EmailTemplatePreviewResponse>('/admin/email/templates/preview', {
+      token,
+      body: { templateId, subject, html }
+    })
   }
 
   async adminRoles(token: string) {

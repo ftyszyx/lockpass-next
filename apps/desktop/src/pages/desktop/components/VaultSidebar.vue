@@ -44,7 +44,7 @@ function accountStatusLabel(): string {
   if (props.connectionStatus === "offline") return t("app.offline");
   if (props.connectionStatus === "serverUnavailable")
     return t("app.serverUnavailable");
-  return !vaultStore.unlocked ? t("app.locked") : t("app.unlocked");
+  return t("app.serverConnected");
 }
 
 function closeUserMenu(): void {
@@ -89,7 +89,7 @@ function requestDeleteVault(event: MouseEvent, vaultId: string): void {
         :name="activeUserName"
         :initials="activeUserInitials"
         :status-label="accountStatusLabel()"
-        :status-tone="connectionStatus === 'online' ? 'normal' : 'warning'"
+        :status-tone="connectionStatus === 'online' ? 'success' : 'warning'"
         interactive
         @activate="userMenuOpen = !userMenuOpen"
       >

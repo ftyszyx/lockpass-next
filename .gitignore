@@ -38,3 +38,4 @@ tools/keys/lockpass.key.pub
 .playwright-cli
 diagrams
 output
+server/target-smtp-test/debug

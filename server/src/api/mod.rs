@@ -59,7 +59,7 @@ fn cors_layer(state: &AppState) -> CorsLayer {
     #[cfg(debug_assertions)]
     {
         for origin in default_dev_cors_origins() {
-            if !origins.iter().any(|allowed| allowed == &origin) {
+            if !origins.contains(&origin) {
                 origins.push(origin);
             }
         }
@@ -71,6 +71,7 @@ fn cors_layer(state: &AppState) -> CorsLayer {
         .allow_methods([
             Method::GET,
             Method::POST,
+            Method::PUT,
             Method::PATCH,
             Method::DELETE,
             Method::OPTIONS,
