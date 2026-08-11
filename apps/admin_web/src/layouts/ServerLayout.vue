@@ -28,6 +28,7 @@ const toast = ref<string | null>(null)
 const accountMenuOpen = ref(false)
 const changePasswordOpen = ref(false)
 const accountMenuRef = ref<HTMLElement | null>(null)
+let toastTimer: number | null = null
 
 interface NavItem {
   to: string
@@ -78,6 +79,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', closeAccountMenuOnOutsideClick)
+  if (toastTimer !== null) window.clearTimeout(toastTimer)
 })
 
 async function logout() {
@@ -104,9 +106,11 @@ function closeAccountMenuOnOutsideClick(event: PointerEvent) {
 
 function showToast(message: string) {
   toast.value = message
-  window.setTimeout(() => {
+  if (toastTimer !== null) window.clearTimeout(toastTimer)
+  toastTimer = window.setTimeout(() => {
     toast.value = null
-  }, 1800)
+    toastTimer = null
+  }, 2500)
 }
 
 function flattenNavItems(items: NavItem[]): NavItem[] {
