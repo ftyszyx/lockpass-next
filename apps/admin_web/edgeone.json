@@ -1,8 +1,8 @@
 {
-  "installCommand": "cd ../.. && npm ci",
+  "installCommand": "cd ../.. && npm ci --include=optional",
   "buildCommand": "cd ../.. && npm run build:admin_web",
   "outputDirectory": "dist",
-  "nodeVersion": "22.11.0",
+  "nodeVersion": "22.18.0",
   "rewrites": [
     {
       "source": "/*",
