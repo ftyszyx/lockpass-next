@@ -2,5 +2,5 @@
   "installCommand": "cd ../.. && npm ci --include=optional",
   "buildCommand": "cd ../.. && npm run build:landing",
   "outputDirectory": "dist",
-  "nodeVersion": "22.18.0"
+  "nodeVersion": "22.21.1"
 }

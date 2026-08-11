@@ -2,7 +2,7 @@
   "installCommand": "cd ../.. && npm ci --include=optional",
   "buildCommand": "cd ../.. && npm run build:web",
   "outputDirectory": "dist",
-  "nodeVersion": "22.18.0",
+  "nodeVersion": "22.21.1",
   "rewrites": [
     {
       "source": "/*",
