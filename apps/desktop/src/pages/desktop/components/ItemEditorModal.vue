@@ -21,6 +21,7 @@ import type {
   VaultItemFieldKind,
   VaultItemType,
 } from "@lockpass/core";
+import { PasswordInput } from "@lockpass/ui";
 import { computed, onBeforeUnmount, reactive } from "vue";
 import { useI18n } from "vue-i18n";
 import Draggable from "vuedraggable";
@@ -530,9 +531,11 @@ onBeforeUnmount(() => {
                                 v-if="isGeneratedField(child.kind)"
                                 class="grid grid-cols-[1fr_auto] gap-2"
                               >
-                                <input
+                                <PasswordInput
                                   v-model="child.value"
                                   class="form-input"
+                                  :show-label="t('user.showPassword')"
+                                  :hide-label="t('user.hidePassword')"
                                 />
                                 <button
                                   class="plain-button"
@@ -561,6 +564,13 @@ onBeforeUnmount(() => {
                                 v-model="child.value"
                                 class="form-input min-h-20"
                               ></textarea>
+                              <PasswordInput
+                                v-else-if="child.sensitive"
+                                v-model="child.value"
+                                class="form-input"
+                                :show-label="t('user.showPassword')"
+                                :hide-label="t('user.hidePassword')"
+                              />
                               <input
                                 v-else
                                 v-model="child.value"
@@ -715,7 +725,12 @@ onBeforeUnmount(() => {
                       v-else-if="isGeneratedField(field.kind)"
                       class="grid grid-cols-[1fr_auto] gap-2"
                     >
-                      <input v-model="field.value" class="form-input" />
+                      <PasswordInput
+                        v-model="field.value"
+                        class="form-input"
+                        :show-label="t('user.showPassword')"
+                        :hide-label="t('user.hidePassword')"
+                      />
                       <button
                         class="plain-button"
                         type="button"
@@ -743,6 +758,13 @@ onBeforeUnmount(() => {
                       v-model="field.value"
                       class="form-input min-h-20"
                     ></textarea>
+                    <PasswordInput
+                      v-else-if="field.sensitive"
+                      v-model="field.value"
+                      class="form-input"
+                      :show-label="t('user.showPassword')"
+                      :hide-label="t('user.hidePassword')"
+                    />
                     <input v-else v-model="field.value" class="form-input" />
                   </template>
                 </div>

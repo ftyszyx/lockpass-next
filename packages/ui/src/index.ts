@@ -1,4 +1,5 @@
 export { default as VaultAccountSummary } from './VaultAccountSummary.vue'
 export { default as VaultItemRow } from './VaultItemRow.vue'
 export { default as VaultSearchInput } from './VaultSearchInput.vue'
+export { default as PasswordInput } from './PasswordInput.vue'
 export { getAccountInitials, vaultItemIconText } from './vaultFormatters'

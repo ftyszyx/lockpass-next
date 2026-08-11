@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ArrowLeft, ShieldCheck, Unlock } from "@lucide/vue";
+import { PasswordInput } from "@lockpass/ui";
 import { nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useVaultStore } from "@/stores/vault";
@@ -29,7 +30,7 @@ const vaultStore = useVaultStore();
 const selectedUserId = ref(
   vaultStore.activeUserId ?? vaultStore.users[0]?.id ?? "",
 );
-const passwordInput = ref<HTMLInputElement | null>(null);
+const passwordInput = ref<InstanceType<typeof PasswordInput> | null>(null);
 const unlockStep = ref<"account" | "password" | "secretKey">(
   props.secretKeyRequired
     ? "secretKey"
@@ -181,14 +182,15 @@ function submitUnlock(): void {
         <div class="grid gap-1">
           <h2 class="auth-heading">{{ t("lock.secretKeyTitle") }}</h2>
         </div>
-        <input
+        <PasswordInput
           ref="passwordInput"
-          :value="password"
+          :model-value="password"
           class="form-input"
           autocomplete="current-password"
-          type="password"
           :placeholder="t('lock.passwordPlaceholder')"
-          @input="emit('update:password', ($event.target as HTMLInputElement).value)"
+          :show-label="t('user.showPassword')"
+          :hide-label="t('user.hidePassword')"
+          @update:model-value="emit('update:password', $event)"
         />
         <textarea
           :value="secretKey"
@@ -238,14 +240,15 @@ function submitUnlock(): void {
         <div class="grid gap-1">
           <h2 class="auth-heading">{{ t("lock.title") }}</h2>
         </div>
-        <input
+        <PasswordInput
           ref="passwordInput"
-          :value="password"
+          :model-value="password"
           class="form-input"
           autocomplete="current-password"
-          type="password"
           :placeholder="t('lock.passwordPlaceholder')"
-          @input="emit('update:password', ($event.target as HTMLInputElement).value)"
+          :show-label="t('user.showPassword')"
+          :hide-label="t('user.hidePassword')"
+          @update:model-value="emit('update:password', $event)"
         />
         <p
           v-if="authError"

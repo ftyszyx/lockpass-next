@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { KeyRound, ServerCog, ShieldCheck } from '@lucide/vue'
+import { PasswordInput } from '@lockpass/ui'
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n, type AdminWebLocale } from '@/i18n'
@@ -88,7 +89,14 @@ async function submit() {
           </label>
           <label class="lp-label">
             {{ t('auth.password') }}
-            <input v-model="password" class="lp-input" autocomplete="current-password" required type="password" />
+            <PasswordInput
+              v-model="password"
+              class="lp-input"
+              autocomplete="current-password"
+              required
+              :show-label="t('common.showPassword')"
+              :hide-label="t('common.hidePassword')"
+            />
           </label>
 
           <p v-if="session.error" class="m-0 rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Cloud, Download, KeyRound, LogIn, ShieldCheck } from '@lucide/vue'
+import { PasswordInput } from '@lockpass/ui'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -442,7 +443,14 @@ function changeLocale(event: Event): void {
             <p class="m-0 text-sm leading-6 text-slate-600">{{ t('webAuth.unlockVaultBody') }}</p>
             <label class="form-label">
               {{ t('user.masterPassword') }}
-              <input v-model="masterPassword" class="form-input" autocomplete="current-password" required type="password" />
+              <PasswordInput
+                v-model="masterPassword"
+                class="form-input"
+                autocomplete="current-password"
+                required
+                :show-label="t('user.showPassword')"
+                :hide-label="t('user.hidePassword')"
+              />
             </label>
             <label class="form-label">
               {{ t('user.secretKey') }}
@@ -454,11 +462,25 @@ function changeLocale(event: Event): void {
             <p class="m-0 text-sm leading-6 text-slate-600">{{ t('webAuth.setMasterPasswordBody') }}</p>
             <label class="form-label">
               {{ t('user.masterPassword') }}
-              <input v-model="masterPassword" class="form-input" autocomplete="new-password" required type="password" />
+              <PasswordInput
+                v-model="masterPassword"
+                class="form-input"
+                autocomplete="new-password"
+                required
+                :show-label="t('user.showPassword')"
+                :hide-label="t('user.hidePassword')"
+              />
             </label>
             <label class="form-label">
               {{ t('user.confirmPassword') }}
-              <input v-model="confirmMasterPassword" class="form-input" autocomplete="new-password" required type="password" />
+              <PasswordInput
+                v-model="confirmMasterPassword"
+                class="form-input"
+                autocomplete="new-password"
+                required
+                :show-label="t('user.showPassword')"
+                :hide-label="t('user.hidePassword')"
+              />
             </label>
             <p class="m-0 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900">
               {{ t('webAuth.masterPasswordResetNotice') }}

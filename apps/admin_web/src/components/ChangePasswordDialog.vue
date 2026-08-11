@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { X } from '@lucide/vue'
+import { PasswordInput } from '@lockpass/ui'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { t } from '@/i18n'
 import { useSessionStore } from '@/stores/session'
@@ -15,7 +16,7 @@ const currentPassword = ref('')
 const newPassword = ref('')
 const confirmPassword = ref('')
 const validationError = ref('')
-const currentPasswordInput = ref<HTMLInputElement | null>(null)
+const currentPasswordInput = ref<InstanceType<typeof PasswordInput> | null>(null)
 const errorMessage = computed(() => validationError.value || session.error || '')
 
 watch(
@@ -104,33 +105,36 @@ function validate(): string {
         <div class="grid gap-4 p-5">
           <label class="lp-label">
             {{ t('changePassword.currentPassword') }}
-            <input
+            <PasswordInput
               ref="currentPasswordInput"
               v-model="currentPassword"
               class="lp-input"
-              type="password"
               autocomplete="current-password"
               :disabled="session.loading"
+              :show-label="t('common.showPassword')"
+              :hide-label="t('common.hidePassword')"
             />
           </label>
           <label class="lp-label">
             {{ t('changePassword.newPassword') }}
-            <input
+            <PasswordInput
               v-model="newPassword"
               class="lp-input"
-              type="password"
               autocomplete="new-password"
               :disabled="session.loading"
+              :show-label="t('common.showPassword')"
+              :hide-label="t('common.hidePassword')"
             />
           </label>
           <label class="lp-label">
             {{ t('changePassword.confirmPassword') }}
-            <input
+            <PasswordInput
               v-model="confirmPassword"
               class="lp-input"
-              type="password"
               autocomplete="new-password"
               :disabled="session.loading"
+              :show-label="t('common.showPassword')"
+              :hide-label="t('common.hidePassword')"
             />
           </label>
 

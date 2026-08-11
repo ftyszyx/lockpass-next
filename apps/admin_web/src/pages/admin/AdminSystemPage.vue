@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Save } from '@lucide/vue'
+import { PasswordInput } from '@lockpass/ui'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '@/api/client'
@@ -153,7 +154,14 @@ async function save() {
             <label class="lp-label">
               {{ t('adminSystem.smtpPassword') }}
               <div class="flex flex-wrap items-center gap-2">
-                <input v-model="config.email.smtpPassword" class="lp-input w-full max-w-sm" type="password" autocomplete="new-password" />
+                <PasswordInput
+                  v-model="config.email.smtpPassword"
+                  class="lp-input"
+                  container-class="w-full max-w-sm"
+                  autocomplete="new-password"
+                  :show-label="t('common.showPassword')"
+                  :hide-label="t('common.hidePassword')"
+                />
                 <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">
                   {{ config.email.smtpPasswordSet ? t('adminSystem.secretSet') : t('adminSystem.secretNotSet') }}
                 </span>
@@ -162,7 +170,14 @@ async function save() {
             <label class="lp-label">
               {{ t('adminSystem.emailCodeSecret') }}
               <div class="flex flex-wrap items-center gap-2">
-                <input v-model="config.email.codeSecret" class="lp-input w-full max-w-sm" type="password" autocomplete="new-password" />
+                <PasswordInput
+                  v-model="config.email.codeSecret"
+                  class="lp-input"
+                  container-class="w-full max-w-sm"
+                  autocomplete="new-password"
+                  :show-label="t('common.showPassword')"
+                  :hide-label="t('common.hidePassword')"
+                />
                 <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">
                   {{ config.email.codeSecretSet ? t('adminSystem.secretSet') : t('adminSystem.secretNotSet') }}
                 </span>

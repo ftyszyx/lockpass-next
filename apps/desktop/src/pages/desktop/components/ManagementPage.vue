@@ -20,6 +20,7 @@ import {
   Sun,
   X,
 } from "@lucide/vue";
+import { PasswordInput } from "@lockpass/ui";
 import { computed, ref, watch, type Component } from "vue";
 import { useI18n } from "vue-i18n";
 import { localeLabels, supportedLocales, type SupportedLocale } from "@/i18n";
@@ -1169,13 +1170,14 @@ function clearShortcutError(
           </div>
           <label class="form-label">
             {{ t("backup.legacyPassword") }}
-            <input
+            <PasswordInput
               v-model="legacyPassword"
               class="form-input"
-              type="password"
               autocomplete="current-password"
               autofocus
               :placeholder="t('backup.legacyPassword')"
+              :show-label="t('user.showPassword')"
+              :hide-label="t('user.hidePassword')"
               @keydown.enter.prevent="submitLegacyImport"
             />
           </label>

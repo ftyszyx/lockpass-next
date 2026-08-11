@@ -3,8 +3,6 @@ import {
   ArrowLeft,
   Check,
   CircleHelp,
-  Eye,
-  EyeOff,
   KeyRound,
   LogIn,
   Save,
@@ -13,6 +11,7 @@ import {
   UserPlus,
   X,
 } from "@lucide/vue";
+import { PasswordInput } from "@lockpass/ui";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { SyncMode } from "@/services/syncClient";
@@ -51,8 +50,6 @@ const savedOfflineConfirmInput = ref<HTMLInputElement | null>(null);
 const savedOfflineConfirmAttention = ref(false);
 const restorePassword = ref("");
 const restoreSecretKey = ref("");
-const masterPasswordVisible = ref(false);
-const confirmPasswordVisible = ref(false);
 const showSelfhostDialog = ref(false);
 const selfhostHelpOpen = ref(false);
 const selfhostUrlDraft = ref("");
@@ -272,12 +269,13 @@ function saveSelfhostUrl(): void {
         </h2>
         <label class="form-label">
           {{ t("user.masterPassword") }}
-          <input
+          <PasswordInput
             v-model="restorePassword"
             class="form-input"
             autocomplete="current-password"
-            type="password"
             :placeholder="t('lock.passwordPlaceholder')"
+            :show-label="t('user.showPassword')"
+            :hide-label="t('user.hidePassword')"
           />
         </label>
         <label class="form-label">
@@ -330,61 +328,23 @@ function saveSelfhostUrl(): void {
         </label>
         <label class="form-label">
           {{ t("user.masterPassword") }}
-          <span class="password-input-wrap">
-            <input
-              v-model="draft.password"
-              class="form-input pr-10"
-              autocomplete="new-password"
-              :type="masterPasswordVisible ? 'text' : 'password'"
-            />
-            <button
-              class="password-visibility-button"
-              type="button"
-              :title="
-                masterPasswordVisible
-                  ? t('user.hidePassword')
-                  : t('user.showPassword')
-              "
-              :aria-label="
-                masterPasswordVisible
-                  ? t('user.hidePassword')
-                  : t('user.showPassword')
-              "
-              @click="masterPasswordVisible = !masterPasswordVisible"
-            >
-              <EyeOff v-if="masterPasswordVisible" class="size-4" />
-              <Eye v-else class="size-4" />
-            </button>
-          </span>
+          <PasswordInput
+            v-model="draft.password"
+            class="form-input"
+            autocomplete="new-password"
+            :show-label="t('user.showPassword')"
+            :hide-label="t('user.hidePassword')"
+          />
         </label>
         <label class="form-label">
           {{ t("user.confirmPassword") }}
-          <span class="password-input-wrap">
-            <input
-              v-model="draft.confirmPassword"
-              class="form-input pr-10"
-              autocomplete="new-password"
-              :type="confirmPasswordVisible ? 'text' : 'password'"
-            />
-            <button
-              class="password-visibility-button"
-              type="button"
-              :title="
-                confirmPasswordVisible
-                  ? t('user.hidePassword')
-                  : t('user.showPassword')
-              "
-              :aria-label="
-                confirmPasswordVisible
-                  ? t('user.hidePassword')
-                  : t('user.showPassword')
-              "
-              @click="confirmPasswordVisible = !confirmPasswordVisible"
-            >
-              <EyeOff v-if="confirmPasswordVisible" class="size-4" />
-              <Eye v-else class="size-4" />
-            </button>
-          </span>
+          <PasswordInput
+            v-model="draft.confirmPassword"
+            class="form-input"
+            autocomplete="new-password"
+            :show-label="t('user.showPassword')"
+            :hide-label="t('user.hidePassword')"
+          />
         </label>
         <p
           v-if="authError"
@@ -525,30 +485,6 @@ function saveSelfhostUrl(): void {
 </template>
 
 <style scoped>
-.password-input-wrap {
-  position: relative;
-  display: block;
-}
-
-.password-visibility-button {
-  position: absolute;
-  top: 50%;
-  right: 6px;
-  display: inline-flex;
-  width: 30px;
-  height: 30px;
-  align-items: center;
-  justify-content: center;
-  color: var(--app-muted);
-  border-radius: 6px;
-  transform: translateY(-50%);
-}
-
-.password-visibility-button:hover {
-  color: var(--app-primary-text);
-  background: var(--app-primary-soft);
-}
-
 .saved-confirm-check {
   transition:
     background-color 120ms ease,

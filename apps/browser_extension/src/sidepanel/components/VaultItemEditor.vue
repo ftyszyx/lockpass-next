@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Vault, VaultItem, VaultItemField, VaultItemFieldKind, VaultItemType } from '@lockpass/core'
+import { PasswordInput } from '@lockpass/ui'
 import { Plus, Save, Trash2, X } from '@lucide/vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -133,6 +134,13 @@ function submit(): void {
               <div v-for="child in field.children ?? []" :key="child.id" class="extension-editor-field-row">
                 <input v-model="child.label" class="extension-field-label-input" :aria-label="t('editor.fieldName')" />
                 <textarea v-if="isTextareaKind(child.kind)" v-model="child.value" class="form-input extension-field-value"></textarea>
+                <PasswordInput
+                  v-else-if="child.sensitive"
+                  v-model="child.value"
+                  class="form-input extension-field-value"
+                  :show-label="t('app.showPassword')"
+                  :hide-label="t('app.hidePassword')"
+                />
                 <input v-else v-model="child.value" class="form-input extension-field-value" :type="fieldInputType(child)" />
                 <button class="icon-button" type="button" :title="t('editor.removeField')" @click="removeField(child.id, field)">
                   <Trash2 />
@@ -144,6 +152,13 @@ function submit(): void {
             <input v-model="field.label" class="extension-field-label-input" :aria-label="t('editor.fieldName')" />
             <span v-if="field.kind === 'attachment'" class="extension-attachment-reference">{{ t('editor.attachmentPreserved') }}</span>
             <textarea v-else-if="isTextareaKind(field.kind)" v-model="field.value" class="form-input extension-field-value"></textarea>
+            <PasswordInput
+              v-else-if="field.sensitive"
+              v-model="field.value"
+              class="form-input extension-field-value"
+              :show-label="t('app.showPassword')"
+              :hide-label="t('app.hidePassword')"
+            />
             <input v-else v-model="field.value" class="form-input extension-field-value" :type="fieldInputType(field)" />
             <button class="icon-button" type="button" :title="t('editor.removeField')" @click="removeField(field.id)">
               <Trash2 />

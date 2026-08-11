@@ -38,6 +38,8 @@ const zhCN = {
     unknown: '未知',
     neverSynced: '从未保存',
     processing: '处理中...',
+    showPassword: '显示密码',
+    hidePassword: '隐藏密码',
     previous: '上一页',
     next: '下一页',
     language: '语言'

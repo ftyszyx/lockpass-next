@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { KeyRound, LockKeyhole, LogIn, Pencil, Server, X } from '@lucide/vue'
+import { PasswordInput } from '@lockpass/ui'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { normalizeSelfHostServerUrl } from '@/services/extensionServer'
@@ -127,24 +128,26 @@ function submitUnlock(): void {
       <form v-else class="gate-form" @submit.prevent="submitUnlock">
         <label class="form-label">
           <span>{{ t('auth.masterPassword') }}</span>
-          <input
+          <PasswordInput
             v-model="password"
             class="form-input"
-            type="password"
             autocomplete="current-password"
             autofocus
+            :show-label="t('app.showPassword')"
+            :hide-label="t('app.hidePassword')"
           />
         </label>
         <label v-if="requiresSecretKey" class="form-label">
           <span>{{ t('auth.secretKey') }}</span>
-          <input
+          <PasswordInput
             v-model="secretKey"
             class="form-input"
-            type="password"
             autocomplete="off"
             autocapitalize="off"
             spellcheck="false"
             :placeholder="t('auth.secretKeyPlaceholder')"
+            :show-label="t('app.showPassword')"
+            :hide-label="t('app.hidePassword')"
           />
         </label>
         <button class="primary-button wide-button" type="submit" :disabled="!canUnlock">

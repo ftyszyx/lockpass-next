@@ -40,6 +40,8 @@ const enUS: ServerWebMessages = {
     unknown: 'Unknown',
     neverSynced: 'Never saved',
     processing: 'Processing...',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
     previous: 'Previous',
     next: 'Next',
     language: 'Language'
