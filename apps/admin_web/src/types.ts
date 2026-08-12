@@ -141,6 +141,39 @@ export interface AuditLogView {
   createdAt: string
 }
 
+export type ServerLogLevel = 'info' | 'warning' | 'error'
+
+export interface ServerLogView {
+  id: number
+  requestId: string
+  level: ServerLogLevel
+  message: string
+  accountId?: string | null
+  accountDisplayName?: string | null
+  accountEmail?: string | null
+  method: string
+  path: string
+  statusCode: number
+  durationMs: number
+  clientIp?: string | null
+  createdAt: string
+}
+
+export interface ServerLogListResponse {
+  logs: ServerLogView[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export interface ServerLogQuery {
+  level?: ServerLogLevel
+  accountId?: string
+  search?: string
+  page?: number
+  pageSize?: number
+}
+
 export interface RoleView {
   code: string
   name: string

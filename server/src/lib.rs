@@ -5,5 +5,6 @@ pub mod error;
 pub mod mailer;
 pub mod model;
 pub mod rbac;
+pub mod server_log;
 pub mod state;
 pub mod storage;

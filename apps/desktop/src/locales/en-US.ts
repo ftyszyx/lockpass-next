@@ -88,6 +88,8 @@ const enUS: LocaleMessages = {
     signOut: "Sign out",
     loginFailed:
       "Sign-in failed. Check the email code, account, or server status.",
+    accountNotFound:
+      "No account exists for this email. Switch to registration.",
     registerFailed:
       "Registration failed. Check the email code, email, or server status.",
     registerConflict: "This email is already registered. Log in instead.",
@@ -175,6 +177,12 @@ const enUS: LocaleMessages = {
     tools: "Tools",
     backup: "Backup restore",
     settings: "Settings",
+  },
+  accountMenu: {
+    account: "Account",
+    security: "Security",
+    manageAccounts: "Account management",
+    serverConnection: "Server connection",
   },
   management: {
     title: "Management",

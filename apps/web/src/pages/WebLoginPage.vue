@@ -233,6 +233,12 @@ function clearSecretInputs(options: { keepFinalizing?: boolean } = {}): void {
 
 function authErrorMessage(cause: unknown): string {
   if (cause instanceof WebApiError) {
+    if (
+      mode.value === 'login' &&
+      (cause.errorCode === 'not_found' || cause.status === 404)
+    ) {
+      return t('webAuth.accountNotFound')
+    }
     if (mode.value === 'register') {
       if (cause.errorCode === 'conflict' || cause.status === 409) return t('webAuth.registerConflict')
       if (cause.errorCode === 'forbidden' || cause.status === 403) return t('webAuth.registerDisabled')

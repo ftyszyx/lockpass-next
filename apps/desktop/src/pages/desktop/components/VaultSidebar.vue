@@ -126,7 +126,14 @@ function requestDeleteVault(event: MouseEvent, vaultId: string): void {
         class="floating-panel absolute left-2.5 right-2.5 top-[58px] z-40 overflow-hidden rounded-md border"
       >
         <div class="grid gap-1 p-1">
-          <div class="grid gap-1">
+          <div class="grid gap-0.5">
+            <div class="menu-section-label">
+              {{ t("accountMenu.account") }}
+            </div>
+            <button class="menu-item" @click="manageUsers">
+              <Users class="size-4" />
+              <span>{{ t("accountMenu.manageAccounts") }}</span>
+            </button>
             <button
               class="menu-item"
               :class="{
@@ -139,31 +146,21 @@ function requestDeleteVault(event: MouseEvent, vaultId: string): void {
               <CloudOff v-else class="size-4" />
               <span>{{
                 vaultStore.syncConnected
-                  ? t("sync.title")
+                  ? t("accountMenu.serverConnection")
                   : t("sync.connectServer")
               }}</span>
             </button>
           </div>
 
-          <div class="grid gap-1 border-t border-slate-100 pt-1">
-            <button
-              class="menu-item"
-              @click="manageUsers"
-            >
-              <Users class="size-4" />
-              <span>{{ t("user.manageUsers") }}</span>
-            </button>
-            <button
-              class="menu-item"
-              @click="changeMasterPassword"
-            >
+          <div class="grid gap-0.5 border-t border-slate-100 pt-1">
+            <div class="menu-section-label">
+              {{ t("accountMenu.security") }}
+            </div>
+            <button class="menu-item" @click="changeMasterPassword">
               <KeyRound class="size-4" />
               <span>{{ t("settings.changeMasterPassword") }}</span>
             </button>
-            <button
-              class="menu-item"
-              @click="showSecretKey"
-            >
+            <button class="menu-item" @click="showSecretKey">
               <QrCode class="size-4" />
               <span class="truncate">{{
                 t("settings.setupAnotherDeviceTitle")
@@ -172,31 +169,23 @@ function requestDeleteVault(event: MouseEvent, vaultId: string): void {
           </div>
 
           <div class="border-t border-slate-100 pt-1">
-            <button
-              class="menu-item"
-              @click="openManagement"
-            >
+            <button class="menu-item" @click="openManagement">
               <Settings class="size-4" />
               <span class="truncate">{{ t("nav.settings") }}</span>
             </button>
           </div>
 
-          <div class="grid gap-1 border-t border-slate-100 pt-1">
+          <div class="grid gap-0.5 border-t border-slate-100 pt-1">
+            <button class="menu-item" @click="lock">
+              <Lock class="size-4" />
+              <span>{{ t("app.lock") }}</span>
+            </button>
             <button
-              class="menu-item"
+              class="menu-item text-rose-700 hover:bg-rose-50 hover:text-rose-700"
               @click="signOutCurrentUser"
             >
               <LogOut class="size-4" />
-              <span class="truncate">{{
-                t("settings.signOutCurrentUser")
-              }}</span>
-            </button>
-            <button
-              class="menu-item"
-              @click="lock"
-            >
-              <Lock class="size-4" />
-              <span>{{ t("app.lock") }}</span>
+              <span class="truncate">{{ t("settings.signOutAction") }}</span>
             </button>
           </div>
         </div>

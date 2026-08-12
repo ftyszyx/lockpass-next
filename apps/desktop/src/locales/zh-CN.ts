@@ -82,6 +82,7 @@ const zhCN = {
     signedIn: "服务器账号已登录",
     signOut: "退出登录",
     loginFailed: "登录失败，请检查邮箱验证码、账号或服务器状态。",
+    accountNotFound: "该邮箱尚未注册，请切换到注册。",
     registerFailed: "注册失败，请检查邮箱验证码、邮箱或服务器状态。",
     registerConflict: "这个邮箱已经注册，请直接登录。",
     registerDisabled: "当前服务器没有开放注册。",
@@ -159,6 +160,12 @@ const zhCN = {
     tools: "工具",
     backup: "备份恢复",
     settings: "设置",
+  },
+  accountMenu: {
+    account: "账号",
+    security: "安全",
+    manageAccounts: "账号管理",
+    serverConnection: "服务器连接",
   },
   management: {
     title: "管理中心",

@@ -76,6 +76,12 @@ const showRestoreStep = computed(
     !props.secretKey &&
     !props.isLegacyImport,
 );
+const primaryServerAuthMode = computed<"login" | "register">(() =>
+  props.isAdding ? "register" : "login",
+);
+const secondaryServerAuthMode = computed<"login" | "register">(() =>
+  primaryServerAuthMode.value === "register" ? "login" : "register",
+);
 
 watch(
   () => props.serverAccountLabel,
@@ -99,7 +105,7 @@ watch(savedOfflineConfirmed, (confirmed) => {
 
 function handleSubmit(): void {
   if (showServerStep.value) {
-    openServerLogin("login");
+    openServerLogin(primaryServerAuthMode.value);
     return;
   }
 
@@ -234,21 +240,35 @@ function saveSelfhostUrl(): void {
               type="submit"
               :disabled="serverBusy"
             >
-              <LogIn class="size-4" />
+              <UserPlus
+                v-if="primaryServerAuthMode === 'register'"
+                class="size-4"
+              />
+              <LogIn v-else class="size-4" />
               {{
                 serverBusy
                   ? t("sync.officialLoginPending")
-                  : t("user.serverLoginAction")
+                  : primaryServerAuthMode === "register"
+                    ? t("user.createServerAccountAction")
+                    : t("user.serverLoginAction")
               }}
             </button>
             <button
               class="plain-button justify-center"
               type="button"
               :disabled="serverBusy"
-              @click="openServerLogin('register')"
+              @click="openServerLogin(secondaryServerAuthMode)"
             >
-              <UserPlus class="size-4" />
-              {{ t("user.createServerAccountAction") }}
+              <LogIn
+                v-if="secondaryServerAuthMode === 'login'"
+                class="size-4"
+              />
+              <UserPlus v-else class="size-4" />
+              {{
+                secondaryServerAuthMode === "login"
+                  ? t("user.serverLoginAction")
+                  : t("user.createServerAccountAction")
+              }}
             </button>
           </div>
         </div>

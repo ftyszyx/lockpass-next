@@ -14,6 +14,56 @@ pub struct AuthPrincipal {
 }
 
 #[derive(Clone, Debug)]
+pub struct ServerLogEntry {
+    pub request_id: Uuid,
+    pub level: String,
+    pub message: String,
+    pub token_hash: Option<String>,
+    pub method: String,
+    pub path: String,
+    pub status_code: i32,
+    pub duration_ms: i64,
+    pub client_ip: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminServerLogQuery {
+    pub level: Option<String>,
+    pub account_id: Option<Uuid>,
+    pub search: Option<String>,
+    pub page: Option<i64>,
+    pub page_size: Option<i64>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerLogView {
+    pub id: i64,
+    pub request_id: Uuid,
+    pub level: String,
+    pub message: String,
+    pub account_id: Option<Uuid>,
+    pub account_display_name: Option<String>,
+    pub account_email: Option<String>,
+    pub method: String,
+    pub path: String,
+    pub status_code: i32,
+    pub duration_ms: i64,
+    pub client_ip: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerLogListResponse {
+    pub logs: Vec<ServerLogView>,
+    pub total: i64,
+    pub page: i64,
+    pub page_size: i64,
+}
+
+#[derive(Clone, Debug)]
 pub struct AccountRecord {
     pub id: Uuid,
     pub display_name: String,

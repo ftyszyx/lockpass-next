@@ -6,6 +6,8 @@ use axum::{
 use serde::Serialize;
 use thiserror::Error;
 
+use crate::server_log::ServerLogErrorContext;
+
 pub type AppResult<T> = Result<T, AppError>;
 
 #[derive(Debug, Error)]
@@ -75,15 +77,19 @@ impl IntoResponse for AppError {
         };
 
         let message = self.to_string();
-        (
+        let mut response = (
             status,
             Json(ErrorBody {
                 error: code,
-                message,
+                message: message.clone(),
                 retry_after_seconds,
             }),
         )
-            .into_response()
+            .into_response();
+        response
+            .extensions_mut()
+            .insert(ServerLogErrorContext { code, message });
+        response
     }
 }
 

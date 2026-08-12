@@ -66,6 +66,8 @@ const enUS: ServerWebMessages = {
     systemEmail: 'Email codes',
     systemAuth: 'Sign-in methods',
     systemQuota: 'Quotas',
+    logs: 'Logs',
+    serverLogs: 'Server logs',
     audit: 'Audit logs',
     accountMenu: 'Account menu',
     changePassword: 'Change password',
@@ -85,6 +87,8 @@ const enUS: ServerWebMessages = {
     adminSystemEmail: 'Management email code settings',
     adminSystemAuth: 'Management sign-in method settings',
     adminSystemQuota: 'Management quota settings',
+    adminLogs: 'Management logs',
+    adminServerLogs: 'Management server logs',
     adminAudit: 'Management audit logs'
   },
   roleCodes: {
@@ -283,6 +287,30 @@ const enUS: ServerWebMessages = {
     targetId: 'Target ID',
     actor: 'Actor',
     time: 'Time'
+  },
+  adminServerLogs: {
+    title: 'Server logs',
+    summary: 'Review API results and error summaries to troubleshoot connections, sync, and email delivery.',
+    noLogs: 'No matching logs',
+    allLevels: 'All levels',
+    allAccounts: 'All users',
+    level: 'Level',
+    account: 'User',
+    searchPlaceholder: 'Search endpoint, request ID, IP, or error',
+    apply: 'Filter',
+    request: 'Request',
+    result: 'Status',
+    duration: 'Duration',
+    clientIp: 'Client IP',
+    message: 'Log message',
+    time: 'Time',
+    unknownAccount: 'Unidentified user',
+    range: '{start}-{end} of {total}',
+    levels: {
+      info: 'Info',
+      warning: 'Warning',
+      error: 'Error'
+    }
   },
   adminSyncData: {
     title: 'Encrypted data',

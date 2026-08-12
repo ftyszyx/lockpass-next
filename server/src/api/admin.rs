@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::HeaderMap,
     routing::{delete, get, post},
     Json, Router,
@@ -15,6 +15,7 @@ use crate::{
         AdminAccountPatchRequest, AdminConfigPatchRequest, AdminEmailTemplatePreviewRequest,
         AdminEmailTemplateUpdateRequest, AdminEmailTestConnectionRequest,
         AdminEmailTestSendRequest, AdminPasswordChangeRequest, AdminRoleGrantRequest,
+        AdminServerLogQuery,
     },
     state::AppState,
 };
@@ -43,6 +44,7 @@ pub fn router() -> Router<AppState> {
         )
         .route("/roles", get(roles))
         .route("/sync-data", get(sync_data))
+        .route("/server-logs", get(server_logs))
         .route("/audit-logs", get(audit_logs))
 }
 
@@ -270,4 +272,14 @@ async fn audit_logs(State(state): State<AppState>, headers: HeaderMap) -> AppRes
     let principal = auth_principal(&state, &headers)?;
     ensure_admin(&principal)?;
     Ok(Json(json!(state.store.admin_audit_logs()?)))
+}
+
+async fn server_logs(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<AdminServerLogQuery>,
+) -> AppResult<Json<Value>> {
+    let principal = auth_principal(&state, &headers)?;
+    ensure_admin(&principal)?;
+    Ok(Json(json!(state.store.admin_server_logs(query)?)))
 }

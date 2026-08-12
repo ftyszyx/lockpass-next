@@ -14,6 +14,8 @@ import type {
   InstanceConfig,
   InstanceConfigPatch,
   MeResponse,
+  ServerLogListResponse,
+  ServerLogQuery,
   SyncAckResponse,
   SyncPullResponse,
   SyncPushObject,
@@ -243,6 +245,19 @@ export class ApiClient {
 
   async auditLogs(token: string) {
     return this.request<AuditLogView[]>('/admin/audit-logs', { token })
+  }
+
+  async serverLogs(token: string, query: ServerLogQuery = {}) {
+    return this.request<ServerLogListResponse>('/admin/server-logs', {
+      token,
+      query: {
+        level: query.level,
+        accountId: query.accountId,
+        search: query.search,
+        page: query.page,
+        pageSize: query.pageSize
+      }
+    })
   }
 
   private async request<T>(path: string, options: RequestOptions = {}): Promise<T> {

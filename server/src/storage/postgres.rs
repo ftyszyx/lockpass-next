@@ -16,6 +16,8 @@ use sqlx::{postgres::PgRow, PgConnection, PgPool, Postgres, Row, Transaction};
 use tracing::info;
 use uuid::Uuid;
 
+mod server_logs;
+
 use crate::{
     email_template,
     error::{AppError, AppResult},

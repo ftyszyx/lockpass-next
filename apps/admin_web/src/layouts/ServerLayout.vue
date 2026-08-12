@@ -3,6 +3,7 @@ import {
   ChevronDown,
   Gauge,
   KeyRound,
+  ListTree,
   LogOut,
   Mail,
   ScrollText,
@@ -57,7 +58,16 @@ const navGroups = computed(() => [
           { to: '/admin/system/quota', label: t('layout.systemQuota'), ariaLabel: t('layout.adminSystemQuota'), icon: Gauge }
         ]
       },
-      { to: '/admin/audit', label: t('layout.audit'), ariaLabel: t('layout.adminAudit'), icon: ScrollText }
+      {
+        to: '/admin/logs/server',
+        label: t('layout.logs'),
+        ariaLabel: t('layout.adminLogs'),
+        icon: ListTree,
+        children: [
+          { to: '/admin/logs/server', label: t('layout.serverLogs'), ariaLabel: t('layout.adminServerLogs'), icon: ScrollText },
+          { to: '/admin/logs/audit', label: t('layout.audit'), ariaLabel: t('layout.adminAudit'), icon: ScrollText }
+        ]
+      }
     ]
   }
 ])

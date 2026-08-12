@@ -77,10 +77,24 @@ const routes: RouteRecordRaw[] = [
         redirect: '/admin/system/general'
       },
       {
-        path: 'admin/audit',
-        name: 'admin-audit',
+        path: 'admin/logs',
+        redirect: '/admin/logs/server'
+      },
+      {
+        path: 'admin/logs/server',
+        name: 'admin-server-logs',
+        meta: { titleKey: 'layout.serverLogs', requiresAdmin: true },
+        component: () => import('@/pages/admin/AdminServerLogsPage.vue')
+      },
+      {
+        path: 'admin/logs/audit',
+        name: 'admin-audit-logs',
         meta: { titleKey: 'layout.audit', requiresAdmin: true },
         component: () => import('@/pages/admin/AdminAuditPage.vue')
+      },
+      {
+        path: 'admin/audit',
+        redirect: '/admin/logs/audit'
       },
       {
         path: 'admin/system',

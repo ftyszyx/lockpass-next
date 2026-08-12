@@ -1,6 +1,7 @@
 use axum::{
     extract::{ConnectInfo, State},
     http::{header, HeaderMap, HeaderValue, Method},
+    middleware,
     routing::get,
     Json, Router,
 };
@@ -14,7 +15,7 @@ use tower_http::{
 use crate::{
     error::{AppError, AppResult},
     model::AuthPrincipal,
-    rbac,
+    rbac, server_log,
     state::AppState,
 };
 
@@ -26,6 +27,8 @@ pub mod sync;
 
 pub fn router(state: AppState) -> Router {
     let cors = cors_layer(&state);
+    let server_log_layer =
+        middleware::from_fn_with_state(state.clone(), server_log::capture_server_log);
 
     Router::new()
         .route("/health", get(health))
@@ -34,6 +37,7 @@ pub fn router(state: AppState) -> Router {
         .nest("/sync", sync::router())
         .nest("/console", console::router())
         .nest("/admin", admin::router())
+        .layer(server_log_layer)
         .layer(TraceLayer::new_for_http())
         .layer(cors)
         .with_state(state)

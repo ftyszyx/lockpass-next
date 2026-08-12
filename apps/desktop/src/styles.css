@@ -306,6 +306,11 @@ select {
     color: var(--app-primary-text);
   }
 
+  .menu-section-label {
+    @apply px-2 pb-0.5 pt-1 text-[11px] font-semibold;
+    color: var(--app-muted);
+  }
+
   .auth-backdrop {
     background: var(--app-auth-backdrop);
     backdrop-filter: blur(12px);

@@ -64,6 +64,8 @@ const zhCN = {
     systemEmail: '邮件验证码',
     systemAuth: '登录方式',
     systemQuota: '配额限制',
+    logs: '日志',
+    serverLogs: '服务器日志',
     audit: '审计日志',
     accountMenu: '账号菜单',
     changePassword: '修改密码',
@@ -83,6 +85,8 @@ const zhCN = {
     adminSystemEmail: '管理后台邮件验证码配置',
     adminSystemAuth: '管理后台登录方式配置',
     adminSystemQuota: '管理后台配额限制配置',
+    adminLogs: '管理后台日志',
+    adminServerLogs: '管理后台服务器日志',
     adminAudit: '管理后台审计日志'
   },
   roleCodes: {
@@ -281,6 +285,30 @@ const zhCN = {
     targetId: '目标 ID',
     actor: '操作者',
     time: '时间'
+  },
+  adminServerLogs: {
+    title: '服务器日志',
+    summary: '查看接口请求结果和错误摘要，用于定位连接、同步和邮件发送问题。',
+    noLogs: '暂无匹配日志',
+    allLevels: '全部级别',
+    allAccounts: '全部用户',
+    level: '级别',
+    account: '用户',
+    searchPlaceholder: '搜索接口、请求 ID、IP 或错误信息',
+    apply: '筛选',
+    request: '请求',
+    result: '状态码',
+    duration: '耗时',
+    clientIp: '客户端 IP',
+    message: '日志信息',
+    time: '时间',
+    unknownAccount: '未识别用户',
+    range: '第 {start}-{end} 条，共 {total} 条',
+    levels: {
+      info: '信息',
+      warning: '警告',
+      error: '错误'
+    }
   },
   adminSyncData: {
     title: '密文数据',
