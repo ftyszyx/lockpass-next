@@ -102,6 +102,7 @@ export const messages = {
       unavailable: '暂不可用',
       recommended: '推荐下载',
       groups: {
+        macos: 'macOS',
         windows: 'Windows'
       },
       platforms: {
@@ -248,6 +249,7 @@ export const messages = {
       unavailable: 'Unavailable',
       recommended: 'Recommended',
       groups: {
+        macos: 'macOS',
         windows: 'Windows'
       },
       platforms: {
