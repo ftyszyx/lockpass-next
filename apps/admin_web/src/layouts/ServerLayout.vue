@@ -6,7 +6,6 @@ import {
   LogOut,
   Mail,
   ScrollText,
-  ServerCog,
   Settings,
   SlidersHorizontal,
   TableProperties,
@@ -71,6 +70,11 @@ const pageTitle = computed(() => {
 
 const accountDisplayName = computed(() => session.account?.displayName || session.account?.email || t('common.account'))
 const accountEmail = computed(() => session.account?.email ?? '')
+const serverVersion = computed(() => {
+  const version = session.health?.version.trim()
+  if (!version) return ''
+  return version.startsWith('v') ? version : `v${version}`
+})
 
 onMounted(async () => {
   document.addEventListener('pointerdown', closeAccountMenuOnOutsideClick)
@@ -127,12 +131,19 @@ function isNavItemActive(item: NavItem): boolean {
   <div class="grid min-h-screen grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)]">
     <aside class="flex min-h-0 flex-col border-b border-slate-200 bg-[#eef4f2] lg:border-b-0 lg:border-r">
       <div class="grid grid-cols-[36px_minmax(0,1fr)] items-center gap-3 border-b border-slate-200 p-4">
-        <div class="grid size-9 place-items-center rounded-lg bg-slate-950 text-white">
-          <ServerCog class="size-5" />
-        </div>
+        <img class="size-9 object-contain" src="/favicon.svg" alt="" />
         <div>
           <strong class="block text-sm text-slate-950">{{ t('common.productName') }}</strong>
-          <small class="text-xs font-semibold text-slate-500">{{ t('common.serverWeb') }}</small>
+          <div class="mt-0.5 flex min-w-0 items-center gap-2">
+            <small class="truncate text-xs font-semibold text-slate-500">{{ t('common.serverWeb') }}</small>
+            <span
+              v-if="serverVersion"
+              class="shrink-0 rounded bg-white/80 px-1.5 py-0.5 font-mono text-[10px] font-bold leading-none text-teal-700 ring-1 ring-inset ring-teal-700/15"
+              :title="t('common.serverVersion', { version: serverVersion })"
+            >
+              {{ serverVersion }}
+            </span>
+          </div>
         </div>
       </div>
 

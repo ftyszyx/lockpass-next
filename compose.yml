@@ -25,6 +25,8 @@ services:
   server:
     build:
       context: ./server
+      args:
+        APP_VERSION: ${RELEASE_TAG:-0.1.0}
     environment:
       LOCKPASS_SERVER_ADDR: 0.0.0.0:8080
       DATABASE_URL: "postgres://${POSTGRES_USER:-lockpass}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-lockpass}"

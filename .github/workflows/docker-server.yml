@@ -27,6 +27,7 @@ on:
 env:
   SERVER_IMAGE_NAME: ftyszyx752/lockpass
   GATEWAY_IMAGE_NAME: ftyszyx752/lockpass-gateway
+  SERVER_VERSION: ${{ github.ref_name }}
 
 jobs:
   build-and-push:
@@ -72,7 +73,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            APP_VERSION=${{ github.ref_name }}
+            APP_VERSION=${{ env.SERVER_VERSION }}
             APP_IMAGE_NAME=${{ env.SERVER_IMAGE_NAME }}
             APP_IMAGE_TAG=${{ github.ref_name }}
             APP_GIT_COMMIT=${{ github.sha }}

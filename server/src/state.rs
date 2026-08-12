@@ -13,6 +13,11 @@ use crate::{
     storage::AppStore,
 };
 
+const SERVER_VERSION: &str = match option_env!("LOCKPASS_BUILD_VERSION") {
+    Some(version) => version,
+    None => env!("CARGO_PKG_VERSION"),
+};
+
 #[derive(Clone)]
 pub struct AppState {
     pub config: Arc<Config>,
@@ -80,10 +85,24 @@ impl AppState {
 
         HealthResponse {
             status: "ok".to_string(),
-            version: env!("CARGO_PKG_VERSION").to_string(),
+            version: SERVER_VERSION.to_string(),
             storage: "postgres".to_string(),
             database: database.to_string(),
             started_at: self.started_at,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn server_version_is_available() {
+        assert!(!SERVER_VERSION.trim().is_empty());
+        match option_env!("LOCKPASS_BUILD_VERSION") {
+            Some(version) => assert_eq!(SERVER_VERSION, version),
+            None => assert_eq!(SERVER_VERSION, env!("CARGO_PKG_VERSION")),
         }
     }
 }

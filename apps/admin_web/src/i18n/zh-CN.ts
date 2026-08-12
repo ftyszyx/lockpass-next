@@ -2,6 +2,7 @@ const zhCN = {
   common: {
     productName: 'LockPass Server',
     serverWeb: '管理员后台',
+    serverVersion: '服务器版本 {version}',
     refresh: '刷新',
     save: '保存',
     loadingFailed: '加载失败',

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { KeyRound, ServerCog, ShieldCheck } from '@lucide/vue'
+import { KeyRound, Mail, ServerCog, ShieldCheck } from '@lucide/vue'
 import { PasswordInput } from '@lockpass/ui'
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -34,9 +34,7 @@ async function submit() {
   <div class="grid min-h-screen grid-cols-1 bg-[#f6f8f9] lg:grid-cols-[minmax(0,1fr)_430px]">
     <section class="grid content-start gap-6 p-6 sm:p-8 lg:p-10">
       <div class="flex items-center gap-3">
-        <div class="grid size-10 place-items-center rounded-lg bg-slate-950 text-white">
-          <ServerCog class="size-5" />
-        </div>
+        <img class="size-10 object-contain" src="/favicon.svg" alt="" />
         <div>
           <strong class="block text-lg">{{ t('common.productName') }}</strong>
           <small class="font-semibold text-slate-500">{{ t('auth.subtitle') }}</small>

@@ -4,6 +4,7 @@ const enUS: ServerWebMessages = {
   common: {
     productName: 'LockPass Server',
     serverWeb: 'Admin console',
+    serverVersion: 'Server version {version}',
     refresh: 'Refresh',
     save: 'Save',
     loadingFailed: 'Loading failed',
