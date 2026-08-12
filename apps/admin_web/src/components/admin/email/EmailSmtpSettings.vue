@@ -84,20 +84,6 @@ const config = defineModel<EmailServiceConfig>({ required: true })
         </label>
       </div>
 
-      <details class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-        <summary class="cursor-pointer text-sm font-bold text-slate-700">{{ t('adminSystem.verificationSecurity') }}</summary>
-        <label class="lp-label mt-3 max-w-xl">
-          {{ t('adminSystem.emailCodeSecret') }}
-          <PasswordInput
-            v-model="config.codeSecret"
-            class="lp-input"
-            autocomplete="new-password"
-            :placeholder="config.codeSecretSet ? t('adminSystem.passwordKeepPlaceholder') : ''"
-            :show-label="t('common.showPassword')"
-            :hide-label="t('common.hidePassword')"
-          />
-        </label>
-      </details>
     </div>
   </section>
 </template>

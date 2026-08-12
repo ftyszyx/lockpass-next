@@ -96,13 +96,11 @@ export interface EmailServiceConfig {
   smtpUsername?: string | null
   smtpPassword?: string
   smtpPasswordSet: boolean
-  codeSecret?: string
-  codeSecretSet: boolean
 }
 
 export type EmailServicePatch = Partial<Pick<
   EmailServiceConfig,
-  'mode' | 'from' | 'smtpHost' | 'smtpPort' | 'smtpUsername' | 'smtpPassword' | 'codeSecret'
+  'mode' | 'from' | 'smtpHost' | 'smtpPort' | 'smtpUsername' | 'smtpPassword'
 >>
 
 export type InstanceConfigPatch = Partial<Omit<InstanceConfig, 'email'>> & {

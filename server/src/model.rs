@@ -386,7 +386,7 @@ pub struct EmailServiceConfig {
     pub smtp_password: Option<String>,
     #[serde(default)]
     pub smtp_password_set: bool,
-    #[serde(default = "default_email_code_secret")]
+    #[serde(default)]
     pub code_secret: String,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub templates: BTreeMap<String, EmailTemplateOverride>,
@@ -402,7 +402,7 @@ impl Default for EmailServiceConfig {
             smtp_username: None,
             smtp_password: None,
             smtp_password_set: false,
-            code_secret: default_email_code_secret(),
+            code_secret: String::new(),
             templates: BTreeMap::new(),
         }
     }
@@ -417,7 +417,6 @@ impl EmailServiceConfig {
             smtp_port: self.smtp_port,
             smtp_username: self.smtp_username.clone(),
             smtp_password_set: self.smtp_password.is_some() || self.smtp_password_set,
-            code_secret_set: !self.code_secret.trim().is_empty(),
         }
     }
 }
@@ -431,7 +430,6 @@ pub struct AdminEmailServiceConfigView {
     pub smtp_port: u16,
     pub smtp_username: Option<String>,
     pub smtp_password_set: bool,
-    pub code_secret_set: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -495,10 +493,6 @@ fn default_mailer_from() -> String {
 
 fn default_smtp_port() -> u16 {
     587
-}
-
-fn default_email_code_secret() -> String {
-    "lockpass-dev-email-code-secret-change-me".to_string()
 }
 
 #[derive(Deserialize)]
@@ -1002,7 +996,6 @@ pub struct AdminEmailServicePatchRequest {
     pub smtp_port: Option<u16>,
     pub smtp_username: Option<String>,
     pub smtp_password: Option<String>,
-    pub code_secret: Option<String>,
 }
 
 #[derive(Deserialize)]

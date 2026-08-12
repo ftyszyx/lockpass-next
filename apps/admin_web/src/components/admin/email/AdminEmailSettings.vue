@@ -3,7 +3,7 @@ import { FileText, Send, Server } from '@lucide/vue'
 import { ref, watch } from 'vue'
 import { api } from '@/api/client'
 import { t, useI18n } from '@/i18n'
-import { userFacingErrorMessage } from '@/services/errorMessage'
+import { userFacingErrorMessage, userFacingSmtpErrorMessage } from '@/services/errorMessage'
 import { useSessionStore } from '@/stores/session'
 import type { EmailServiceConfig, EmailServicePatch, EmailTemplateSummary } from '@/types'
 import EmailSmtpSettings from './EmailSmtpSettings.vue'
@@ -61,8 +61,7 @@ function normalizeConfig(config: EmailServiceConfig): EmailServiceConfig {
     ...config,
     smtpHost: config.smtpHost ?? '',
     smtpUsername: config.smtpUsername ?? '',
-    smtpPassword: '',
-    codeSecret: ''
+    smtpPassword: ''
   }
 }
 
@@ -75,7 +74,6 @@ function buildPatch(): EmailServicePatch {
     smtpUsername: draft.value.smtpUsername ?? ''
   }
   if (draft.value.smtpPassword?.trim()) patch.smtpPassword = draft.value.smtpPassword
-  if (draft.value.codeSecret?.trim()) patch.codeSecret = draft.value.codeSecret
   return patch
 }
 
@@ -105,7 +103,7 @@ async function testConnection() {
     await api.testAdminEmailConnection(session.token, buildPatch())
     smtpMessage.value = t('adminSystem.connectionSuccess')
   } catch (cause) {
-    smtpError.value = userFacingErrorMessage(cause)
+    smtpError.value = userFacingSmtpErrorMessage(cause, 'connection')
   } finally {
     testing.value = false
   }
@@ -120,7 +118,7 @@ async function sendTest(payload: { recipient: string; templateId: string }) {
     await api.sendAdminTestEmail(session.token, payload.recipient, payload.templateId, buildPatch())
     testMessage.value = t('adminSystem.testEmailSent')
   } catch (cause) {
-    testError.value = userFacingErrorMessage(cause)
+    testError.value = userFacingSmtpErrorMessage(cause, 'send')
   } finally {
     sending.value = false
   }

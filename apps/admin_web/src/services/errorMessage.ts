@@ -31,3 +31,15 @@ export function userFacingErrorMessage(cause: unknown): string {
   if (cause instanceof TypeError) return t('errors.networkError')
   return t('errors.requestFailed')
 }
+
+export function userFacingSmtpErrorMessage(
+  cause: unknown,
+  operation: 'connection' | 'send'
+): string {
+  if (!(cause instanceof ApiError)) return userFacingErrorMessage(cause)
+
+  if (operation === 'connection') {
+    return t('errors.smtpConnectionFailed', { detail: cause.message })
+  }
+  return t('errors.smtpSendFailed', { detail: cause.message })
+}

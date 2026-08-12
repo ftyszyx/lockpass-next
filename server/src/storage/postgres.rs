@@ -35,6 +35,7 @@ use crate::{
 };
 
 const INSTANCE_CONFIG_KEY: &str = "server";
+const LEGACY_EMAIL_CODE_SECRET: &str = "lockpass-dev-email-code-secret-change-me";
 const EMAIL_CODE_TTL_MINUTES: i64 = 10;
 const EMAIL_CODE_RESEND_SECONDS: i64 = 60;
 const EMAIL_CODE_MAX_ATTEMPTS: i32 = 5;
@@ -65,7 +66,7 @@ impl PostgresStore {
         info!("seeding RBAC data");
         seed_rbac(&mut connection).await?;
         info!("ensuring instance config");
-        save_instance_config_if_missing(&mut connection, InstanceConfig::default()).await
+        ensure_instance_config(&mut connection, &self.auth).await
     }
 
     pub async fn account_count(&self) -> AppResult<i64> {
@@ -2903,15 +2904,6 @@ fn apply_email_service_patch(
             config.smtp_password_set = true;
         }
     }
-    if let Some(value) = patch.code_secret {
-        let value = value.trim();
-        if value.is_empty() {
-            return Err(AppError::BadRequest(
-                "email code secret is required".to_string(),
-            ));
-        }
-        config.code_secret = value.to_string();
-    }
     Ok(())
 }
 
@@ -3054,16 +3046,31 @@ async fn load_instance_config(pool: &PgPool) -> AppResult<InstanceConfig> {
     }
 }
 
-async fn save_instance_config_if_missing(
+async fn ensure_instance_config(
     connection: &mut PgConnection,
-    mut config: InstanceConfig,
+    auth: &AuthServices,
 ) -> AppResult<()> {
+    let existing =
+        sqlx::query_scalar::<_, Value>("select value from instance_config where key = $1")
+            .bind(INSTANCE_CONFIG_KEY)
+            .fetch_optional(&mut *connection)
+            .await?;
+    let mut config = match existing {
+        Some(value) => serde_json::from_value::<InstanceConfig>(value)
+            .map_err(|error| AppError::Internal(format!("invalid instance config: {error}")))?,
+        None => InstanceConfig::default(),
+    };
+    if !email_code_secret_needs_generation(&config.email.code_secret) {
+        return Ok(());
+    }
+
+    config.email.code_secret = auth.secrets().issue("lp_email_code_secret").into_value();
     normalize_instance_config_for_storage(&mut config);
     let value = serde_json::to_value(config)
         .map_err(|error| AppError::Internal(format!("invalid instance config: {error}")))?;
     sqlx::query(
         "insert into instance_config (key, value, updated_at) values ($1, $2, $3) \
-         on conflict (key) do nothing",
+         on conflict (key) do update set value = excluded.value, updated_at = excluded.updated_at",
     )
     .bind(INSTANCE_CONFIG_KEY)
     .bind(value)
@@ -3071,6 +3078,10 @@ async fn save_instance_config_if_missing(
     .execute(connection)
     .await?;
     Ok(())
+}
+
+fn email_code_secret_needs_generation(secret: &str) -> bool {
+    secret.trim().is_empty() || secret == LEGACY_EMAIL_CODE_SECRET
 }
 
 async fn save_instance_config(pool: &PgPool, config: &InstanceConfig) -> AppResult<()> {
@@ -3686,4 +3697,19 @@ fn row_to_audit_log(row: PgRow) -> AppResult<AuditLogView> {
         metadata: row.try_get("metadata")?,
         created_at: row.try_get("created_at")?,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn email_code_secret_is_generated_only_when_missing_or_legacy() {
+        assert!(email_code_secret_needs_generation(""));
+        assert!(email_code_secret_needs_generation("   "));
+        assert!(email_code_secret_needs_generation(LEGACY_EMAIL_CODE_SECRET));
+        assert!(!email_code_secret_needs_generation(
+            "lp_email_code_secret_existing_random_value"
+        ));
+    }
 }

@@ -39,9 +39,7 @@ function normalizeReservedLoginConfig(nextConfig: InstanceConfig): InstanceConfi
       smtpPort: nextConfig.email?.smtpPort ?? 587,
       smtpUsername: nextConfig.email?.smtpUsername ?? '',
       smtpPassword: '',
-      smtpPasswordSet: Boolean(nextConfig.email?.smtpPasswordSet),
-      codeSecret: '',
-      codeSecretSet: Boolean(nextConfig.email?.codeSecretSet)
+      smtpPasswordSet: Boolean(nextConfig.email?.smtpPasswordSet)
     },
     smsEnabled: false,
     googleEnabled: false,
@@ -59,9 +57,6 @@ function buildPatchConfig(nextConfig: InstanceConfig): InstanceConfigPatch {
   }
   if (nextConfig.email.smtpPassword?.trim()) {
     email.smtpPassword = nextConfig.email.smtpPassword
-  }
-  if (nextConfig.email.codeSecret?.trim()) {
-    email.codeSecret = nextConfig.email.codeSecret
   }
 
   return {
