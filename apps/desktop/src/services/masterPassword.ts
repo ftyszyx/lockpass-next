@@ -73,6 +73,24 @@ export async function verifyUserCryptoCredentials(
   return cryptoProvider.verifyCredentials({ userId, password, secretKey, cryptoConfig })
 }
 
+export async function changeUserMasterPassword(
+  userId: string,
+  sessionId: string,
+  currentPassword: string,
+  newPassword: string,
+  secretKey: string,
+  cryptoConfig: DesktopUserCrypto
+): Promise<DesktopUserCrypto> {
+  return cryptoProvider.changeUserPassword({
+    userId,
+    sessionId,
+    password: currentPassword,
+    newPassword,
+    secretKey,
+    cryptoConfig
+  })
+}
+
 export async function encryptAttachmentBytes(
   sessionId: string,
   keyId: string,

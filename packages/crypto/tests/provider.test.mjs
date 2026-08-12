@@ -52,6 +52,39 @@ await assert.rejects(
 assert.equal(await provider.resume(created.sessionId, 'wrong password'), false)
 assert.equal(await provider.resume(created.sessionId, password), true)
 
+const changedPassword = 'new correct horse battery staple'
+await assert.rejects(
+  provider.changeUserPassword({
+    userId: 'user-test',
+    sessionId: created.sessionId,
+    password: 'wrong password',
+    newPassword: changedPassword,
+    secretKey,
+    cryptoConfig: created.crypto
+  }),
+  /incorrect/
+)
+const changedCrypto = await provider.changeUserPassword({
+  userId: 'user-test',
+  sessionId: created.sessionId,
+  password,
+  newPassword: changedPassword,
+  secretKey,
+  cryptoConfig: created.crypto
+})
+assert.equal(await provider.verifyCredentials({
+  userId: 'user-test',
+  password,
+  secretKey,
+  cryptoConfig: changedCrypto
+}), false)
+assert.equal(await provider.verifyCredentials({
+  userId: 'user-test',
+  password: changedPassword,
+  secretKey,
+  cryptoConfig: changedCrypto
+}), true)
+
 const fastUnlock = await provider.createDeviceFastUnlock({
   accountId: 'account-test',
   userId: 'user-test',
@@ -77,6 +110,17 @@ const tamperedEnvelope = { ...envelope, keyId: 'wrong-key' }
 await assert.rejects(
   provider.decryptObject(unlocked.sessionId, created.crypto.keyId, metadata, tamperedEnvelope),
   /key does not match/
+)
+
+const changedSession = await provider.unlockUser({
+  userId: 'user-test',
+  password: changedPassword,
+  secretKey,
+  cryptoConfig: changedCrypto
+})
+assert.deepEqual(
+  await provider.decryptObject(changedSession.sessionId, changedCrypto.keyId, metadata, envelope),
+  payload
 )
 
 await provider.closeAllSessions()

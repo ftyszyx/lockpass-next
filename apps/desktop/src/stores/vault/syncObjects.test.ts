@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import type { VaultItem } from "@lockpass/core";
-import { chunkArray, countItemsByVault, mergeById } from "./syncObjects";
+import {
+  chunkArray,
+  countItemsByVault,
+  mergeById,
+} from "./syncObjects";
 
 assert.deepEqual(chunkArray([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]]);
 assert.deepEqual(chunkArray([], 2), []);

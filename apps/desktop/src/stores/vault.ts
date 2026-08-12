@@ -82,6 +82,13 @@ import {
   cleanupLocalAttachmentRefs,
   migrateLegacyPayload
 } from './vault/legacyMigration'
+import { changeStoredMasterPassword } from './vault/masterPasswordChange'
+import {
+  attachImportSource,
+  findPreviouslyImportedVault,
+  importableExternalItems,
+  partitionImportedItems
+} from './vault/importDeduplication'
 import {
   cleanupLocalSecretsForUser,
   deleteFastUnlockSecretsForUsers,
@@ -116,7 +123,6 @@ import {
 } from './vault/syncConnection'
 import {
   applyAcceptedSyncObjects,
-  applyConflictedSyncObjects,
   applyRemoteSyncObject,
   buildLocalEncryptedObjectRecords,
   buildSyncPushObjects,
@@ -132,6 +138,12 @@ import {
   shouldResetLocalObjectsForInitialSync,
   toServerUuid
 } from './vault/syncObjects'
+import {
+  applyPulledSyncObject,
+  reconcileLocalObjectsWithSyncSnapshot,
+  reconcilePushConflicts,
+  repairEquivalentSyncConflictsFromSnapshot
+} from './vault/syncReconciliation'
 export const useVaultStore = defineStore('vault', {
   state: createVaultStoreState,
   getters: vaultGetters,
@@ -487,13 +499,21 @@ export const useVaultStore = defineStore('vault', {
     },
     async applySyncExchange(mode: SyncMode, serverUrl: string, exchange: SyncDeviceBindResponse): Promise<void> {
       const user = this.activeUser
+      const { sessionId } = this.requireVaultSession()
       if (!user?.crypto) throw new Error('syncLocked')
 
       await saveSyncDeviceToken(user.id, exchange.deviceToken)
       const client = new SyncApiClient(serverUrl)
       const syncSpace = await ensureSyncSpace(client, exchange.deviceToken, user.displayName || user.username)
       await this.ensureAllVaultObjectsLoaded()
-      resetLoadedObjectsForNewSyncTarget(this.vaults, this.items, this.attachments, this.settings.deviceId)
+      const reconciliation = await reconcileLocalObjectsWithSyncSnapshot({
+        store: this,
+        client,
+        deviceToken: exchange.deviceToken,
+        syncSpaceId: syncSpace.id,
+        sessionId,
+        deviceId: this.settings.deviceId
+      })
       const wrappedVaultId = user.crypto.wrappedVaultKey.aad.vaultId || this.vaults.find((vault) => !vault.sync.deletedAt)?.id
       if (wrappedVaultId) {
         await client.createWrappedVaultKey(exchange.deviceToken, {
@@ -513,9 +533,9 @@ export const useVaultStore = defineStore('vault', {
         accountId: exchange.account.id,
         accountLabel: exchange.account.email ?? exchange.account.displayName,
         deviceId: exchange.device.id,
-        cursor: 0,
+        cursor: reconciliation.cursor,
         connectedAt: now,
-        lastSyncAt: null
+        lastSyncAt: reconciliation.downloaded > 0 ? now : null
       }
       this.clearOfficialLoginState()
       await this.persist()
@@ -523,7 +543,8 @@ export const useVaultStore = defineStore('vault', {
         mode,
         serverUrl,
         syncSpaceId: syncSpace.id,
-        localObjects: this.vaults.length + this.items.length + this.attachments.length
+        localObjects: this.vaults.length + this.items.length + this.attachments.length,
+        ...reconciliation
       })
     },
     async disconnectSync(): Promise<void> {
@@ -611,6 +632,18 @@ export const useVaultStore = defineStore('vault', {
         : await ensureSyncSpace(client, deviceToken, user.displayName || user.username)
       this.settings.sync.syncSpaceId = syncSpace.id
 
+      const repairedConflicts = await repairEquivalentSyncConflictsFromSnapshot({
+        store: this,
+        client,
+        deviceToken,
+        syncSpaceId: syncSpace.id,
+        sessionId
+      })
+      if (repairedConflicts > 0) {
+        await this.persist()
+        await logInfo('sync repaired equivalent conflicts', { repairedConflicts })
+      }
+
       if (shouldResetLocalObjectsForInitialSync(this)) {
         resetLoadedObjectsForNewSyncTarget(this.vaults, this.items, this.attachments, this.settings.deviceId)
         await this.persist()
@@ -663,11 +696,15 @@ export const useVaultStore = defineStore('vault', {
         if (batch.length === 0) continue
         const pushResult = await client.pushSync(deviceToken, batch)
         pushed += pushResult.accepted.length
-        conflicts += pushResult.conflicts.length
         rejected += pushResult.rejected?.length ?? 0
         rejectedCodes.push(...(pushResult.rejected ?? []).map((item) => `${item.code}: ${item.message}`))
         applyAcceptedSyncObjects(this, pushResult.accepted)
-        applyConflictedSyncObjects(this, pushResult.conflicts)
+        const conflictResult = await reconcilePushConflicts(
+          this,
+          pushResult.conflicts,
+          sessionId
+        )
+        conflicts += conflictResult.unresolved
         removeAcceptedDeletedObjects(this, pushResult.accepted)
       }
 
@@ -682,11 +719,14 @@ export const useVaultStore = defineStore('vault', {
             skippedOtherSpaces += 1
             continue
           }
-          if (event.objectSnapshot.updatedByDeviceId === this.settings.sync.deviceId) {
-            continue
-          }
           try {
-            await applyRemoteSyncObject(this, event.objectSnapshot, sessionId)
+            const outcome = await applyPulledSyncObject(
+              this,
+              event.objectSnapshot,
+              sessionId
+            )
+            if (outcome === 'applied') pulled += 1
+            if (outcome === 'conflicted') conflicts += 1
           } catch (error) {
             await logError('sync remote object failed', {
               ...syncErrorLogMetadata(error),
@@ -698,7 +738,6 @@ export const useVaultStore = defineStore('vault', {
             })
             throw error
           }
-          pulled += 1
         }
         if (skippedOtherSpaces > 0) {
           await logInfo('sync skipped events from other spaces', {
@@ -846,6 +885,24 @@ export const useVaultStore = defineStore('vault', {
         this.storageError = error instanceof Error ? error.message : String(error)
         return 'failed'
       }
+    },
+    async changeMasterPassword(currentPassword: string, newPassword: string): Promise<void> {
+      const user = this.activeUser
+      const { sessionId } = this.requireVaultSession()
+      if (!user?.crypto) throw new Error('syncLocked')
+
+      const result = await changeStoredMasterPassword({
+        activeUserId: this.activeUserId,
+        currentPassword,
+        newPassword,
+        sessionId,
+        settings: this.settings,
+        user,
+        users: this.users
+      })
+      this.users = result.users
+      await this.lock()
+      await logInfo('master password changed', { serverBacked: result.serverBacked })
     },
     async unlockActiveUser(password: string, secretKey: string): Promise<boolean> {
       const user = this.activeUser
@@ -1321,26 +1378,88 @@ export const useVaultStore = defineStore('vault', {
     async importExternalVaults(vaults: ExternalImportVault[], fallbackVaultName: string): Promise<ImportVaultsResult> {
       this.requireVaultSession()
       if (vaults.length === 0) {
-        return { imported: 0, skipped: 0, vaults: 0 }
+        return { imported: 0, skipped: 0, vaults: 0, skippedVaults: 0 }
       }
+      await this.ensureAllVaultObjectsLoaded()
 
       const now = new Date().toISOString()
       const importedVaults: Vault[] = []
       const importedItems: VaultItem[] = []
+      const updatedVaults = new Map<string, Vault>()
+      const updatedItems = new Map<string, VaultItem>()
       let skipped = 0
+      let skippedVaults = 0
 
       for (const sourceVault of vaults) {
-        const cleanItems = sourceVault.items.filter((item) =>
-          item.title.trim() || item.fields.some((field) => field.value.trim()) || item.notes.trim()
+        const cleanItems = importableExternalItems(sourceVault.items)
+        const existingVault = findPreviouslyImportedVault(
+          sourceVault,
+          [...this.vaults, ...importedVaults],
+          [...this.items, ...importedItems]
         )
-        const vault = buildImportedVault(sourceVault.name || fallbackVaultName, now, this.settings.deviceId, this.settings.locale)
-        importedVaults.push(vault)
-        importedItems.push(...buildImportedItems(cleanItems, vault.id, now, this.settings.deviceId, this.settings.locale))
+
+        if (existingVault) {
+          skippedVaults += 1
+          skipped += sourceVault.items.length - cleanItems.length
+
+          const markedVault = attachImportSource(
+            existingVault,
+            sourceVault.sourceId,
+            now,
+            this.settings.deviceId
+          )
+          if (markedVault !== existingVault) updatedVaults.set(existingVault.id, markedVault)
+
+          const existingItems = [...this.items, ...importedItems].filter((item) => item.vaultId === existingVault.id)
+          const partition = partitionImportedItems(cleanItems, existingItems)
+          skipped += partition.matches.length
+
+          for (const match of partition.matches) {
+            const markedItem = attachImportSource(
+              match.existing,
+              match.source.sourceId,
+              now,
+              this.settings.deviceId
+            )
+            if (markedItem !== match.existing) updatedItems.set(match.existing.id, markedItem)
+          }
+
+          importedItems.push(...buildImportedItems(
+            partition.missing,
+            existingVault.id,
+            now,
+            this.settings.deviceId,
+            this.settings.locale
+          ))
+          continue
+        }
+
+        const newVault = buildImportedVault(
+          sourceVault.name || fallbackVaultName,
+          now,
+          this.settings.deviceId,
+          this.settings.locale,
+          sourceVault.sourceId
+        )
+        importedVaults.push(newVault)
+        importedItems.push(...buildImportedItems(
+          cleanItems,
+          newVault.id,
+          now,
+          this.settings.deviceId,
+          this.settings.locale
+        ))
         skipped += sourceVault.items.length - cleanItems.length
       }
 
-      this.vaults = [...importedVaults, ...this.vaults]
-      this.items = [...importedItems, ...this.items]
+      this.vaults = [
+        ...importedVaults,
+        ...this.vaults.map((vault) => updatedVaults.get(vault.id) ?? vault)
+      ]
+      this.items = [
+        ...importedItems,
+        ...this.items.map((item) => updatedItems.get(item.id) ?? item)
+      ]
       this.loadedVaultIds = [...new Set([...this.loadedVaultIds, ...importedVaults.map((vault) => vault.id)])]
       this.vaultItemCounts = countItemsByVault(this.items)
       this.selectedVaultId = importedVaults[0]?.id ?? this.selectedVaultId
@@ -1350,12 +1469,14 @@ export const useVaultStore = defineStore('vault', {
       await logInfo('external vaults imported', {
         imported: importedItems.length,
         skipped,
-        vaults: importedVaults.length
+        vaults: importedVaults.length,
+        skippedVaults
       })
       return {
         imported: importedItems.length,
         skipped,
-        vaults: importedVaults.length
+        vaults: importedVaults.length,
+        skippedVaults
       }
     }
   }

@@ -27,7 +27,7 @@ interface BackupStore {
   importExternalVaults(
     vaults: ExternalImportVault[],
     fallbackVaultName: string,
-  ): Promise<{ imported: number; vaults: number }>;
+  ): Promise<{ imported: number; vaults: number; skippedVaults: number }>;
   restoreBackupPackage(backup: ReturnType<typeof assertBackupPackage>): Promise<void>;
 }
 
@@ -144,6 +144,7 @@ export function useBackupActions(input: UseBackupActionsInput) {
           input.t("backup.legacyImportSuccess", {
             count: imported.imported,
             vaults: imported.vaults,
+            skippedVaults: imported.skippedVaults,
           }),
         );
       },
@@ -184,15 +185,19 @@ export function useBackupActions(input: UseBackupActionsInput) {
   async function importExternalVaults(
     vaults: ExternalImportVault[],
     fallbackVaultName: string,
-  ): Promise<{ imported: number; vaults: number }> {
+  ): Promise<{ imported: number; vaults: number; skippedVaults: number }> {
     if (!input.vaultStore.unlocked) throw new Error("syncLocked");
     const result = await input.vaultStore.importExternalVaults(
       vaults,
       fallbackVaultName,
     );
-    if (result.imported === 0 && result.vaults === 0)
+    if (result.imported === 0 && result.vaults === 0 && result.skippedVaults === 0)
       throw new Error("backup-empty-import");
-    return { imported: result.imported, vaults: result.vaults };
+    return {
+      imported: result.imported,
+      vaults: result.vaults,
+      skippedVaults: result.skippedVaults
+    };
   }
 
   async function runBackupTask(

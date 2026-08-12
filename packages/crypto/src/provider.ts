@@ -12,6 +12,7 @@ import { attachmentInfo, deviceFastUnlockInfo, objectInfo, vaultKeyInfo } from '
 import { VaultSessionStore } from './sessionStore.js'
 import type {
   CreateDeviceFastUnlockInput,
+  ChangeUserPasswordInput,
   CreateUserInput,
   CryptoEnvelope,
   DeviceFastUnlock,
@@ -75,6 +76,32 @@ export class WebVaultCryptoProvider implements VaultCryptoProvider {
       return true
     } catch {
       return false
+    }
+  }
+
+  async changeUserPassword(input: ChangeUserPasswordInput): Promise<UserCryptoConfig> {
+    const session = this.sessions.requireUnlocked(input.sessionId, input.cryptoConfig.keyId)
+    if (session.userId !== input.userId) throw new Error('Vault session user does not match')
+    if (!await this.sessions.verifyPassword(input.sessionId, input.password)) {
+      throw new Error('Current password is incorrect')
+    }
+    const kdfParams = createKdfParams()
+    const unlockKey = await deriveUnlockKey(input.newPassword, input.secretKey, kdfParams)
+    const vaultId = input.cryptoConfig.wrappedVaultKey.aad.vaultId || input.userId
+
+    try {
+      return {
+        keyId: input.cryptoConfig.keyId,
+        kdfParams,
+        wrappedVaultKey: await encryptEnvelope(
+          unlockKey,
+          session.vaultKeyBytes,
+          vaultKeyInfo(input.userId, vaultId, input.cryptoConfig.keyId, kdfParams),
+          input.cryptoConfig.keyId
+        )
+      }
+    } finally {
+      unlockKey.fill(0)
     }
   }
 

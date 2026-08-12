@@ -96,6 +96,7 @@ export interface ImportVaultsResult {
   imported: number
   skipped: number
   vaults: number
+  skippedVaults: number
 }
 
 export type SecretKeyStorageStatus = CreateUserResult['secretKeyStorage']

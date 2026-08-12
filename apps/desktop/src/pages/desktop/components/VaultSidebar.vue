@@ -2,6 +2,8 @@
 import {
   BriefcaseBusiness,
   ChevronDown,
+  Cloud,
+  CloudOff,
   CreditCard,
   FolderLock,
   House,
@@ -30,6 +32,8 @@ const emit = defineEmits<{
   createVault: [];
   deleteVault: [vaultId: string];
   manageUsers: [];
+  changeMasterPassword: [];
+  openServerAccount: [];
   openManagement: [];
   showSecretKey: [];
   signOutCurrentUser: [];
@@ -59,6 +63,16 @@ function manageUsers(): void {
 function openManagement(): void {
   closeUserMenu();
   emit("openManagement");
+}
+
+function openServerAccount(): void {
+  closeUserMenu();
+  emit("openServerAccount");
+}
+
+function changeMasterPassword(): void {
+  closeUserMenu();
+  emit("changeMasterPassword");
 }
 
 function signOutCurrentUser(): void {
@@ -115,10 +129,36 @@ function requestDeleteVault(event: MouseEvent, vaultId: string): void {
           <div class="grid gap-1">
             <button
               class="menu-item"
+              :class="{
+                'bg-[var(--app-primary-soft)] text-[var(--app-primary-text)]':
+                  !vaultStore.syncConnected,
+              }"
+              @click="openServerAccount"
+            >
+              <Cloud v-if="vaultStore.syncConnected" class="size-4" />
+              <CloudOff v-else class="size-4" />
+              <span>{{
+                vaultStore.syncConnected
+                  ? t("sync.title")
+                  : t("sync.connectServer")
+              }}</span>
+            </button>
+          </div>
+
+          <div class="grid gap-1 border-t border-slate-100 pt-1">
+            <button
+              class="menu-item"
               @click="manageUsers"
             >
               <Users class="size-4" />
               <span>{{ t("user.manageUsers") }}</span>
+            </button>
+            <button
+              class="menu-item"
+              @click="changeMasterPassword"
+            >
+              <KeyRound class="size-4" />
+              <span>{{ t("settings.changeMasterPassword") }}</span>
             </button>
             <button
               class="menu-item"

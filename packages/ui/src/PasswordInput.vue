@@ -78,6 +78,12 @@ defineExpose({ focus, select })
   padding-right: 2.75rem !important;
 }
 
+/* WebView2/Edge can add a second native password reveal button. */
+.lp-password-input :deep(input::-ms-reveal),
+.lp-password-input :deep(input::-ms-clear) {
+  display: none;
+}
+
 .lp-password-input-toggle {
   position: absolute;
   top: 50%;

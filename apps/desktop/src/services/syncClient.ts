@@ -125,6 +125,29 @@ export interface WrappedVaultKeyCreateRequest {
   wrappedVaultKey: WrappedVaultKey
 }
 
+export interface WrappedVaultKeyView {
+  id: string
+  syncSpaceId: string
+  vaultId: string
+  keyId: string
+  wrapType: 'user_wrapped'
+  generation: number
+  kdfParams: KdfParams
+  wrappedVaultKey: WrappedVaultKey
+  createdAt: string
+}
+
+export interface WrappedVaultKeysResponse {
+  wrappedVaultKeys: WrappedVaultKeyView[]
+}
+
+export interface WrappedVaultKeyCreateResponse {
+  wrappedVaultKeyRecord: Pick<
+    WrappedVaultKeyView,
+    'id' | 'syncSpaceId' | 'vaultId' | 'keyId' | 'wrapType' | 'generation' | 'createdAt'
+  >
+}
+
 export class SyncApiError extends Error {
   constructor(
     message: string,
@@ -171,10 +194,20 @@ export class SyncApiClient {
     })
   }
 
-  async createWrappedVaultKey(token: string, body: WrappedVaultKeyCreateRequest): Promise<unknown> {
+  async createWrappedVaultKey(
+    token: string,
+    body: WrappedVaultKeyCreateRequest
+  ): Promise<WrappedVaultKeyCreateResponse> {
     return this.request('/sync/wrapped-vault-keys', {
       token,
       body
+    })
+  }
+
+  async wrappedVaultKeys(token: string, syncSpaceId: string): Promise<WrappedVaultKeysResponse> {
+    return this.request('/sync/wrapped-vault-keys', {
+      token,
+      query: { syncSpaceId }
     })
   }
 

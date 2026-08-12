@@ -15,7 +15,7 @@ import { WebApiError } from '../api/client'
 import { useWebSessionStore } from '../stores/webSession'
 
 type AuthMode = 'login' | 'register'
-type AuthStep = 'email' | 'code' | 'unlockVault' | 'masterPassword' | 'generateSecretKey' | 'backupSecretKey'
+type AuthStep = 'email' | 'code' | 'unlockVault' | 'masterPassword' | 'generateSecretKey' | 'backupSecretKey' | 'desktopCallback'
 
 const route = useRoute()
 const router = useRouter()
@@ -39,6 +39,7 @@ const busy = ref(false)
 const finalizingSetup = ref(false)
 const completedAccountExchange = ref<SyncDeviceBindResponse | null>(null)
 const pendingWebBinding = ref<SyncDeviceBindCallbackPayload | null>(null)
+const desktopCallbackUrl = ref('')
 
 const desktopBind = computed(() => route.query.desktopBind === '1')
 const extensionBind = computed(() => route.query.extensionBind === '1')
@@ -211,6 +212,7 @@ function resetCodeStep(): void {
   accountSetupToken.value = ''
   completedAccountExchange.value = null
   pendingWebBinding.value = null
+  desktopCallbackUrl.value = ''
   clearSecretInputs()
 }
 
@@ -300,7 +302,15 @@ function redirectExternalBinding(binding: SyncDeviceBindCallbackPayload): void {
     window.location.replace(redirectUrl.toString())
     return
   }
-  window.location.href = `lockpass://auth/callback?payload=${encodeURIComponent(payload)}`
+  desktopCallbackUrl.value = `lockpassnew://auth/callback?payload=${encodeURIComponent(payload)}`
+  step.value = 'desktopCallback'
+  finalizingSetup.value = false
+  window.location.assign(desktopCallbackUrl.value)
+}
+
+function openDesktopApp(): void {
+  if (!desktopCallbackUrl.value) return
+  window.location.assign(desktopCallbackUrl.value)
 }
 
 function validatedExtensionRedirectUrl(): URL {
@@ -392,7 +402,8 @@ function changeLocale(event: Event): void {
       <div class="grid gap-4">
         <div class="flex items-center justify-between">
           <h2 class="m-0 text-xl font-black">
-            <template v-if="isRegisterPasswordStep">{{ t('webAuth.setMasterPasswordTitle') }}</template>
+            <template v-if="step === 'desktopCallback'">{{ t('webAuth.desktopOpenTitle') }}</template>
+            <template v-else-if="isRegisterPasswordStep">{{ t('webAuth.setMasterPasswordTitle') }}</template>
             <template v-else-if="step === 'unlockVault'">{{ t('webAuth.unlockVaultTitle') }}</template>
             <template v-else-if="step === 'generateSecretKey'">{{ t('webAuth.generateSecretKeyTitle') }}</template>
             <template v-else-if="step === 'backupSecretKey'">{{ t('webAuth.backupSecretKeyTitle') }}</template>
@@ -401,7 +412,7 @@ function changeLocale(event: Event): void {
           </h2>
         </div>
 
-        <div v-if="!isRegisterPasswordStep && !isRegisterSecretStep && step !== 'unlockVault'" class="grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1">
+        <div v-if="!isRegisterPasswordStep && !isRegisterSecretStep && step !== 'unlockVault' && step !== 'desktopCallback'" class="grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1">
           <button
             type="button"
             class="h-9 rounded-md text-sm font-bold"
@@ -421,7 +432,18 @@ function changeLocale(event: Event): void {
         </div>
 
         <form class="grid gap-3" @submit.prevent="submit">
-          <template v-if="step === 'email'">
+          <template v-if="step === 'desktopCallback'">
+            <div class="grid justify-items-start gap-3 rounded-lg border border-teal-200 bg-teal-50 p-4">
+              <ShieldCheck class="size-7 text-teal-700" />
+              <p class="m-0 text-sm leading-6 text-teal-950">{{ t('webAuth.desktopOpenBody') }}</p>
+            </div>
+            <button class="primary-button justify-center" type="button" @click="openDesktopApp">
+              <LogIn class="size-4" />
+              {{ t('webAuth.openDesktop') }}
+            </button>
+          </template>
+
+          <template v-else-if="step === 'email'">
             <label v-if="mode === 'register'" class="form-label">
               {{ t('webAuth.displayName') }}
               <input v-model="displayName" class="form-input" autocomplete="name" required />
@@ -517,7 +539,7 @@ function changeLocale(event: Event): void {
             {{ error || session.error }}
           </p>
 
-          <button v-if="!finalizingSetup" class="primary-button justify-center" type="submit" :disabled="submitting">
+          <button v-if="!finalizingSetup && step !== 'desktopCallback'" class="primary-button justify-center" type="submit" :disabled="submitting">
             <LogIn class="size-4" />
             {{
               submitting

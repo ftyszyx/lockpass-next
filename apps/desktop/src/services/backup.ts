@@ -38,6 +38,7 @@ export interface ExternalImportField {
 }
 
 export interface ExternalImportItem {
+  sourceId?: string
   type: VaultItemType
   title: string
   notes: string
@@ -46,6 +47,7 @@ export interface ExternalImportItem {
 }
 
 export interface ExternalImportVault {
+  sourceId?: string
   name: string
   items: ExternalImportItem[]
 }
@@ -95,6 +97,7 @@ interface LegacyLockPassExport {
 interface LegacyDecodedUser {
   user: LegacyUserRow
   keyBytes: Uint8Array
+  sourceKey: string
 }
 
 const BACKUP_FORMAT = 'lockpass-next-backup'
@@ -220,14 +223,16 @@ export async function readLegacyLockPassBackup(
     itemsByVaultId.set(item.vaultId, [...(itemsByVaultId.get(item.vaultId) ?? []), item])
   }
 
-  const vaultGroups = sourceVaults.map((vault) => ({
+  const vaultGroups = await Promise.all(sourceVaults.map(async (vault) => ({
+    sourceId: await legacyImportSourceId(decodedUser.sourceKey, 'vault', vault.id),
     name: vault.name?.trim() || fallbackVaultName,
     rows: itemsByVaultId.get(vault.id) ?? []
-  }))
+  })))
   const orphanItems = sourceItems.filter((item) => !sourceVaultIds.has(item.vaultId))
 
   if (orphanItems.length > 0) {
     vaultGroups.push({
+      sourceId: await legacyImportSourceId(decodedUser.sourceKey, 'vault', 'orphan'),
       name: fallbackVaultName,
       rows: orphanItems
     })
@@ -236,11 +241,20 @@ export async function readLegacyLockPassBackup(
   const vaults = await Promise.all(
     vaultGroups.map(async (vault) => {
       const items = await Promise.all(
-        vault.rows.map((item) => legacyItemToImportItem(item, decodedUser.keyBytes, labels))
+        vault.rows.map(async (item) => {
+          const imported = await legacyItemToImportItem(item, decodedUser.keyBytes, labels)
+          if (!imported) return null
+          const importItem: ExternalImportItem = {
+            ...imported,
+            sourceId: await legacyImportSourceId(decodedUser.sourceKey, 'item', item.id)
+          }
+          return importItem
+        })
       )
       return {
+        sourceId: vault.sourceId,
         name: vault.name,
-        items: items.filter((item): item is ExternalImportItem => Boolean(item))
+        items: items.filter((item): item is ExternalImportItem => item !== null)
       }
     })
   )
@@ -248,6 +262,16 @@ export async function readLegacyLockPassBackup(
   return {
     vaults
   }
+}
+
+async function legacyImportSourceId(
+  sourceKey: string,
+  kind: 'vault' | 'item',
+  legacyObjectId: number | 'orphan'
+): Promise<string> {
+  const source = new TextEncoder().encode(`legacy-lockpass:${sourceKey}:${kind}:${legacyObjectId}`)
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', source))
+  return `legacy-lockpass:${kind}:${Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('')}`
 }
 
 function fieldValue(item: ExternalImportItem, kind: VaultItemFieldKind): string {
@@ -401,7 +425,7 @@ async function findLegacyUserForPassword(legacy: LegacyLockPassExport, password:
       const validText = await decryptLegacyText(secret.validData, keyBytes)
       const valid = JSON.parse(validText) as { username?: unknown; id?: unknown }
       if (valid.username === user.username && Number(valid.id) === user.id) {
-        return { user, keyBytes }
+        return { user, keyBytes, sourceKey: `${user.id}:${user.username}:${secret.key}` }
       }
     } catch {
       // Try the next user; old backups can contain multiple local users.

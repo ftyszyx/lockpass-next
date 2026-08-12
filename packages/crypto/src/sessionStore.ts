@@ -53,11 +53,17 @@ export class VaultSessionStore {
 
   async resume(sessionId: string, password: string): Promise<boolean> {
     const session = this.require(sessionId)
+    const valid = await this.verifyPassword(sessionId, password)
+    if (valid) session.locked = false
+    return valid
+  }
+
+  async verifyPassword(sessionId: string, password: string): Promise<boolean> {
+    const session = this.require(sessionId)
     if (!session.verifierSalt || !session.verifierHash) return false
     const verifier = await passwordVerifier(password, session.verifierSalt, session.userId, session.keyId)
     const valid = timingSafeEqual(verifier, session.verifierHash)
     verifier.fill(0)
-    if (valid) session.locked = false
     return valid
   }
 

@@ -43,6 +43,7 @@ import type {
 } from "./types";
 import { useBackupActions } from "./useBackupActions";
 import { useColumnResize } from "./useColumnResize";
+import { useChangeMasterPassword } from "./useChangeMasterPassword";
 import { useItemEditor } from "./useItemEditor";
 import { useUserSessionFlow } from "./useUserSessionFlow";
 
@@ -243,6 +244,19 @@ const {
   vaultStore,
 });
 
+const {
+  changeMasterPasswordError,
+  changingMasterPassword,
+  closeChangeMasterPassword,
+  openChangeMasterPassword,
+  submitMasterPasswordChange,
+} = useChangeMasterPassword({
+  activeModal,
+  showToast,
+  t,
+  vaultStore,
+});
+
 provide(
   desktopPageContextKey,
   reactive({
@@ -257,6 +271,8 @@ provide(
     backupBusy,
     canUseGeneratedPassword: computed(() => passwordTargetFieldId.value !== null),
     connectionStatus,
+    changeMasterPasswordError,
+    changingMasterPassword,
     creatingUser,
     deletingVault,
     editingItemId,
@@ -327,6 +343,7 @@ provide(
     closeActiveModal: () => {
       activeModal.value = null;
     },
+    closeChangeMasterPassword,
     closeDrawer,
     closeManagement: () => {
       activeManagementPage.value = null;
@@ -353,6 +370,7 @@ provide(
     openDesktopLogDir,
     openEditItem,
     openAddUserFromManagement,
+    openChangeMasterPassword,
     openImportFromItemPicker,
     openInitialServerLogin,
     openManagement,
@@ -360,6 +378,7 @@ provide(
     openNewVault,
     openPasswordGenerator,
     openQuickSearch,
+    openServerAccount,
     openSecretKeyModal,
     openSavedBackupDirectory,
     openSignOutCurrentUserModal,
@@ -386,6 +405,7 @@ provide(
     signOutCurrentUser,
     startColumnResize,
     startNewItem,
+    submitMasterPasswordChange,
     toggleDraftGroup,
     updateActiveTab: (tab: DetailTab) => {
       activeTab.value = tab;
@@ -609,6 +629,16 @@ function closeDrawer(): void {
   clearSecretKeyReveal();
 }
 
+function openServerAccount(): void {
+  activeManagementPage.value = null;
+  activeModal.value = null;
+  clearPasswordTarget();
+  if (!vaultStore.syncConnected) {
+    vaultStore.clearOfficialLoginState();
+  }
+  activeDrawer.value = "sync";
+}
+
 async function openSecretKeyModal(): Promise<void> {
   activeDrawer.value = null;
   clearSecretKeyReveal();
@@ -731,7 +761,7 @@ async function runWithOperationProgress<T>(
 }
 
 async function handleDeepLink(url: string): Promise<void> {
-  if (!url.startsWith("lockpass://auth/callback")) return;
+  if (!url.startsWith("lockpassnew://auth/callback")) return;
 
   try {
     if (isSettingUpServerAccount()) {

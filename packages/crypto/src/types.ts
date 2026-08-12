@@ -106,6 +106,11 @@ export interface UnlockUserInput {
   cryptoConfig: UserCryptoConfig
 }
 
+export interface ChangeUserPasswordInput extends UnlockUserInput {
+  sessionId: string
+  newPassword: string
+}
+
 export interface CreateDeviceFastUnlockInput {
   accountId: string
   userId: string
@@ -127,6 +132,7 @@ export interface VaultCryptoProvider {
   createUser(input: CreateUserInput): Promise<{ crypto: UserCryptoConfig; sessionId: string }>
   unlockUser(input: UnlockUserInput): Promise<VaultCryptoSession>
   verifyCredentials(input: UnlockUserInput): Promise<boolean>
+  changeUserPassword(input: ChangeUserPasswordInput): Promise<UserCryptoConfig>
   createDeviceFastUnlock(
     input: CreateDeviceFastUnlockInput
   ): Promise<{ fastUnlock: DeviceFastUnlock; deviceUnlockKey: string }>

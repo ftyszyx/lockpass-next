@@ -43,7 +43,7 @@ export function webUrlForApiUrl(apiUrl: string): string {
 
 export function parseSyncDeviceBindCallback(value: string): SyncDeviceBindCallbackPayload {
   const parsed = new URL(value)
-  if (parsed.protocol !== 'lockpass:' || parsed.hostname !== 'auth' || parsed.pathname !== '/callback') {
+  if (parsed.protocol !== 'lockpassnew:' || parsed.hostname !== 'auth' || parsed.pathname !== '/callback') {
     throw new Error('syncOfficialCallbackMismatch')
   }
 

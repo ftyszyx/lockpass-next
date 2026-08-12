@@ -56,6 +56,8 @@ defineExpose({ mainGridElement });
         @create-vault="page.openNewVault"
         @delete-vault="page.requestDeleteVault"
         @manage-users="page.openUserManagement"
+        @change-master-password="page.openChangeMasterPassword"
+        @open-server-account="page.openServerAccount"
         @open-management="page.openManagement"
         @show-secret-key="page.openSecretKeyModal"
         @sign-out-current-user="page.openSignOutCurrentUserModal"

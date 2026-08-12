@@ -4,6 +4,7 @@ import type {
 } from "@lockpass/core";
 import { useDesktopPageContext } from "../desktopPageContext";
 import BackupSavedModal from "./BackupSavedModal.vue";
+import ChangeMasterPasswordModal from "./ChangeMasterPasswordModal.vue";
 import DeleteVaultConfirmModal from "./DeleteVaultConfirmModal.vue";
 import DesktopDrawer from "./DesktopDrawer.vue";
 import ItemEditorModal from "./ItemEditorModal.vue";
@@ -12,6 +13,7 @@ import ProgressModal from "./ProgressModal.vue";
 import QuickSearchModal from "./QuickSearchModal.vue";
 import SecretKeyModal from "./SecretKeyModal.vue";
 import RemoveUserModal from "./RemoveUserModal.vue";
+import ServerAccountModal from "./ServerAccountModal.vue";
 import SwitchUserConfirmModal from "./SwitchUserConfirmModal.vue";
 import ToastNotice from "./ToastNotice.vue";
 import UserManagementModal from "./UserManagementModal.vue";
@@ -23,8 +25,7 @@ const page = useDesktopPageContext();
 
 <template>
   <DesktopDrawer
-    v-if="page.activeDrawer"
-    :active-drawer="page.activeDrawer"
+    v-if="page.activeDrawer === 'generator'"
     :generated-password="page.generatedPassword"
     :password-options="page.passwordOptions"
     :can-use-password="page.canUseGeneratedPassword"
@@ -32,6 +33,11 @@ const page = useDesktopPageContext();
     @copy-value="page.copyValue"
     @regenerate="page.regeneratePassword"
     @use-password="page.useGeneratedPassword"
+  />
+
+  <ServerAccountModal
+    v-if="page.activeDrawer === 'sync'"
+    @close="page.closeDrawer"
     @sync-toast="page.showToast"
     @operation-start="page.showOperationProgress"
     @operation-end="page.hideOperationProgress"
@@ -125,6 +131,14 @@ const page = useDesktopPageContext();
     @close="page.closeSecretKeyModal"
     @copy-value="page.copyValue"
     @save-secret-key-to-device="page.saveSecretKeyToDevice"
+  />
+
+  <ChangeMasterPasswordModal
+    v-if="page.activeModal === 'changeMasterPassword'"
+    :busy="page.changingMasterPassword"
+    :error="page.changeMasterPasswordError"
+    @close="page.closeChangeMasterPassword"
+    @submit="page.submitMasterPasswordChange"
   />
 
   <RemoveUserModal

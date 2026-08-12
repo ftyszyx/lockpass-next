@@ -2,7 +2,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { isTauriRuntime } from "@/services/runtime";
 
 export const SYSTEM_SESSION_LOCKED_EVENT =
-  "lockpass://system-session-locked";
+  "lockpassnew://system-session-locked";
 
 export type SystemSessionLockHandler = () => void | Promise<void>;
 

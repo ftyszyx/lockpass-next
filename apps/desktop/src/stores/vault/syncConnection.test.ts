@@ -25,7 +25,7 @@ const callbackPayload = {
 };
 const encodedPayload = Buffer.from(JSON.stringify(callbackPayload)).toString("base64url");
 const parsed = parseSyncDeviceBindCallback(
-  `lockpass://auth/callback?payload=${encodedPayload}`,
+  `lockpassnew://auth/callback?payload=${encodedPayload}`,
 );
 
 assert.equal(parsed.serverUrl, "http://127.0.0.1:1480");
@@ -33,7 +33,7 @@ assert.equal(parsed.account.id, "account-one");
 assert.equal(parsed.device.id, "device-one");
 
 assert.throws(
-  () => parseSyncDeviceBindCallback("lockpass://auth/callback"),
+  () => parseSyncDeviceBindCallback("lockpassnew://auth/callback"),
   /syncOfficialAuthorizationMissing/,
 );
 assert.throws(

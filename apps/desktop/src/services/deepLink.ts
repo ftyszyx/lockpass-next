@@ -4,7 +4,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 export type DeepLinkHandler = (url: string) => void | Promise<void>
 
 const NATIVE_DEEP_LINK_EVENT = 'lockpass-deep-link'
-const DEEP_LINK_PREFIX = 'lockpass://'
+const DEEP_LINK_PREFIX = 'lockpassnew://'
 const handlers = new Set<DeepLinkHandler>()
 const pendingUrls: string[] = []
 

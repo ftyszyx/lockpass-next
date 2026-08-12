@@ -361,10 +361,12 @@ export function buildImportedVault(
   now: string,
   deviceId: string,
   locale: SupportedLocale,
+  importSourceId?: string,
 ): Vault {
   return {
     id: `vault-${crypto.randomUUID()}`,
     schemaVersion: CORE_SCHEMA_VERSION,
+    importSourceId,
     name: name.trim() || desktopMessages[locale].vault.importedName,
     description: "",
     color: "slate",
@@ -396,6 +398,7 @@ export function buildImportedItems(
       id: itemId,
       vaultId,
       schemaVersion: CORE_SCHEMA_VERSION,
+      importSourceId: item.sourceId,
       type: item.type,
       title: item.title.trim() || desktopMessages[locale].itemDefaults.imported,
       subtitle: buildSubtitle(item.type, fields, [], item.notes, locale),

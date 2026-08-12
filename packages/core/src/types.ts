@@ -25,6 +25,7 @@ export interface SyncMetadata {
 export interface Vault {
   id: LockPassId;
   schemaVersion: CoreSchemaVersion;
+  importSourceId?: string;
   name: string;
   description: string;
   color: VaultColor;
@@ -75,6 +76,7 @@ export interface VaultItem {
   id: LockPassId;
   vaultId: LockPassId;
   schemaVersion: CoreSchemaVersion;
+  importSourceId?: string;
   type: VaultItemType;
   title: string;
   subtitle: string;

@@ -2117,7 +2117,7 @@ dependencies = [
 
 [[package]]
 name = "lockpass-next-desktop"
-version = "0.0.105"
+version = "0.0.108"
 dependencies = [
  "base64 0.22.1",
  "keyring",

@@ -14,12 +14,12 @@ const rustBackend = read("../../src-tauri/src/lib.rs");
 
 assert.match(
   service,
-  /lockpass:\/\/system-session-locked/,
+  /lockpassnew:\/\/system-session-locked/,
   "the frontend listener should subscribe to the native session-lock event",
 );
 assert.match(
   rustBackend,
-  /const SYSTEM_SESSION_LOCKED_EVENT: &str =\s*"lockpass:\/\/system-session-locked";/,
+  /const SYSTEM_SESSION_LOCKED_EVENT: &str =\s*"lockpassnew:\/\/system-session-locked";/,
   "the native listener should emit the event used by the frontend",
 );
 assert.match(

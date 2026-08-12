@@ -57,9 +57,9 @@ mod user_vault_migrations {
 const SECRET_KEY_SERVICE: &str = "lockpass-next-secret-key";
 const DEVICE_UNLOCK_KEY_SERVICE: &str = "lockpass-next-fast-unlock";
 const SYNC_DEVICE_TOKEN_SERVICE: &str = "lockpass-next-sync-device-token";
-const DEEP_LINK_SCHEME: &str = "lockpass://";
+const DEEP_LINK_SCHEME: &str = "lockpassnew://";
 const DEEP_LINK_EVENT: &str = "lockpass-deep-link";
-const SYSTEM_SESSION_LOCKED_EVENT: &str = "lockpass://system-session-locked";
+const SYSTEM_SESSION_LOCKED_EVENT: &str = "lockpassnew://system-session-locked";
 const DESKTOP_STORE_SCHEMA_VERSION: i64 = 2;
 const APP_META_SQLITE_FILE: &str = "app-meta.sqlite";
 const USER_VAULT_SQLITE_FILE: &str = "vault.sqlite";
@@ -2607,7 +2607,7 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             capture_deep_link_urls(app, argv);
-            let _ = app.emit("lockpass://single-instance", ());
+            let _ = app.emit("lockpassnew://single-instance", ());
         }))
         .setup(|app| {
             app.handle()
@@ -2615,7 +2615,7 @@ pub fn run() {
             #[cfg(target_os = "windows")]
             start_system_session_lock_listener(app.handle().clone());
             set_main_window_title(app);
-            let _ = app.deep_link().register("lockpass");
+            let _ = app.deep_link().register("lockpassnew");
             capture_deep_link_urls(&app.handle().clone(), std::env::args());
             Ok(())
         })
@@ -2670,7 +2670,7 @@ where
     }
 
     #[cfg(debug_assertions)]
-    eprintln!("[deep-link] received {} lockpass callback(s)", urls.len());
+    eprintln!("[deep-link] received {} lockpassnew callback(s)", urls.len());
 
     if let Some(pending) = app.try_state::<PendingDeepLinks>() {
         if let Ok(mut pending_urls) = pending.urls.lock() {
@@ -2751,24 +2751,24 @@ mod tests {
     fn collect_deep_link_urls_reads_plain_and_forwarded_args() {
         let urls = collect_deep_link_urls([
             "target/debug/lockpass-next-desktop.exe",
-            "lockpass://auth/callback?deviceAuthId=one&state=two",
-            "E:\\workspace|target\\debug\\lockpass-next-desktop.exe|lockpass://auth/callback?deviceAuthId=three&state=four",
-            "\"lockpass://auth/callback?deviceAuthId=five&state=six\"",
+            "lockpassnew://auth/callback?deviceAuthId=one&state=two",
+            "E:\\workspace|target\\debug\\lockpass-next-desktop.exe|lockpassnew://auth/callback?deviceAuthId=three&state=four",
+            "\"lockpassnew://auth/callback?deviceAuthId=five&state=six\"",
         ]);
 
         assert_eq!(
             urls,
             vec![
-                "lockpass://auth/callback?deviceAuthId=one&state=two",
-                "lockpass://auth/callback?deviceAuthId=three&state=four",
-                "lockpass://auth/callback?deviceAuthId=five&state=six",
+                "lockpassnew://auth/callback?deviceAuthId=one&state=two",
+                "lockpassnew://auth/callback?deviceAuthId=three&state=four",
+                "lockpassnew://auth/callback?deviceAuthId=five&state=six",
             ]
         );
     }
 
     #[test]
     fn collect_deep_link_urls_deduplicates_callbacks() {
-        let callback = "lockpass://auth/callback?deviceAuthId=one&state=two";
+        let callback = "lockpassnew://auth/callback?deviceAuthId=one&state=two";
         let urls = collect_deep_link_urls([callback, callback, &format!("ignored|{callback}")]);
 
         assert_eq!(urls, vec![callback]);
