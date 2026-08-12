@@ -62,17 +62,15 @@ function formatVersion(version: string): string {
                       data-download-platform={download.id}
                       aria-label={`${labels.download} ${download.label}`}
                     >
-                      <span class="download-card-main">
-                        <strong>{download.label}</strong>
+                      <strong class="download-card-title">{download.label}</strong>
+                      <span class="download-card-version" data-platform-version>{formatVersion(download.version)}</span>
+                      <div class="download-card-tags">
                         <span class="download-extension">{download.extension}</span>
                         <span class="download-recommended" data-recommended-badge hidden={download.id !== recommendedId}>
                           {labels.recommended}
                         </span>
-                      </span>
-                      <span class="download-card-meta">
-                        <span data-platform-version>{formatVersion(download.version)}</span>
-                        <small data-platform-file>{download.fileName}</small>
-                      </span>
+                      </div>
+                      <small class="download-card-file" data-platform-file>{download.fileName}</small>
                     </a>
                   ))
                 }

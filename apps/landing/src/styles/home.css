@@ -223,34 +223,6 @@
   background: rgb(255 255 255 / 8%);
 }
 
-.hero-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 22px;
-  color: var(--night-muted);
-  font-size: 0.9rem;
-}
-
-.hero-meta span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 12px;
-  border: 1px solid var(--night-line);
-  border-radius: 999px;
-  background: rgb(255 255 255 / 4%);
-}
-
-.hero-meta span::before {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--glow-teal);
-  content: "";
-  opacity: 0.9;
-}
-
 /* Hero 截图窗口（真实产品截图） */
 
 .hero-visual {
@@ -577,43 +549,6 @@
   line-height: 1.75;
 }
 
-/* ---------- 服务器 band ---------- */
-
-.server-band {
-  position: relative;
-  overflow: hidden;
-  color: var(--night-ink);
-  background:
-    radial-gradient(800px 480px at 85% 20%, rgb(47 214 176 / 12%), transparent 60%),
-    linear-gradient(180deg, var(--night-1) 0%, var(--night-2) 100%);
-}
-
-.server-band .home-section {
-  width: min(1180px, calc(100% - 40px));
-  max-width: 900px;
-  margin: 0 auto;
-  text-align: center;
-}
-
-.server-band .eyebrow {
-  color: var(--glow-teal);
-}
-
-.server-band h2 {
-  max-width: none;
-  color: var(--night-ink);
-  font-size: clamp(1.9rem, 3.6vw, 2.9rem);
-  line-height: 1.12;
-}
-
-.server-band p {
-  margin: 20px auto 0;
-  max-width: 720px;
-  color: var(--night-muted);
-  font-size: 1.02rem;
-  line-height: 1.85;
-}
-
 /* ---------- FAQ ---------- */
 
 .faq-list {
@@ -714,13 +649,14 @@
 
 .download-inner {
   display: grid;
-  grid-template-columns: minmax(0, 0.72fr) minmax(420px, 1fr);
-  gap: clamp(32px, 6vw, 72px);
-  align-items: start;
+  grid-template-columns: 1fr;
+  justify-items: center;
+  gap: clamp(32px, 5vw, 56px);
 }
 
 .download-heading {
-  max-width: 620px;
+  max-width: 560px;
+  text-align: center;
 }
 
 .download-heading .eyebrow {
@@ -729,6 +665,7 @@
 
 .download-heading h2 {
   max-width: 12ch;
+  margin-inline: auto;
   color: var(--night-ink);
 }
 
@@ -746,7 +683,9 @@
 }
 
 .download-platforms {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  max-width: 480px;
+  grid-template-columns: 1fr;
   gap: 22px;
 }
 
@@ -784,11 +723,13 @@
 }
 
 .download-card {
-  display: flex;
-  min-height: 66px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  column-gap: 16px;
+  row-gap: 8px;
   align-items: center;
-  justify-content: space-between;
-  gap: 18px;
+  min-height: 70px;
   padding: 14px 18px;
   border: 1px solid var(--night-line);
   border-radius: 14px;
@@ -814,20 +755,31 @@
   background: rgb(239 68 68 / 18%);
 }
 
-.download-card-main,
-.download-card-meta {
+.download-card-title {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  font-size: 0.96rem;
+  font-weight: 820;
+}
+
+.download-card-version {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: 0.92rem;
+  font-weight: 780;
+  white-space: nowrap;
+  color: var(--night-ink);
+}
+
+.download-card-tags {
+  grid-column: 1;
+  grid-row: 2;
   display: flex;
   align-items: center;
-}
-
-.download-card-main {
-  min-width: 0;
   flex-wrap: wrap;
-  gap: 9px;
-}
-
-.download-card-main strong {
-  font-size: 0.96rem;
+  gap: 8px;
+  min-width: 0;
 }
 
 .download-extension,
@@ -848,24 +800,16 @@
   background: #ef4444;
 }
 
-.download-card-meta {
+.download-card-file {
+  grid-column: 2;
+  grid-row: 2;
   min-width: 0;
-  align-items: flex-end;
-  flex-direction: column;
-  gap: 4px;
-  text-align: right;
-}
-
-.download-card-meta > span {
-  font-size: 0.92rem;
-  font-weight: 780;
-}
-
-.download-card-meta small {
-  max-width: 260px;
+  max-width: 280px;
   overflow: hidden;
   color: var(--night-muted);
-  font-size: 0.7rem;
+  font-size: 0.72rem;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -885,10 +829,6 @@
 
   .workflow-step:nth-child(3)::after {
     display: none;
-  }
-
-  .download-platforms {
-    grid-template-columns: 1fr;
   }
 }
 
@@ -923,10 +863,6 @@
   }
 
   .trust-bar {
-    grid-template-columns: 1fr;
-  }
-
-  .download-inner {
     grid-template-columns: 1fr;
   }
 }
@@ -981,16 +917,8 @@
     padding: 64px 18px;
   }
 
-  .download-card {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .download-card-meta {
-    width: 100%;
-    align-items: flex-start;
-    text-align: left;
+  .download-card-file {
+    max-width: 160px;
   }
 
   .home-footer .site-footer {

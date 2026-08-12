@@ -89,9 +89,6 @@ const platforms = getLocalizedDownloadPlatforms(locale)
         link.setAttribute('href', platform.href)
         link.setAttribute('download', '')
       })
-      document.querySelectorAll('[data-recommended-version]').forEach((version) => {
-        version.textContent = platform.version || ''
-      })
     }
 
     const updateSupportQq = (platform) => {
