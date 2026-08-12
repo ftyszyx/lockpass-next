@@ -1,0 +1,89 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { desktopDownloadHref, helpMessages } from '../../i18n/help'
+import { localeLabels, locales, type Locale } from '../../i18n'
+
+export function getStaticPaths() {
+  return locales.map((locale) => ({ params: { locale } }))
+}
+
+const locale = Astro.params.locale as Locale
+const t = helpMessages[locale]
+const alternateLocale: Locale = locale === 'zh-CN' ? 'en-US' : 'zh-CN'
+const currentYear = new Date().getFullYear()
+const downloadHref = desktopDownloadHref.replace('/zh-CN/', `/${locale}/`)
+---
+
+<BaseLayout locale={locale} title={t.meta.title} description={t.meta.description}>
+  <header class="site-header legal-site-header" aria-label="LockPass">
+    <a class="brand" href={`/${locale}/`} aria-label="LockPass">
+      <span class="brand-mark" aria-hidden="true">L</span>
+      <span>LockPass</span>
+    </a>
+    <nav class="legal-header-actions" aria-label={t.title}>
+      <a class="legal-home-link" href={`/${locale}/`}>{t.backHome}</a>
+      <a class="language-link" href={`/${alternateLocale}/help/`} aria-label={localeLabels[alternateLocale]}>
+        {t.language}
+      </a>
+    </nav>
+  </header>
+
+  <main class="desktop-guide-main">
+    <header class="desktop-guide-hero">
+      <div>
+        <p class="eyebrow">{t.eyebrow}</p>
+        <h1>{t.title}</h1>
+        <p>{t.summary}</p>
+      </div>
+      <a class="button button-primary" href={downloadHref}>{t.download}</a>
+    </header>
+
+    <nav class="desktop-guide-nav" aria-label={t.eyebrow}>
+      {t.sections.map((section, index) => (
+        <a href={`#${section.id}`}>
+          <span>{String(index + 1).padStart(2, '0')}</span>
+          {section.title}
+        </a>
+      ))}
+    </nav>
+
+    {t.sections.map((section, sectionIndex) => (
+      <section id={section.id} class="desktop-guide-section">
+        <header class="desktop-guide-section-title">
+          <span>{String(sectionIndex + 1).padStart(2, '0')}</span>
+          <h2>{section.title}</h2>
+        </header>
+
+        <div class="desktop-guide-steps">
+          {section.steps.map((step, stepIndex) => (
+            <article class:list={['desktop-guide-step', step.compact && 'desktop-guide-step-compact']}>
+              <header>
+                <span>{sectionIndex + 1}.{stepIndex + 1}</span>
+                <div>
+                  <h3>{step.title}</h3>
+                  {step.note && (
+                    <p class:list={[step.warning && 'desktop-guide-warning']}>
+                      {step.warning && <strong>{t.warningLabel}</strong>}
+                      {step.note}
+                    </p>
+                  )}
+                </div>
+              </header>
+              <a class="desktop-guide-image" href={step.image}>
+                <img src={step.image} alt={step.imageAlt} loading={sectionIndex === 0 && stepIndex === 0 ? 'eager' : 'lazy'} />
+              </a>
+            </article>
+          ))}
+        </div>
+      </section>
+    ))}
+  </main>
+
+  <footer class="site-footer legal-footer">
+    <a href={`/${locale}/`}><strong>{t.footer.product}</strong></a>
+    <div class="footer-meta">
+      <a href={`/${locale}/privacy/`}>{t.footer.privacy}</a>
+      <span>{currentYear} {t.footer.copyright}</span>
+    </div>
+  </footer>
+</BaseLayout>

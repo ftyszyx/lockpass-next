@@ -1,0 +1,19 @@
+---
+import { defaultLocale } from '../i18n'
+
+const targetHref = `/${defaultLocale}/help/`
+---
+
+<html lang={defaultLocale}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="refresh" content={`0;url=${targetHref}`} />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LockPass Help</title>
+  </head>
+  <body>
+    <script is:inline define:vars={{ targetHref }}>
+      window.location.replace(targetHref)
+    </script>
+  </body>
+</html>

@@ -21,6 +21,7 @@ export const messages = {
       workflow: '使用流程',
       download: '软件下载',
       guide: '使用说明',
+      help: '帮助',
       language: 'English'
     },
     hero: {
@@ -180,6 +181,7 @@ export const messages = {
       workflow: 'Workflow',
       download: 'Download',
       guide: 'Guide',
+      help: 'Help',
       language: '中文'
     },
     hero: {
