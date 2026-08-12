@@ -3,12 +3,15 @@ import { manifestUrlFor } from './site'
 
 /**
  * 客户端下载分组（按"MacOS / Windows"等大类）。
+ * 注意：这里定义"可展示的平台大类"，可以多于实际有下载项的平台 ——
+ * 没有下载条目的分组在渲染时会被自动跳过（见 DownloadSection.astro）。
+ *
  * 增删平台时：
  *   1. 在这里加分组 id；
- *   2. 在 `platformConfigs` 加新条目；
+ *   2. 在 `platformConfigs` 加新条目（分组定义无条目则不会渲染）；
  *   3. 在 `i18n.downloadSection.groups` 加分组名、`platforms` 加 variant 标签。
  */
-export const downloadGroups = ['windows'] as const
+export const downloadGroups = ['macos', 'windows'] as const
 export type DownloadGroup = (typeof downloadGroups)[number]
 
 /**
