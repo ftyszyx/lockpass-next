@@ -49,13 +49,15 @@ const platforms = getLocalizedDownloadPlatforms(locale)
         return {
           ...platform,
           version: pickString(manifest.version, platform.fallbackVersion),
-          href: pickString(manifest.url, platform.fallbackDownloadUrl)
+          href: pickString(manifest.url, platform.fallbackDownloadUrl),
+          supportQq: pickString(manifest.qq, platform.fallbackSupportQq) || ''
         }
       } catch {
         return {
           ...platform,
           version: platform.fallbackVersion,
-          href: platform.fallbackDownloadUrl
+          href: platform.fallbackDownloadUrl,
+          supportQq: platform.fallbackSupportQq || ''
         }
       }
     }
@@ -92,10 +94,29 @@ const platforms = getLocalizedDownloadPlatforms(locale)
       })
     }
 
+    const updateSupportQq = (platform) => {
+      const number = document.querySelector('[data-support-qq-number]')
+      if (!number) return
+      const qq = platform?.supportQq || ''
+      if (!qq) {
+        const link = number.closest('.support-qq')
+        if (link) link.remove()
+        return
+      }
+      number.textContent = qq
+      const link = number.closest('.support-qq')
+      if (link) {
+        link.setAttribute('href', `https://wpa.qq.com/msgrd?v=3&uin=${qq}&site=qq&menu=yes`)
+        link.setAttribute('aria-label', `${link.dataset.qqLabel || 'Support QQ'} ${qq}`)
+      }
+    }
+
     Promise.all(platforms.map(loadPlatform)).then((results) => {
       const recommendedId = detectRecommendedPlatform(results)
       results.forEach((platform) => updatePlatformCard(platform, recommendedId))
-      updateRecommendedDownload(results.find((platform) => platform.id === recommendedId) || results[0])
+      const recommended = results.find((platform) => platform.id === recommendedId) || results[0]
+      updateRecommendedDownload(recommended)
+      updateSupportQq(recommended)
     })
   })()
 </script>

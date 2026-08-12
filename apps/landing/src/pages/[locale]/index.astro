@@ -2,8 +2,10 @@
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import DownloadRuntime from '../../components/DownloadRuntime.astro'
 import DownloadSection from '../../components/DownloadSection.astro'
+import SecurityDiagram from '../../components/SecurityDiagram.astro'
 import { loadDownloadPlatforms, preferredDownload } from '../../downloads'
 import { localeLabels, locales, messages, type Locale } from '../../i18n'
+import '../../styles/home.css'
 
 export function getStaticPaths() {
   return locales.map((locale) => ({ params: { locale } }))
@@ -16,71 +18,102 @@ const alternateHref = `/${alternateLocale}/`
 const currentYear = new Date().getFullYear()
 const downloads = await loadDownloadPlatforms(locale)
 const recommendedDownload = preferredDownload(downloads)
-const screenshots = [
-  {
-    src: '/screenshots/desktop-vault.png',
-    alt: t.screenshotSection.items[0].title,
-    ...t.screenshotSection.items[0]
-  },
-  {
-    src: '/screenshots/desktop-settings.png',
-    alt: t.screenshotSection.items[1].title,
-    ...t.screenshotSection.items[1]
-  }
-]
+
+const featureIcons = ['🗄', '🔐', '🛡', '🌐']
+const securityIcons = ['🔑', '⚙️', '🔒', '🙈']
+const trustIcons = ['⬇', '🔒', '🖥']
 ---
 
 <BaseLayout locale={locale} title={t.meta.title} description={t.meta.description}>
-  <header class="site-header" aria-label="LockPass">
+  <header class="home-header" aria-label="LockPass">
     <a class="brand" href={`/${locale}/`} aria-label="LockPass">
       <span class="brand-mark" aria-hidden="true">L</span>
       <span>LockPass</span>
     </a>
-    <nav class="nav-links" aria-label="Primary">
+    <nav class="home-nav" aria-label="Primary">
       <a href="#features">{t.nav.features}</a>
+      <a href="#security">{t.nav.security}</a>
       <a href="#workflow">{t.nav.workflow}</a>
       <a href="#download">{t.nav.download}</a>
-      <a href="#guide">{t.nav.guide}</a>
-      <a href={`/${locale}/help/`}>{t.nav.help}</a>
+      <a href={`/${locale}/help/`}>{t.nav.guide}</a>
     </nav>
+    <a
+      class="github-link"
+      href="https://github.com/ftyszyx/lockpass-next"
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={t.nav.github}
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path
+          fill="currentColor"
+          d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.09.68-.22.68-.49 0-.24-.01-.87-.01-1.7-2.78.62-3.37-1.37-3.37-1.37-.45-1.18-1.11-1.5-1.11-1.5-.91-.63.07-.62.07-.62 1 .07 1.53 1.06 1.53 1.06.89 1.57 2.34 1.12 2.91.85.09-.66.35-1.11.63-1.37-2.22-.26-4.56-1.14-4.56-5.07 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05a9.36 9.36 0 0 1 5 0c1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.94-2.34 4.81-4.57 5.06.36.32.68.94.68 1.9 0 1.37-.01 2.47-.01 2.81 0 .27.18.59.69.49A10.03 10.03 0 0 0 22 12.25C22 6.58 17.52 2 12 2Z"
+        />
+      </svg>
+      <span>{t.nav.github}</span>
+    </a>
     <a class="language-link" href={alternateHref} aria-label={localeLabels[alternateLocale]}>
       {t.nav.language}
     </a>
   </header>
 
   <main>
+    <!-- Hero：深色安全堡垒 -->
     <section class="hero">
-      <img class="hero-preview" src="/screenshots/desktop-vault.png" alt="" aria-hidden="true" />
-      <div class="hero-overlay"></div>
-      <div class="hero-content">
-        <p class="eyebrow">{t.hero.eyebrow}</p>
-        <h1>{t.hero.title}</h1>
-        <p class="hero-subtitle">{t.hero.subtitle}</p>
-        <div class="hero-actions">
-          <a class="button button-primary" href={recommendedDownload.href} download data-recommended-download>{t.hero.primaryCta}</a>
-          <a class="button button-secondary" href="#guide">{t.hero.secondaryCta}</a>
+      <div class="hero-inner">
+        <div class="hero-content">
+          <p class="eyebrow">{t.hero.eyebrow}</p>
+          <h1>{t.hero.title}</h1>
+          <p class="hero-highlight">{t.hero.highlight}</p>
+          <p class="hero-subtitle">{t.hero.subtitle}</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#download">
+              {t.hero.primaryCta}
+            </a>
+            <a class="button button-secondary" href={`/${locale}/help/`}>{t.hero.secondaryCta}</a>
+          </div>
+          <div class="hero-meta" aria-label={t.hero.platformNote}>
+            <span>{t.hero.versionPrefix} <span data-recommended-version>{recommendedDownload.version}</span></span>
+            <span>{t.hero.platformNote}</span>
+          </div>
         </div>
-        <div class="hero-meta" aria-label={t.hero.platformNote}>
-          <span>{t.hero.versionPrefix} <span data-recommended-version>{recommendedDownload.version}</span></span>
-          <span>{t.hero.platformNote}</span>
+
+        <div class="hero-visual">
+          <figure class="window-frame">
+            <div class="window-bar">
+              <span class="window-dot window-dot--r" aria-hidden="true"></span>
+              <span class="window-dot window-dot--y" aria-hidden="true"></span>
+              <span class="window-dot window-dot--g" aria-hidden="true"></span>
+              <span class="window-title">LockPass — {t.hero.eyebrow}</span>
+            </div>
+            <img src="/screenshots/desktop-vault.png" alt={t.hero.visualAlt} loading="eager" />
+          </figure>
         </div>
-        <ul class="trust-list" aria-label={t.featureSection.eyebrow}>
-          {t.hero.trustItems.map((item) => <li>{item}</li>)}
-        </ul>
+      </div>
+
+      <div class="trust-bar" aria-label={t.hero.trustItems.join('、')}>
+        {
+          t.hero.trustItems.map((item, index) => (
+            <div class="trust-item">
+              <span class="trust-item-icon" aria-hidden="true">{trustIcons[index]}</span>
+              <strong>{item}</strong>
+            </div>
+          ))
+        }
       </div>
     </section>
 
-    <section id="features" class="section">
-      <div class="section-heading">
+    <!-- 产品功能 -->
+    <section id="features" class="home-section">
+      <div class="home-section-heading">
         <p class="eyebrow">{t.featureSection.eyebrow}</p>
         <h2>{t.featureSection.title}</h2>
-        <p>{t.featureSection.intro}</p>
       </div>
       <div class="feature-grid">
         {
-          t.featureSection.items.map((item) => (
+          t.featureSection.items.map((item, index) => (
             <article class="feature-card">
-              <span class="feature-icon" aria-hidden="true"></span>
+              <span class="feature-icon" aria-hidden="true">{featureIcons[index]}</span>
               <h3>{item.title}</h3>
               <p>{item.body}</p>
             </article>
@@ -89,69 +122,62 @@ const screenshots = [
       </div>
     </section>
 
-    <section class="section screenshot-section">
-      <div class="section-heading">
-        <p class="eyebrow">{t.screenshotSection.eyebrow}</p>
-        <h2>{t.screenshotSection.title}</h2>
-        <p>{t.screenshotSection.intro}</p>
+    <!-- 使用流程 -->
+    <section id="workflow" class="home-section">
+      <div class="home-section-heading">
+        <p class="eyebrow">{t.workflowSection.eyebrow}</p>
+        <h2>{t.workflowSection.title}</h2>
       </div>
-      <div class="screenshot-grid">
+      <div class="workflow-layout">
         {
-          screenshots.map((screenshot) => (
-            <article class="screenshot-card">
-              <a class="screenshot-frame" href={screenshot.src}>
-                <img src={screenshot.src} alt={screenshot.alt} loading="lazy" />
-              </a>
-              <div>
-                <h3>{screenshot.title}</h3>
-                <p>{screenshot.body}</p>
-              </div>
+          t.workflowSection.steps.map((step, index) => (
+            <article class="workflow-step">
+              <span class="workflow-num">{String(index + 1).padStart(2, '0')}</span>
+              <h3>{step.title}</h3>
+              <p>{step.body}</p>
             </article>
           ))
         }
+      </div>
+    </section>
+
+    <!-- 安全架构：深色区 -->
+    <section id="security" class="security-section">
+      <div class="home-section">
+        <div class="home-section-heading">
+          <p class="eyebrow">{t.securitySection.eyebrow}</p>
+          <h2>{t.securitySection.title}</h2>
+          <p>{t.securitySection.intro}</p>
+        </div>
+        <div class="security-grid">
+          {
+            t.securitySection.points.map((point, index) => (
+              <article class="security-card">
+                <span class="security-card-icon" aria-hidden="true">{securityIcons[index]}</span>
+                <h3>{point.title}</h3>
+                <p>{point.body}</p>
+              </article>
+            ))
+          }
+        </div>
+        <SecurityDiagram labels={t.securitySection.diagram} />
+      </div>
+    </section>
+
+    <!-- 服务器 band -->
+    <section class="server-band">
+      <div class="home-section">
+        <p class="eyebrow">{t.serverSection.eyebrow}</p>
+        <h2>{t.serverSection.title}</h2>
+        <p>{t.serverSection.body}</p>
       </div>
     </section>
 
     <DownloadSection locale={locale} downloads={downloads} recommendedId={recommendedDownload.id} />
 
-    <section id="workflow" class="section">
-      <div class="section-heading">
-        <p class="eyebrow">{t.workflowSection.eyebrow}</p>
-        <h2>{t.workflowSection.title}</h2>
-      </div>
-      <div class="steps">
-        {
-          t.workflowSection.steps.map((step, index) => (
-            <article class="step">
-              <span class="step-index">{String(index + 1).padStart(2, '0')}</span>
-              <div>
-                <h3>{step.title}</h3>
-                <p>{step.body}</p>
-              </div>
-            </article>
-          ))
-        }
-      </div>
-    </section>
-
-    <section id="guide" class="section guide-section">
-      <div class="section-heading">
-        <p class="eyebrow">{t.guideSection.eyebrow}</p>
-        <h2>{t.guideSection.title}</h2>
-      </div>
-      <ol class="guide-list">
-        {t.guideSection.items.map((item) => <li>{item}</li>)}
-      </ol>
-    </section>
-
-    <section class="section server-band">
-      <p class="eyebrow">{t.serverSection.eyebrow}</p>
-      <h2>{t.serverSection.title}</h2>
-      <p>{t.serverSection.body}</p>
-    </section>
-
-    <section class="section faq-section">
-      <div class="section-heading">
+    <!-- 常见问题 -->
+    <section class="home-section faq-section">
+      <div class="home-section-heading">
         <p class="eyebrow">{t.faqSection.eyebrow}</p>
         <h2>{t.faqSection.title}</h2>
       </div>
@@ -168,14 +194,37 @@ const screenshots = [
     </section>
   </main>
 
-  <footer class="site-footer">
-    <div>
-      <strong>{t.footer.product}</strong>
-      <p>{t.footer.tagline}</p>
-    </div>
-    <div class="footer-meta">
-      <a href={`/${locale}/privacy/`}>{t.footer.privacy}</a>
-      <span>{currentYear} {t.footer.copyright}</span>
+  <footer class="home-footer">
+    <div class="site-footer">
+      <div>
+        <strong>{t.footer.product}</strong>
+        <p>{t.footer.tagline}</p>
+        {
+          recommendedDownload.supportQq && (
+            <a
+              class="support-qq"
+              href={`https://wpa.qq.com/msgrd?v=3&uin=${recommendedDownload.supportQq}&site=qq&menu=yes`}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-qq-label={t.footer.supportQqLabel}
+              aria-label={`${t.footer.supportQqLabel} ${recommendedDownload.supportQq}`}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path
+                  fill="currentColor"
+                  d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm0 16.5c-1.66 0-3-1.34-3-3h6c0 1.66-1.34 3-3 3Zm4.6-4H7.4a.6.6 0 0 1-.6-.6v-1.15c0-.34.28-.62.62-.62h.28c-.05-.4-.1-.84-.1-1.28C7.6 8.98 9.47 7.7 12 7.7s4.4 1.28 4.4 3.15c0 .44-.05.88-.1 1.28h.28c.34 0 .62.28.62.62v1.15c0 .33-.27.6-.6.6Z"
+                />
+              </svg>
+              <span>{t.footer.supportQqLabel}</span>
+              <strong data-support-qq-number>{recommendedDownload.supportQq}</strong>
+            </a>
+          )
+        }
+      </div>
+      <div class="footer-meta">
+        <a href={`/${locale}/privacy/`}>{t.footer.privacy}</a>
+        <span>{currentYear} {t.footer.copyright}</span>
+      </div>
     </div>
   </footer>
   <DownloadRuntime locale={locale} />

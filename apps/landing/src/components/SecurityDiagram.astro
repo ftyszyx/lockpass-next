@@ -1,0 +1,227 @@
+---
+interface DiagramLabels {
+  master: string
+  secret: string
+  kdf: string
+  unlockKey: string
+  wrap: string
+  vaultKey: string
+  wrapped: string
+  storage: string
+  note: string
+}
+
+interface Props {
+  labels: DiagramLabels
+}
+
+const { labels } = Astro.props
+---
+
+<figure class="security-diagram" aria-label={labels.wrap}>
+  <div class="diagram-rows">
+    <div class="diagram-row">
+      <div class="diagram-inputs">
+        <span class="diagram-chip diagram-chip--input">{labels.master}</span>
+        <span class="diagram-chip diagram-chip--input">{labels.secret}</span>
+      </div>
+      <span class="diagram-arrow" aria-hidden="true">→</span>
+      <div class="diagram-node diagram-node--kdf">
+        <strong>{labels.kdf}</strong>
+      </div>
+      <span class="diagram-arrow" aria-hidden="true">→</span>
+      <div class="diagram-node">
+        <strong>{labels.unlockKey}</strong>
+        <small>unlockKey</small>
+      </div>
+    </div>
+
+    <div class="diagram-divider" aria-hidden="true">
+      <span>{labels.wrap}</span>
+    </div>
+
+    <div class="diagram-row diagram-row--second">
+      <div class="diagram-inputs">
+        <span class="diagram-chip diagram-chip--key">{labels.vaultKey}</span>
+        <span class="diagram-chip diagram-chip--key diagram-chip--derived">{labels.unlockKey}</span>
+      </div>
+      <span class="diagram-arrow" aria-hidden="true">→</span>
+      <div class="diagram-node diagram-node--crypto">
+        <strong>AES-256-GCM</strong>
+      </div>
+      <span class="diagram-arrow" aria-hidden="true">→</span>
+      <div class="diagram-node diagram-node--wrapped">
+        <strong>{labels.wrapped}</strong>
+      </div>
+    </div>
+
+    <div class="diagram-row diagram-row--final">
+      <span class="diagram-arrow diagram-arrow--down" aria-hidden="true">↓</span>
+      <div class="diagram-node diagram-node--storage">
+        <strong>{labels.storage}</strong>
+        <small>{labels.note}</small>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<style>
+  .security-diagram {
+    margin: 0;
+    padding: clamp(20px, 4vw, 34px);
+    border: 1px solid rgb(255 255 255 / 12%);
+    border-radius: 16px;
+    background: rgb(255 255 255 / 4%);
+  }
+
+  .diagram-rows {
+    display: grid;
+    gap: 14px;
+  }
+
+  .diagram-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .diagram-inputs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .diagram-chip,
+  .diagram-node {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+
+  .diagram-chip {
+    min-height: 34px;
+    padding: 0 12px;
+    font-size: 0.8rem;
+  }
+
+  .diagram-chip--input {
+    color: #9ed8c6;
+    border: 1px solid rgb(158 216 198 / 34%);
+    background: rgb(158 216 198 / 10%);
+  }
+
+  .diagram-chip--key {
+    color: #c9d9ef;
+    border: 1px solid rgb(120 150 200 / 34%);
+    background: rgb(120 150 200 / 10%);
+  }
+
+  .diagram-chip--derived {
+    color: rgb(255 255 255 / 66%);
+  }
+
+  .diagram-node {
+    min-height: 44px;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 16px;
+    border: 1px solid rgb(255 255 255 / 14%);
+    background: rgb(255 255 255 / 7%);
+  }
+
+  .diagram-node strong {
+    font-size: 0.86rem;
+    color: #f2faf6;
+  }
+
+  .diagram-node small {
+    font-size: 0.68rem;
+    color: rgb(255 255 255 / 48%);
+    font-family: "SFMono-Regular", Consolas, monospace;
+  }
+
+  .diagram-node--kdf {
+    border-color: rgb(197 138 37 / 46%);
+    background: rgb(197 138 37 / 14%);
+  }
+
+  .diagram-node--kdf strong {
+    color: #f3d493;
+  }
+
+  .diagram-node--crypto {
+    border-color: rgb(88 180 158 / 52%);
+    background: rgb(88 180 158 / 14%);
+  }
+
+  .diagram-node--crypto strong {
+    color: #9fe3cf;
+  }
+
+  .diagram-node--wrapped {
+    border-color: rgb(220 140 130 / 46%);
+    background: rgb(220 140 130 / 12%);
+  }
+
+  .diagram-node--wrapped strong {
+    color: #f0b8b0;
+  }
+
+  .diagram-node--storage {
+    min-height: 50px;
+    border-color: rgb(158 216 198 / 40%);
+    background: rgb(158 216 198 / 10%);
+  }
+
+  .diagram-arrow {
+    color: rgb(255 255 255 / 42%);
+    font-size: 1.1rem;
+    line-height: 1;
+  }
+
+  .diagram-arrow--down {
+    font-size: 1.3rem;
+  }
+
+  .diagram-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: rgb(255 255 255 / 44%);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .diagram-divider::before,
+  .diagram-divider::after {
+    flex: 1;
+    height: 1px;
+    background: rgb(255 255 255 / 10%);
+    content: "";
+  }
+
+  .diagram-row--final {
+    justify-content: center;
+    flex-direction: column;
+    padding-top: 4px;
+  }
+
+  @media (max-width: 620px) {
+    .diagram-row {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .diagram-arrow {
+      transform: rotate(90deg);
+    }
+
+    .diagram-row--final {
+      align-items: center;
+    }
+  }
+</style>

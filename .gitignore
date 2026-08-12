@@ -39,3 +39,4 @@ tools/keys/lockpass.key.pub
 diagrams
 output
 server/target-smtp-test/debug
+.workbuddy
