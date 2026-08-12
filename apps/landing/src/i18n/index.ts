@@ -35,8 +35,6 @@ export const messages = {
       primaryCta: '下载客户端',
       secondaryCta: '查看使用说明',
       visualAlt: 'LockPass 桌面端保险库主界面',
-      versionPrefix: '当前版本',
-      platformNote: 'Windows x64',
       trustItems: ['本地离线可用', '端到端加密同步', '支持自部署服务器']
     },
     featureSection: {
@@ -132,11 +130,6 @@ export const messages = {
         }
       ]
     },
-    serverSection: {
-      eyebrow: '同步服务器',
-      title: '官方服务和自部署使用同一套绑定逻辑',
-      body: '邮箱、短信、OAuth 或自部署入口，统一进入同一套账号绑定流程。'
-    },
     faqSection: {
       eyebrow: '常见问题',
       title: '开始使用前，先确认这三件事',
@@ -188,8 +181,6 @@ export const messages = {
       primaryCta: 'Download',
       secondaryCta: 'Read the guide',
       visualAlt: 'LockPass desktop vault home',
-      versionPrefix: 'Current version',
-      platformNote: 'Windows x64',
       trustItems: ['Works offline', 'End-to-end encrypted sync', 'Self-hostable server']
     },
     featureSection: {
@@ -284,11 +275,6 @@ export const messages = {
           body: 'Sign in and bind your device.'
         }
       ]
-    },
-    serverSection: {
-      eyebrow: 'Sync server',
-      title: 'Official and self-hosted servers use one binding flow',
-      body: 'Email, SMS, OAuth, or self-hosted — all share the same binding flow.'
     },
     faqSection: {
       eyebrow: 'FAQ',

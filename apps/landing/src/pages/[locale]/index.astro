@@ -72,10 +72,6 @@ const trustIcons = ['⬇', '🔒', '🖥']
             </a>
             <a class="button button-secondary" href={`/${locale}/help/`}>{t.hero.secondaryCta}</a>
           </div>
-          <div class="hero-meta" aria-label={t.hero.platformNote}>
-            <span>{t.hero.versionPrefix} <span data-recommended-version>{recommendedDownload.version}</span></span>
-            <span>{t.hero.platformNote}</span>
-          </div>
         </div>
 
         <div class="hero-visual">
@@ -161,15 +157,6 @@ const trustIcons = ['⬇', '🔒', '🖥']
           }
         </div>
         <SecurityDiagram labels={t.securitySection.diagram} />
-      </div>
-    </section>
-
-    <!-- 服务器 band -->
-    <section class="server-band">
-      <div class="home-section">
-        <p class="eyebrow">{t.serverSection.eyebrow}</p>
-        <h2>{t.serverSection.title}</h2>
-        <p>{t.serverSection.body}</p>
       </div>
     </section>
 
