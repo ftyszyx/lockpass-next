@@ -136,6 +136,7 @@ const enUS: LocaleMessages = {
     passwordTooShort: "Master password must be at least 8 characters",
     passwordMismatch: "The two passwords do not match",
     duplicateUsername: "This username already exists",
+    localAccountSaveFailed: "Could not save the local account data. Try again.",
     usernameRequired: "Enter a username",
     wrongPassword: "Incorrect master password",
     wrongUnlockSecret: "Incorrect master password or Secret Key",

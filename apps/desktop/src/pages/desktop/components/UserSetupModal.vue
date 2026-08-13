@@ -151,7 +151,7 @@ function handleBackFromSecretKey(): void {
 }
 
 function submitRestoreExisting(): void {
-  if (!canRestoreExisting.value) return;
+  if (props.creating || !canRestoreExisting.value) return;
   emit("restoreExisting", {
     password: restorePassword.value,
     secretKey: restoreSecretKey.value.trim(),
@@ -293,6 +293,7 @@ function saveSelfhostUrl(): void {
             v-model="restorePassword"
             class="form-input"
             autocomplete="current-password"
+            :disabled="creating"
             :placeholder="t('lock.passwordPlaceholder')"
             :show-label="t('user.showPassword')"
             :hide-label="t('user.hidePassword')"
@@ -304,6 +305,7 @@ function saveSelfhostUrl(): void {
             v-model="restoreSecretKey"
             class="form-input min-h-24 font-mono text-sm"
             autocomplete="off"
+            :disabled="creating"
             spellcheck="false"
             :placeholder="t('user.secretKeyInputPlaceholder')"
           ></textarea>
@@ -318,10 +320,10 @@ function saveSelfhostUrl(): void {
           <button
             class="primary-button"
             type="submit"
-            :disabled="!canRestoreExisting"
+            :disabled="creating || !canRestoreExisting"
           >
             <Unlock class="size-4" />
-            {{ t("user.recoverAndUnlock") }}
+            {{ creating ? t("app.loading") : t("user.recoverAndUnlock") }}
           </button>
         </div>
       </div>

@@ -24,6 +24,7 @@ import type {
 } from "@/services/vaultRepository";
 import type { AttachmentDraft } from "./types";
 import type { DesktopVaultPayload } from "@/services/masterPassword";
+import { deduplicateUserProfiles } from "./userProfiles";
 
 export const CORE_SCHEMA_VERSION = 1;
 export const DESKTOP_STORE_SCHEMA_VERSION = 2;
@@ -174,17 +175,19 @@ export function snapshotActiveUser(
   activeUserId: string | null,
   sync: DesktopSyncSettings,
 ): DesktopUserProfile[] {
-  if (!activeUserId) return users;
+  if (!activeUserId) return deduplicateUserProfiles(users);
 
   const now = new Date().toISOString();
-  return users.map((user) =>
-    user.id === activeUserId
-      ? {
-          ...user,
-          sync: normalizeSyncSettings(sync),
-          updatedAt: now,
-        }
-      : user,
+  return deduplicateUserProfiles(
+    users.map((user) =>
+      user.id === activeUserId
+        ? {
+            ...user,
+            sync: normalizeSyncSettings(sync),
+            updatedAt: now,
+          }
+        : user,
+    ),
   );
 }
 
@@ -500,17 +503,19 @@ function normalizeUsers(data: DesktopVaultStoreData | null): {
   );
 
   if (Array.isArray(data?.users)) {
-    const users = data.users.map((user) => {
-      const normalizedUser = normalizeUserProfile(user);
-      const legacyPayload = extractLegacyPayload(user);
-      if (
-        !normalizedUser.crypto &&
-        (legacyPayload || hasLegacyPasswordAuth(user) || isOldSchema)
-      ) {
-        legacyPayloads[normalizedUser.id] = legacyPayload ?? emptyLegacyPayload();
-      }
-      return normalizedUser;
-    });
+    const users = deduplicateUserProfiles(
+      data.users.map((user) => {
+        const normalizedUser = normalizeUserProfile(user);
+        const legacyPayload = extractLegacyPayload(user);
+        if (
+          !normalizedUser.crypto &&
+          (legacyPayload || hasLegacyPasswordAuth(user) || isOldSchema)
+        ) {
+          legacyPayloads[normalizedUser.id] = legacyPayload ?? emptyLegacyPayload();
+        }
+        return normalizedUser;
+      }),
+    );
 
     return {
       users,

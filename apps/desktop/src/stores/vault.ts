@@ -94,6 +94,12 @@ import {
   deleteFastUnlockSecretsForUsers,
   saveAndVerifySecretKey
 } from './vault/localSecrets'
+import {
+  deduplicateUserProfiles,
+  findServerAccountUser,
+  upsertServerAccountUser,
+  withServerAccountSetupLock
+} from './vault/userProfiles'
 import type {
   AttachmentDraft,
   CreateServerBackedUserPayload,
@@ -193,12 +199,14 @@ export const useVaultStore = defineStore('vault', {
         this.settings = fallback.settings
       }
     },
-    async persist() {
+    async persist(options: { throwOnError?: boolean } = {}) {
       this.saving = true
       this.storageError = ''
 
       try {
-        const users = snapshotActiveUser(this.users, this.activeUserId, this.settings.sync)
+        const users = deduplicateUserProfiles(
+          snapshotActiveUser(this.users, this.activeUserId, this.settings.sync)
+        )
         this.users = users
 
         if (this.activeUserId && this.vaultSessionId && this.activeKeyId) {
@@ -223,6 +231,7 @@ export const useVaultStore = defineStore('vault', {
       } catch (error) {
         this.storageError = error instanceof Error ? error.message : String(error)
         await logError('vault persist failed', { error: this.storageError })
+        if (options.throwOnError) throw error
       } finally {
         this.saving = false
       }
@@ -345,157 +354,174 @@ export const useVaultStore = defineStore('vault', {
       await this.applySyncExchange(exchange.mode, exchange.serverUrl, exchange)
     },
     async createServerBackedUser(input: CreateServerBackedUserPayload): Promise<CreateUserResult> {
-      const existing = this.users.find((user) => user.sync?.accountId === input.exchange.account.id || user.id === input.exchange.account.id)
-      if (existing?.crypto) {
-        throw new Error('duplicate-username')
-      }
-      if (!existing && this.unlocked) {
-        await this.persist()
-      }
+      return withServerAccountSetupLock(input.exchange.account.id, 'create', async () => {
+        const existing = findServerAccountUser(this.users, input.exchange.account.id)
+        if (existing?.crypto) {
+          throw new Error('duplicate-username')
+        }
+        if (!existing && this.unlocked) {
+          await this.persist()
+        }
 
-      const now = new Date().toISOString()
-      const accountLabel = input.exchange.account.email ?? input.exchange.account.displayName ?? input.exchange.account.id
-      const sync = normalizeSyncSettings({
-        mode: input.exchange.mode,
-        serverUrl: input.exchange.serverUrl,
-        syncSpaceId: input.initialVault.syncSpaceId,
-        accountId: input.exchange.account.id,
-        accountLabel,
-        deviceId: input.exchange.device.id,
-        cursor: input.initialVault.cursor,
-        connectedAt: now,
-        lastSyncAt: now
-      })
-      const user: DesktopUserProfile = {
-        id: input.exchange.account.id,
-        username: normalizeUsername(accountLabel),
-        displayName: accountLabel,
-        createdAt: existing?.createdAt ?? now,
-        updatedAt: now,
-        sync,
-        crypto: input.initialVault.crypto
-      }
-
-      await saveSyncDeviceToken(user.id, input.exchange.deviceToken)
-      this.users = existing
-        ? this.users.map((candidate) => (candidate.id === existing.id ? user : candidate))
-        : [...this.users, user]
-      await this.closeCurrentVaultSession()
-      this.activeUserId = user.id
-      this.settings.sync = sync
-      this.unlocked = true
-      this.vaultSessionId = input.initialVault.sessionId
-      this.activeKeyId = input.initialVault.crypto.keyId
-      this.loadActiveUserData(input.initialVault.payload)
-      await upsertEncryptedObjects(
-        user.id,
-        await buildLocalEncryptedObjectRecords({
-          sessionId: input.initialVault.sessionId,
-          keyId: input.initialVault.crypto.keyId,
-          vaults: input.initialVault.payload.vaults,
-          items: input.initialVault.payload.items,
-          attachments: input.initialVault.payload.attachments
+        const now = new Date().toISOString()
+        const accountLabel = input.exchange.account.email ?? input.exchange.account.displayName ?? input.exchange.account.id
+        const sync = normalizeSyncSettings({
+          mode: input.exchange.mode,
+          serverUrl: input.exchange.serverUrl,
+          syncSpaceId: input.initialVault.syncSpaceId,
+          accountId: input.exchange.account.id,
+          accountLabel,
+          deviceId: input.exchange.device.id,
+          cursor: input.initialVault.cursor,
+          connectedAt: now,
+          lastSyncAt: now
         })
-      )
-      const secretKeyStorage = await saveAndVerifySecretKey(user.id, input.secretKey)
-      if (secretKeyStorage === 'failed') {
-        this.storageError = 'secret-key-save-verification-failed'
-      }
-      this.clearOfficialLoginState()
-      await this.persist()
-      return {
-        user,
-        secretKey: input.secretKey,
-        secretKeyStorage
-      }
+        const user: DesktopUserProfile = {
+          id: input.exchange.account.id,
+          username: normalizeUsername(accountLabel),
+          displayName: accountLabel,
+          createdAt: existing?.createdAt ?? now,
+          updatedAt: now,
+          sync,
+          crypto: input.initialVault.crypto
+        }
+
+        await saveSyncDeviceToken(user.id, input.exchange.deviceToken)
+        this.users = upsertServerAccountUser(this.users, user)
+        await this.closeCurrentVaultSession()
+        this.activeUserId = user.id
+        this.settings.sync = sync
+        this.unlocked = true
+        this.vaultSessionId = input.initialVault.sessionId
+        this.activeKeyId = input.initialVault.crypto.keyId
+        this.loadActiveUserData(input.initialVault.payload)
+        await upsertEncryptedObjects(
+          user.id,
+          await buildLocalEncryptedObjectRecords({
+            sessionId: input.initialVault.sessionId,
+            keyId: input.initialVault.crypto.keyId,
+            vaults: input.initialVault.payload.vaults,
+            items: input.initialVault.payload.items,
+            attachments: input.initialVault.payload.attachments
+          })
+        )
+        const secretKeyStorage = await saveAndVerifySecretKey(user.id, input.secretKey)
+        if (secretKeyStorage === 'failed') {
+          this.storageError = 'secret-key-save-verification-failed'
+        }
+        this.clearOfficialLoginState()
+        try {
+          await this.persist({ throwOnError: true })
+        } catch {
+          await this.hydrate()
+          throw new Error('local-user-save-failed')
+        }
+        return {
+          user,
+          secretKey: input.secretKey,
+          secretKeyStorage
+        }
+      })
     },
     async restoreServerAccount(input: RestoreServerAccountPayload): Promise<void> {
-      const existing = this.users.find((user) => user.sync?.accountId === input.exchange.account.id)
-      if (existing?.crypto) {
-        throw new Error('duplicate-username')
-      }
-
-      const client = new SyncApiClient(input.exchange.serverUrl)
-      const syncSpace = await ensureSyncSpace(
-        client,
-        input.exchange.deviceToken,
-        input.exchange.account.email ?? input.exchange.account.displayName
-      )
-      const snapshot = await client.snapshot(input.exchange.deviceToken, syncSpace.id)
-      const wrappedVaultKey = snapshot.wrappedVaultKeys?.[0] as
-        | {
-          vaultId: string
-          keyId: string
-          kdfParams: DesktopUserCrypto['kdfParams']
-          wrappedVaultKey: DesktopUserCrypto['wrappedVaultKey']
+      return withServerAccountSetupLock(input.exchange.account.id, 'restore', async () => {
+        const existing = findServerAccountUser(this.users, input.exchange.account.id)
+        if (existing?.crypto) {
+          throw new Error('duplicate-username')
         }
-        | undefined
-      if (!wrappedVaultKey) {
-        throw new Error('serverVaultKeyMissing')
-      }
+        if (!existing && this.unlocked) {
+          try {
+            await this.persist({ throwOnError: true })
+          } catch {
+            throw new Error('local-user-save-failed')
+          }
+        }
 
-      const userId = input.exchange.account.id
-      const userCrypto: DesktopUserCrypto = {
-        keyId: wrappedVaultKey.keyId,
-        kdfParams: wrappedVaultKey.kdfParams,
-        wrappedVaultKey: wrappedVaultKey.wrappedVaultKey
-      }
-      const unlocked = await unlockUserCrypto(userId, input.password, input.secretKey, userCrypto)
-      const remotePayload: DesktopVaultPayload = { vaults: [], items: [], attachments: [] }
-      for (const object of snapshot.objects) {
-        await applyRemoteSyncObject(remotePayload, object, unlocked.sessionId)
-      }
-      const payload = ensurePayloadHasVault(remotePayload, input.exchange.device.id, this.settings.locale)
-      const now = new Date().toISOString()
-      const sync = normalizeSyncSettings({
-        mode: input.exchange.mode,
-        serverUrl: input.exchange.serverUrl,
-        syncSpaceId: syncSpace.id,
-        accountId: input.exchange.account.id,
-        accountLabel: input.exchange.account.email ?? input.exchange.account.displayName,
-        deviceId: input.exchange.device.id,
-        cursor: snapshot.snapshotCursor,
-        connectedAt: now,
-        lastSyncAt: now
-      })
-      const user: DesktopUserProfile = {
-        id: userId,
-        username: normalizeUsername(input.exchange.account.email ?? input.exchange.account.displayName ?? userId),
-        displayName: input.exchange.account.email ?? input.exchange.account.displayName ?? userId,
-        createdAt: now,
-        updatedAt: now,
-        sync,
-        crypto: userCrypto
-      }
+        const client = new SyncApiClient(input.exchange.serverUrl)
+        const syncSpace = await ensureSyncSpace(
+          client,
+          input.exchange.deviceToken,
+          input.exchange.account.email ?? input.exchange.account.displayName
+        )
+        const snapshot = await client.snapshot(input.exchange.deviceToken, syncSpace.id)
+        const wrappedVaultKey = snapshot.wrappedVaultKeys?.[0] as
+          | {
+            vaultId: string
+            keyId: string
+            kdfParams: DesktopUserCrypto['kdfParams']
+            wrappedVaultKey: DesktopUserCrypto['wrappedVaultKey']
+          }
+          | undefined
+        if (!wrappedVaultKey) {
+          throw new Error('serverVaultKeyMissing')
+        }
 
-      const secretKeyStorage = await saveAndVerifySecretKey(user.id, input.secretKey)
-      if (input.requireSecretKeyStorage && secretKeyStorage !== 'saved') {
-        throw new Error('secretKeyStorageRequired')
-      }
-
-      await saveSyncDeviceToken(user.id, input.exchange.deviceToken)
-      this.users = existing
-        ? this.users.map((candidate) => (candidate.id === existing.id ? user : candidate))
-        : [...this.users, user]
-      await this.closeCurrentVaultSession()
-      this.activeUserId = user.id
-      this.settings.sync = sync
-      this.unlocked = true
-      this.vaultSessionId = unlocked.sessionId
-      this.activeKeyId = userCrypto.keyId
-      this.loadActiveUserData(payload)
-      await upsertEncryptedObjects(
-        user.id,
-        await buildLocalEncryptedObjectRecords({
-          sessionId: unlocked.sessionId,
-          keyId: userCrypto.keyId,
-          vaults: payload.vaults,
-          items: payload.items,
-          attachments: payload.attachments
+        const userId = input.exchange.account.id
+        const userCrypto: DesktopUserCrypto = {
+          keyId: wrappedVaultKey.keyId,
+          kdfParams: wrappedVaultKey.kdfParams,
+          wrappedVaultKey: wrappedVaultKey.wrappedVaultKey
+        }
+        const unlocked = await unlockUserCrypto(userId, input.password, input.secretKey, userCrypto)
+        const remotePayload: DesktopVaultPayload = { vaults: [], items: [], attachments: [] }
+        for (const object of snapshot.objects) {
+          await applyRemoteSyncObject(remotePayload, object, unlocked.sessionId)
+        }
+        const payload = ensurePayloadHasVault(remotePayload, input.exchange.device.id, this.settings.locale)
+        const now = new Date().toISOString()
+        const sync = normalizeSyncSettings({
+          mode: input.exchange.mode,
+          serverUrl: input.exchange.serverUrl,
+          syncSpaceId: syncSpace.id,
+          accountId: input.exchange.account.id,
+          accountLabel: input.exchange.account.email ?? input.exchange.account.displayName,
+          deviceId: input.exchange.device.id,
+          cursor: snapshot.snapshotCursor,
+          connectedAt: now,
+          lastSyncAt: now
         })
-      )
-      this.clearOfficialLoginState()
-      await this.persist()
+        const user: DesktopUserProfile = {
+          id: userId,
+          username: normalizeUsername(input.exchange.account.email ?? input.exchange.account.displayName ?? userId),
+          displayName: input.exchange.account.email ?? input.exchange.account.displayName ?? userId,
+          createdAt: existing?.createdAt ?? now,
+          updatedAt: now,
+          sync,
+          crypto: userCrypto
+        }
+
+        const secretKeyStorage = await saveAndVerifySecretKey(user.id, input.secretKey)
+        if (input.requireSecretKeyStorage && secretKeyStorage !== 'saved') {
+          throw new Error('secretKeyStorageRequired')
+        }
+
+        await saveSyncDeviceToken(user.id, input.exchange.deviceToken)
+        this.users = upsertServerAccountUser(this.users, user)
+        await this.closeCurrentVaultSession()
+        this.activeUserId = user.id
+        this.settings.sync = sync
+        this.unlocked = true
+        this.vaultSessionId = unlocked.sessionId
+        this.activeKeyId = userCrypto.keyId
+        this.loadActiveUserData(payload)
+        await upsertEncryptedObjects(
+          user.id,
+          await buildLocalEncryptedObjectRecords({
+            sessionId: unlocked.sessionId,
+            keyId: userCrypto.keyId,
+            vaults: payload.vaults,
+            items: payload.items,
+            attachments: payload.attachments
+          })
+        )
+        this.clearOfficialLoginState()
+        try {
+          await this.persist({ throwOnError: true })
+        } catch {
+          await this.hydrate()
+          throw new Error('local-user-save-failed')
+        }
+      })
     },
     async applySyncExchange(mode: SyncMode, serverUrl: string, exchange: SyncDeviceBindResponse): Promise<void> {
       const user = this.activeUser

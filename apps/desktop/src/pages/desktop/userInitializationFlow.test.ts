@@ -123,6 +123,16 @@ assert.match(
 );
 assert.match(
   vaultStore,
+  /withServerAccountSetupLock\(input\.exchange\.account\.id, '(?:create|restore)'/,
+  "server account setup should serialize repeated callbacks",
+);
+assert.match(
+  vaultStore,
+  /persist\(\{ throwOnError: true \}\)/,
+  "account setup should stop when local user metadata cannot be saved",
+);
+assert.match(
+  vaultStore,
   /async lock\(\): Promise<void> \{[\s\S]*await this\.closeCurrentVaultSession\(\)/,
   "locking should destroy the active vault-key session",
 );

@@ -122,6 +122,7 @@ const zhCN = {
     passwordTooShort: "主密码至少需要 8 位",
     passwordMismatch: "两次输入的主密码不一致",
     duplicateUsername: "这个用户名已经存在",
+    localAccountSaveFailed: "本机账号数据保存失败，请重试。",
     usernameRequired: "请输入用户名",
     wrongPassword: "主密码不正确",
     wrongUnlockSecret: "主密码或安全密钥不正确",

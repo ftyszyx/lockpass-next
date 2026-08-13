@@ -218,6 +218,7 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
     password: string;
     secretKey: string;
   }): Promise<void> {
+    if (creatingUser.value) return;
     if (!pendingServerExchange.value) {
       authError.value = input.t("sync.syncOfficialAuthorizationMissing");
       return;
@@ -242,6 +243,8 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
           ? input.t("user.serverVaultKeyMissing")
           : message === "secretKeyStorageRequired"
             ? input.t("user.secretKeySaveFailed")
+          : message === "local-user-save-failed"
+            ? input.t("user.localAccountSaveFailed")
           : message === "duplicate-username"
             ? input.t("user.duplicateUsername")
             : input.t("user.wrongUnlockSecret");
@@ -251,6 +254,7 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
   }
 
   async function createUser(): Promise<void> {
+    if (creatingUser.value) return;
     const validationError = validateUserDraft();
     authError.value = validationError;
     if (validationError) {
@@ -295,6 +299,8 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
       authError.value =
         error instanceof Error && error.message === "duplicate-username"
           ? input.t("user.duplicateUsername")
+          : error instanceof Error && error.message === "local-user-save-failed"
+            ? input.t("user.localAccountSaveFailed")
           : error instanceof Error
             ? error.message
             : String(error);

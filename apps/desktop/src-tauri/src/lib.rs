@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -2486,8 +2487,14 @@ fn validate_vault_store(data: &serde_json::Value) -> Result<(), String> {
         .get("users")
         .and_then(serde_json::Value::as_array)
         .ok_or_else(|| "vault store users must be an array".to_string())?;
+    let mut user_ids = HashSet::with_capacity(users.len());
 
     for user in users {
+        let user_id = required_string_field(user, "id")?;
+        if !user_ids.insert(user_id) {
+            return Err(format!("vault store contains duplicate user id: {user_id}"));
+        }
+
         if user.get("passwordAuth").is_some()
             || user.get("vaults").is_some()
             || user.get("items").is_some()
@@ -2985,6 +2992,29 @@ mod tests {
         let error =
             validate_vault_store(&store).expect_err("legacy encrypted payload must be rejected");
         assert!(error.contains("encryptedPayload"));
+    }
+
+    #[test]
+    fn vault_store_rejects_duplicate_user_ids() {
+        let mut store = vault_store_with_fast_unlock(json!({
+            "version": 1,
+            "alg": "AES-256-GCM",
+            "keyId": "device-key-1",
+            "nonce": "nonce",
+            "aad": {
+                "purpose": "device-wrap-vault-key-v1"
+            },
+            "ciphertext": "ciphertext",
+            "tag": "tag"
+        }));
+        let duplicate = store["users"][0].clone();
+        store["users"]
+            .as_array_mut()
+            .expect("users should be an array")
+            .push(duplicate);
+
+        let error = validate_vault_store(&store).expect_err("duplicate user ids must be rejected");
+        assert_eq!(error, "vault store contains duplicate user id: user-1");
     }
 
     #[test]
