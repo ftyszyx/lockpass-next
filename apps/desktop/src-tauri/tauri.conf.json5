@@ -4,7 +4,7 @@
 
   // 产品名会影响安装包名称、系统安装信息和部分系统展示名称。
   productName: 'LockPass',
-  version: '0.0.109',
+  version: '0.0.110',
   identifier: 'com.lockpass.next',
 
   build: {
