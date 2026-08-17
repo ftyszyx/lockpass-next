@@ -23,7 +23,7 @@ export async function cleanupLocalSecretsForUser(user: DesktopUserProfile, stora
     user.crypto?.fastUnlock
       ? deleteDeviceUnlockKey(
           user.crypto.fastUnlock.accountId,
-          user.id,
+          user.crypto.fastUnlock.userId,
           user.crypto.fastUnlock.deviceId,
           user.crypto.fastUnlock.deviceKeyId
         )

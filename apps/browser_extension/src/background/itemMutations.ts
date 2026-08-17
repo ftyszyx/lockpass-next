@@ -33,8 +33,14 @@ export async function saveExtensionVaultItem(
   if (input.editingItemId && !existing) throw new Error('item-not-found')
   if (!existing && input.type === 'attachment') throw new Error('attachment-create-unsupported')
 
-  const session = requireActiveExtensionVaultSession(state.account.id)
-  const deviceToken = await loadEncryptedDeviceToken(state.account.id)
+  const session = requireActiveExtensionVaultSession(
+    state.account.serverUrl,
+    state.account.id
+  )
+  const deviceToken = await loadEncryptedDeviceToken(
+    state.account.serverUrl,
+    state.account.id
+  )
   if (!deviceToken) throw new Error('device-authorization-missing')
 
   const item = buildExtensionVaultItem(input, existing, state.account.deviceId)
@@ -42,6 +48,7 @@ export async function saveExtensionVaultItem(
   const vaultId = requireServerUuidFromLocalId(item.vaultId)
   const payload = withCleanItemSync(item, item.sync.revision)
   const encryptedPayload = await encryptExtensionVaultObject(
+    state.account.serverUrl,
     state.account.id,
     {
       objectType: 'vault_item',

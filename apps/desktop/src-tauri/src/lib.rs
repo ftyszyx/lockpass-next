@@ -45,6 +45,9 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     WTS_SESSION_LOCK,
 };
 
+mod app_window;
+mod global_shortcuts;
+
 mod app_meta_migrations {
     use refinery::embed_migrations;
     embed_migrations!("./migrations/app_meta");
@@ -316,7 +319,15 @@ fn read_desktop_log(app: AppHandle, max_bytes: Option<u64>) -> Result<String, St
 }
 
 #[tauri::command]
-fn check_global_shortcut(shortcut: String) -> Result<&'static str, String> {
+fn check_global_shortcut(
+    app: AppHandle,
+    state: tauri::State<'_, global_shortcuts::GlobalShortcutState>,
+    shortcut: String,
+) -> Result<&'static str, String> {
+    if global_shortcuts::is_registered(&app, &state, &shortcut) {
+        return Ok("available");
+    }
+
     #[cfg(target_os = "windows")]
     {
         let (modifiers, key_code) = parse_windows_hotkey(&shortcut)?;
@@ -393,7 +404,7 @@ fn normalize_log_message(message: &str) -> Result<String, String> {
 }
 
 #[cfg(target_os = "windows")]
-fn parse_windows_hotkey(shortcut: &str) -> Result<(u32, u32), String> {
+pub(crate) fn parse_windows_hotkey(shortcut: &str) -> Result<(u32, u32), String> {
     let mut modifiers = MOD_NOREPEAT;
     let mut key_code = None;
 
@@ -2610,10 +2621,14 @@ fn set_main_window_title(app: &tauri::App) {
 pub fn run() {
     tauri::Builder::default()
         .manage(PendingDeepLinks::default())
+        .manage(global_shortcuts::GlobalShortcutState::default())
+        .manage(app_window::QuickSearchWindowState::default())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             capture_deep_link_urls(app, argv);
+            app_window::show_main_window(app);
             let _ = app.emit("lockpassnew://single-instance", ());
         }))
         .setup(|app| {
@@ -2622,10 +2637,12 @@ pub fn run() {
             #[cfg(target_os = "windows")]
             start_system_session_lock_listener(app.handle().clone());
             set_main_window_title(app);
+            app_window::setup(app)?;
             let _ = app.deep_link().register("lockpassnew");
             capture_deep_link_urls(&app.handle().clone(), std::env::args());
             Ok(())
         })
+        .on_window_event(app_window::handle_window_event)
         .invoke_handler(tauri::generate_handler![
             desktop_status,
             lock_vault,
@@ -2640,6 +2657,16 @@ pub fn run() {
             write_desktop_log,
             read_desktop_log,
             check_global_shortcut,
+            app_window::show_desktop_window,
+            app_window::hide_desktop_window,
+            app_window::show_quick_search_window,
+            app_window::set_quick_search_payload,
+            app_window::quick_search_payload,
+            app_window::close_quick_search_window,
+            app_window::clear_quick_search_payload,
+            global_shortcuts::replace_global_shortcuts,
+            global_shortcuts::stop_global_shortcuts,
+            global_shortcuts::take_pending_global_shortcuts,
             load_start_on_login,
             set_start_on_login,
             take_pending_deep_links,
@@ -2677,7 +2704,10 @@ where
     }
 
     #[cfg(debug_assertions)]
-    eprintln!("[deep-link] received {} lockpassnew callback(s)", urls.len());
+    eprintln!(
+        "[deep-link] received {} lockpassnew callback(s)",
+        urls.len()
+    );
 
     if let Some(pending) = app.try_state::<PendingDeepLinks>() {
         if let Ok(mut pending_urls) = pending.urls.lock() {
@@ -2690,10 +2720,7 @@ where
     }
 
     let _ = app.emit(DEEP_LINK_EVENT, urls);
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.show();
-        let _ = window.set_focus();
-    }
+    app_window::show_main_window(app);
 }
 
 fn collect_deep_link_urls<I, S>(args: I) -> Vec<String>

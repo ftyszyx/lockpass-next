@@ -9,6 +9,7 @@ import {
 } from "@lucide/vue";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { configuredOfficialApiUrl } from "@/services/appConfig";
 import type { SyncMode } from "@/services/syncClient";
 import { openExternalUrl } from "@/services/vaultRepository";
 import { useVaultStore } from "@/stores/vault";
@@ -26,6 +27,15 @@ const syncMode = ref<SyncMode>(vaultStore.settings.sync.mode);
 const syncServerUrl = ref(vaultStore.settings.sync.serverUrl);
 const syncBusy = ref(false);
 const syncErrorKey = ref("");
+const officialServerOptionLabel = computed(
+  () => `${t("sync.officialHosted")} · ${configuredOfficialApiUrl()}`,
+);
+const selfHostedServerOptionLabel = computed(() => {
+  const serverUrl = syncServerUrl.value.trim();
+  return serverUrl
+    ? `${t("sync.selfHosted")} · ${serverUrl}`
+    : t("sync.selfHosted");
+});
 const syncConnected = computed(() => vaultStore.syncConnected);
 const officialLoginInProgress = computed(
   () => vaultStore.officialLogin.inProgress,
@@ -244,8 +254,8 @@ function syncErrorMessageKey(error: unknown): string {
           class="form-input"
           :disabled="syncBusy || syncConnected"
         >
-          <option value="official">{{ t("sync.officialHosted") }}</option>
-          <option value="selfhost">{{ t("sync.selfHosted") }}</option>
+          <option value="official">{{ officialServerOptionLabel }}</option>
+          <option value="selfhost">{{ selfHostedServerOptionLabel }}</option>
         </select>
       </label>
 

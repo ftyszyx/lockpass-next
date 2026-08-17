@@ -198,6 +198,8 @@ const zhCN = {
     globalConflictHint: "全局快捷键至少需要两个修饰键。",
     duplicateConflict: "已和「{action}」重复。",
     systemConflict: "这个全局快捷键可能已被系统或其他程序占用。",
+    registrationFailed: "部分全局快捷键已被占用，无法启用。",
+    actionFailed: "无法完成全局快捷键操作。",
     globalShortcutInvalid: "全局快捷键至少需要两个修饰键。",
     internalShortcutInvalid: "软件内快捷键需要至少一个修饰键，或使用 F1-F24。",
     actions: {
@@ -316,6 +318,7 @@ const zhCN = {
     importBrowserCsv: "导入浏览器 CSV",
     sortNewestFirst: "最新在前",
     sortOldestFirst: "最早在前",
+    vaultContext: "保险库：{name}",
   },
   detail: {
     favorite: "收藏",
@@ -635,6 +638,10 @@ const zhCN = {
     placeholder: "输入名称、账号、网址",
     copy: "复制",
     empty: "没有匹配条目",
+    back: "返回搜索结果",
+    close: "关闭快捷搜索",
+    results: "搜索结果",
+    viewDetails: "查看详情",
   },
   lock: {
     title: "解锁保险库",
@@ -666,6 +673,7 @@ const zhCN = {
     previewImage: "预览图片",
   },
   toast: {
+    searchLoadFailed: "无法加载全部保险库，搜索结果可能不完整",
     loaded: "已读取本地数据",
     vaultCreated: "已创建保险库：{name}",
     itemCreated: "条目已保存到本地保险库",

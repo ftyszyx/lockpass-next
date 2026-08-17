@@ -9,7 +9,7 @@
     "package:store": "npm run verify && node scripts/package-store.mjs",
     "typecheck": "vue-tsc --noEmit",
     "lint": "vue-tsc --noEmit",
-    "test": "node src/locales/registry.test.ts && node src/content/contentLocale.test.ts && node src/content/fieldClassifier.test.ts && node src/services/originMatcher.test.ts && node src/services/extensionAuthorization.test.ts && node src/services/extensionServer.test.ts && node src/background/itemMutationModel.test.ts && node src/sidepanel/itemEditorModel.test.ts",
+    "test": "node src/locales/registry.test.ts && node src/content/contentLocale.test.ts && node src/content/fieldClassifier.test.ts && node src/services/originMatcher.test.ts && node src/services/extensionAuthorization.test.ts && node src/services/extensionServer.test.ts && node src/background/accountScope.test.ts && node src/background/itemMutationModel.test.ts && node src/sidepanel/itemEditorModel.test.ts",
     "verify": "npm run test && npm run build && node scripts/verify-build.mjs"
   },
   "dependencies": {

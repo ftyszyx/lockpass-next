@@ -100,6 +100,13 @@ interface LegacyDecodedUser {
   sourceKey: string
 }
 
+export interface DecodedLegacyItem {
+  vaultItemType: string
+  name: string
+  info: Record<string, unknown>
+  remarks: string
+}
+
 const BACKUP_FORMAT = 'lockpass-next-backup'
 
 export function assertBackupPackage(value: unknown): LockPassBackupPackageV1 {
@@ -452,44 +459,57 @@ async function legacyItemToImportItem(
   const info = parseJsonObject(infoText)
   const remarks = remarksText.trim()
 
+  return legacyDecodedItemToImportItem({
+    vaultItemType: item.vaultItemType,
+    name: item.name,
+    info,
+    remarks
+  }, labels)
+}
+
+export function legacyDecodedItemToImportItem(
+  item: DecodedLegacyItem,
+  labels: ImportFieldLabelMap
+): ExternalImportItem {
   if (item.vaultItemType === 'card') {
     return {
       type: 'payment-card',
-      title: item.name || textValue(info.card_company) || textValue(info.card_holder) || 'Payment card',
-      notes: remarks,
+      title: item.name || textValue(item.info.card_company) || textValue(item.info.card_holder) || 'Payment card',
+      notes: '',
       urls: [],
       fields: compactFields([
-        makeImportField('cardholder', labels.cardholder, textValue(info.card_holder), false),
-        makeImportField('card-number', labels.cardNumber, textValue(info.card_number), true),
-        makeImportField('expiry', labels.expiry, textValue(info.card_valid_time), false),
-        makeImportField('cvv', labels.cvv, textValue(info.card_cvc), true),
-        makeImportField('password', labels.password, textValue(info.card_password), true)
+        makeImportField('cardholder', labels.cardholder, textValue(item.info.card_holder), false),
+        makeImportField('card-number', labels.cardNumber, textValue(item.info.card_number), true),
+        makeImportField('expiry', labels.expiry, textValue(item.info.card_valid_time), false),
+        makeImportField('cvv', labels.cvv, textValue(item.info.card_cvc), true),
+        makeImportField('password', labels.password, textValue(item.info.card_password), true),
+        makeImportField('note', labels.note, item.remarks, false)
       ])
     }
   }
 
   if (item.vaultItemType === 'note') {
-    const noteText = textValue(info.note_text) || remarks
+    const noteText = textValue(item.info.note_text) || item.remarks
     return {
       type: 'secure-note',
       title: item.name || noteText.slice(0, 48) || 'Secure note',
       notes: noteText,
       urls: [],
-      fields: compactFields([makeImportField('note', labels.note, noteText, false)])
+      fields: []
     }
   }
 
-  const urls = arrayValue(info.urls)
+  const urls = arrayValue(item.info.urls)
   return {
     type: 'login',
-    title: item.name || urls[0] || textValue(info.username) || 'Imported login',
-    notes: remarks,
+    title: item.name || urls[0] || textValue(item.info.username) || 'Imported login',
+    notes: '',
     urls,
     fields: compactFields([
       makeImportField('url', labels.url, urls[0] ?? '', false),
-      makeImportField('username', labels.username, textValue(info.username), false),
-      makeImportField('password', labels.password, textValue(info.password), true),
-      makeImportField('note', labels.note, remarks, false)
+      makeImportField('username', labels.username, textValue(item.info.username), false),
+      makeImportField('password', labels.password, textValue(item.info.password), true),
+      makeImportField('note', labels.note, item.remarks, false)
     ])
   }
 }

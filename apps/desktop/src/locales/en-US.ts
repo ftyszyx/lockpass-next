@@ -217,6 +217,9 @@ const enUS: LocaleMessages = {
     duplicateConflict: "Already used by “{action}”.",
     systemConflict:
       "This global shortcut may already be used by the system or another app.",
+    registrationFailed:
+      "Some global shortcuts could not be enabled because they are already in use.",
+    actionFailed: "The global shortcut action could not be completed.",
     globalShortcutInvalid: "Global shortcuts need at least two modifiers.",
     internalShortcutInvalid:
       "In-app shortcuts need at least one modifier, or use F1-F24.",
@@ -345,6 +348,7 @@ const enUS: LocaleMessages = {
     importBrowserCsv: "Import browser CSV",
     sortNewestFirst: "Newest first",
     sortOldestFirst: "Oldest first",
+    vaultContext: "Vault: {name}",
   },
   detail: {
     favorite: "Favorite",
@@ -687,6 +691,10 @@ const enUS: LocaleMessages = {
     placeholder: "Search name, account, or URL",
     copy: "Copy",
     empty: "No matching items",
+    back: "Back to search results",
+    close: "Close quick search",
+    results: "Search results",
+    viewDetails: "View details",
   },
   lock: {
     title: "Unlock vault",
@@ -719,6 +727,7 @@ const enUS: LocaleMessages = {
     previewImage: "Preview image",
   },
   toast: {
+    searchLoadFailed: "Unable to load every vault. Search results may be incomplete.",
     loaded: "Local data loaded",
     vaultCreated: "Created vault: {name}",
     itemCreated: "Item saved to local vault",

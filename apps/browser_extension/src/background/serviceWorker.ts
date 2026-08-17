@@ -122,7 +122,10 @@ async function handleRequest(message: ExtensionRequest, sender: chrome.runtime.M
 async function loadConsistentPanelState() {
   const state = await loadPanelState()
   if (!state.unlocked) return state
-  if (state.account && hasActiveExtensionVaultSession(state.account.id)) return state
+  if (
+    state.account
+    && hasActiveExtensionVaultSession(state.account.serverUrl, state.account.id)
+  ) return state
 
   await lockExtension()
   return loadPanelState()

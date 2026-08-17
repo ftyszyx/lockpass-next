@@ -126,6 +126,21 @@ export function shortcutMatchesEvent(shortcut: string, event: KeyboardEvent): bo
   return normalizeShortcut(shortcut) === formatShortcutFromEvent(event)
 }
 
+export function toTauriGlobalShortcut(shortcut: string): string {
+  return normalizeShortcut(shortcut)
+    .split('+')
+    .map((token) => {
+      if (token === 'Ctrl') return 'Control'
+      if (token === 'Win') return 'Super'
+      if (token === 'Up') return 'ArrowUp'
+      if (token === 'Down') return 'ArrowDown'
+      if (token === 'Left') return 'ArrowLeft'
+      if (token === 'Right') return 'ArrowRight'
+      return token
+    })
+    .join('+')
+}
+
 async function checkGlobalShortcutAvailability(shortcut: string): Promise<'available' | 'unavailable' | 'unsupported'> {
   if (!isTauriRuntime()) return 'unsupported'
   try {

@@ -113,6 +113,7 @@ const page = useDesktopPageContext();
     @update:query="page.updateQuickQuery"
     @close="page.closeActiveModal"
     @select-and-copy="page.selectQuickResult"
+    @copy-value="page.copyQuickDetailValue"
   />
 
   <UserManagementModal

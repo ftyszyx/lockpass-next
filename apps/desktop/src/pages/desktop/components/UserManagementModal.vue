@@ -16,8 +16,18 @@ function userDisplayName(user: { displayName: string; username: string }): strin
   return user.displayName || user.username || t('user.currentUser')
 }
 
-function userAccountLabel(user: { username: string; sync?: { accountLabel: string | null } | null }): string {
-  return user.sync?.accountLabel || user.username
+function userAccountLabel(user: {
+  username: string
+  sync?: { accountLabel: string | null; serverUrl: string } | null
+}): string {
+  const accountLabel = user.sync?.accountLabel || user.username
+  if (!user.sync?.serverUrl || !user.sync.accountLabel) return accountLabel
+
+  try {
+    return `${accountLabel} · ${new URL(user.sync.serverUrl).host}`
+  } catch {
+    return `${accountLabel} · ${user.sync.serverUrl}`
+  }
 }
 
 function userInitial(user: { displayName: string; username: string }): string {

@@ -3,6 +3,7 @@ import { Copy, Eye, FolderLock, Image, Paperclip, Pencil, ShieldCheck } from '@l
 import type { VaultAttachment, VaultItem, VaultItemField } from '@lockpass/core'
 import { computed, onBeforeUnmount, reactive } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { fieldsWithoutRedundantLegacyNote } from '@/services/legacyImportRepair'
 import { loadAttachmentFile } from '@/services/vaultRepository'
 import { useVaultStore } from '@/stores/vault'
 import {
@@ -38,7 +39,12 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const vaultStore = useVaultStore()
 const notesText = computed(() => props.selectedItem?.notes || '')
-const noteFields = computed(() => props.selectedItem?.fields.filter((field) => field.kind === 'note') ?? [])
+const noteFields = computed(() => {
+  const item = props.selectedItem
+  return item
+    ? fieldsWithoutRedundantLegacyNote(item).filter((field) => field.kind === 'note')
+    : []
+})
 const preview = reactive({
   visible: false,
   loading: false,

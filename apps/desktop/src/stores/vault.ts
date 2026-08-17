@@ -100,6 +100,11 @@ import {
   upsertServerAccountUser,
   withServerAccountSetupLock
 } from './vault/userProfiles'
+import {
+  cryptoUserIdForConfig,
+  cryptoUserIdForUser,
+  serverAccountLocalUserId
+} from './vault/userIdentity'
 import type {
   AttachmentDraft,
   CreateServerBackedUserPayload,
@@ -142,7 +147,8 @@ import {
   restoreFromSyncSnapshot,
   shouldRepairEmptyLocalSyncState,
   shouldResetLocalObjectsForInitialSync,
-  toServerUuid
+  toServerUuid,
+  uniqueById
 } from './vault/syncObjects'
 import {
   applyPulledSyncObject,
@@ -354,8 +360,12 @@ export const useVaultStore = defineStore('vault', {
       await this.applySyncExchange(exchange.mode, exchange.serverUrl, exchange)
     },
     async createServerBackedUser(input: CreateServerBackedUserPayload): Promise<CreateUserResult> {
-      return withServerAccountSetupLock(input.exchange.account.id, 'create', async () => {
-        const existing = findServerAccountUser(this.users, input.exchange.account.id)
+      return withServerAccountSetupLock(input.exchange.serverUrl, input.exchange.account.id, 'create', async () => {
+        const existing = findServerAccountUser(
+          this.users,
+          input.exchange.serverUrl,
+          input.exchange.account.id
+        )
         if (existing?.crypto) {
           throw new Error('duplicate-username')
         }
@@ -365,6 +375,10 @@ export const useVaultStore = defineStore('vault', {
 
         const now = new Date().toISOString()
         const accountLabel = input.exchange.account.email ?? input.exchange.account.displayName ?? input.exchange.account.id
+        const localUserId = existing?.id ?? await serverAccountLocalUserId(
+          input.exchange.serverUrl,
+          input.exchange.account.id
+        )
         const sync = normalizeSyncSettings({
           mode: input.exchange.mode,
           serverUrl: input.exchange.serverUrl,
@@ -377,7 +391,7 @@ export const useVaultStore = defineStore('vault', {
           lastSyncAt: now
         })
         const user: DesktopUserProfile = {
-          id: input.exchange.account.id,
+          id: localUserId,
           username: normalizeUsername(accountLabel),
           displayName: accountLabel,
           createdAt: existing?.createdAt ?? now,
@@ -424,8 +438,12 @@ export const useVaultStore = defineStore('vault', {
       })
     },
     async restoreServerAccount(input: RestoreServerAccountPayload): Promise<void> {
-      return withServerAccountSetupLock(input.exchange.account.id, 'restore', async () => {
-        const existing = findServerAccountUser(this.users, input.exchange.account.id)
+      return withServerAccountSetupLock(input.exchange.serverUrl, input.exchange.account.id, 'restore', async () => {
+        const existing = findServerAccountUser(
+          this.users,
+          input.exchange.serverUrl,
+          input.exchange.account.id
+        )
         if (existing?.crypto) {
           throw new Error('duplicate-username')
         }
@@ -456,13 +474,21 @@ export const useVaultStore = defineStore('vault', {
           throw new Error('serverVaultKeyMissing')
         }
 
-        const userId = input.exchange.account.id
+        const userId = existing?.id ?? await serverAccountLocalUserId(
+          input.exchange.serverUrl,
+          input.exchange.account.id
+        )
         const userCrypto: DesktopUserCrypto = {
           keyId: wrappedVaultKey.keyId,
           kdfParams: wrappedVaultKey.kdfParams,
           wrappedVaultKey: wrappedVaultKey.wrappedVaultKey
         }
-        const unlocked = await unlockUserCrypto(userId, input.password, input.secretKey, userCrypto)
+        const unlocked = await unlockUserCrypto(
+          cryptoUserIdForConfig(userCrypto, input.exchange.account.id),
+          input.password,
+          input.secretKey,
+          userCrypto
+        )
         const remotePayload: DesktopVaultPayload = { vaults: [], items: [], attachments: [] }
         for (const object of snapshot.objects) {
           await applyRemoteSyncObject(remotePayload, object, unlocked.sessionId)
@@ -801,8 +827,22 @@ export const useVaultStore = defineStore('vault', {
       const now = new Date().toISOString()
       const username = normalizeUsername(input.username)
       const displayName = input.username.trim()
-      const setupUser = this.activeUser && !this.activeUser.crypto ? this.activeUser : null
-      if (this.users.some((user) => user.id !== setupUser?.id && user.username === username)) {
+      const serverAccountUser = input.serverAccount
+        ? findServerAccountUser(
+            this.users,
+            input.serverAccount.serverUrl,
+            input.serverAccount.accountId
+          )
+        : null
+      if (serverAccountUser?.crypto) {
+        throw new Error('duplicate-username')
+      }
+      const setupUser = serverAccountUser
+        ?? (this.activeUser && !this.activeUser.crypto ? this.activeUser : null)
+      if (
+        !input.serverAccount
+        && this.users.some((user) => user.id !== setupUser?.id && user.username === username)
+      ) {
         throw new Error('duplicate-username')
       }
 
@@ -810,7 +850,14 @@ export const useVaultStore = defineStore('vault', {
         await this.persist()
       }
 
-      const userId = setupUser?.id ?? `user-${crypto.randomUUID()}`
+      const userId = setupUser?.id
+        ?? (input.serverAccount
+          ? await serverAccountLocalUserId(
+              input.serverAccount.serverUrl,
+              input.serverAccount.accountId
+            )
+          : `user-${crypto.randomUUID()}`)
+      const cryptoUserId = input.serverAccount?.accountId ?? userId
       const legacyPayload = setupUser ? this.legacyPayloads[setupUser.id] : undefined
       const payload = ensurePayloadHasVault(
         {
@@ -821,17 +868,32 @@ export const useVaultStore = defineStore('vault', {
         this.settings.deviceId,
         this.settings.locale
       )
-      const created = await createUserCrypto(userId, input.password, payload, input.secretKey)
+      const created = await createUserCrypto(
+        cryptoUserId,
+        input.password,
+        payload,
+        input.secretKey
+      )
       const migrated = legacyPayload
         ? await migrateLegacyPayload(userId, payload, created.sessionId, created.crypto.keyId)
         : { payload, cleanupRefs: [] }
+      const sync = normalizeSyncSettings({
+        ...(input.sync ?? setupUser?.sync ?? this.settings.sync),
+        ...(input.serverAccount
+          ? {
+              serverUrl: input.serverAccount.serverUrl,
+              accountId: input.serverAccount.accountId,
+              accountLabel: displayName || input.serverAccount.accountId,
+            }
+          : {}),
+      })
       const user: DesktopUserProfile = setupUser
         ? {
             ...setupUser,
             username,
             displayName,
             updatedAt: now,
-            sync: normalizeSyncSettings(input.sync ?? setupUser.sync ?? this.settings.sync),
+            sync,
             crypto: created.crypto
           }
         : {
@@ -840,7 +902,7 @@ export const useVaultStore = defineStore('vault', {
             displayName,
             createdAt: now,
             updatedAt: now,
-            sync: normalizeSyncSettings(input.sync ?? DEFAULT_SYNC_SETTINGS),
+            sync,
             crypto: created.crypto
           }
 
@@ -886,14 +948,24 @@ export const useVaultStore = defineStore('vault', {
       const savedSecretKey = await loadSecretKey(user.id)
       if (savedSecretKey.status !== 'loaded') return savedSecretKey
 
-      await verifyUserCryptoCredentials(user.id, password, savedSecretKey.secretKey, user.crypto)
+      await verifyUserCryptoCredentials(
+        cryptoUserIdForUser(user),
+        password,
+        savedSecretKey.secretKey,
+        user.crypto
+      )
       return savedSecretKey
     },
     async saveSecretKeyForActiveUser(password: string, secretKey: string): Promise<SecretKeyStorageStatus> {
       const user = this.activeUser
       if (!this.unlocked || !user?.crypto) return 'failed'
 
-      await verifyUserCryptoCredentials(user.id, password, secretKey, user.crypto)
+      await verifyUserCryptoCredentials(
+        cryptoUserIdForUser(user),
+        password,
+        secretKey,
+        user.crypto
+      )
 
       return this.saveVerifiedSecretKeyForActiveUser(secretKey)
     },
@@ -937,7 +1009,13 @@ export const useVaultStore = defineStore('vault', {
       const perf = createPerfTrace('unlockActiveUser')
 
       try {
-        const unlocked = await unlockUserCrypto(user.id, password, secretKey, user.crypto, perf)
+        const unlocked = await unlockUserCrypto(
+          cryptoUserIdForUser(user),
+          password,
+          secretKey,
+          user.crypto,
+          perf
+        )
         perf.mark('store.cryptoReady')
         await this.closeCurrentVaultSession()
         this.unlocked = true
@@ -976,6 +1054,7 @@ export const useVaultStore = defineStore('vault', {
       this.unlocked = false
       this.vaultSessionId = null
       this.activeKeyId = null
+      this.query = ''
       this.clearSessionData()
     },
     async switchUser(userId: string) {
@@ -1055,7 +1134,7 @@ export const useVaultStore = defineStore('vault', {
         loadVaultMetadataFromLocalObjects(userId, sessionId, keyId),
         countEncryptedObjectsByVault(userId, 'vault_item')
       ])
-      this.vaults = vaults
+      this.vaults = uniqueById(vaults)
       this.items = []
       this.attachments = []
       this.loadedVaultIds = []
@@ -1069,9 +1148,9 @@ export const useVaultStore = defineStore('vault', {
       this.selectedItemId = this.items.find((item) => !item.sync.deletedAt)?.id ?? null
     },
     loadActiveUserData(payload: DesktopVaultPayload) {
-      this.vaults = payload.vaults ?? []
-      this.items = payload.items ?? []
-      this.attachments = payload.attachments ?? []
+      this.vaults = uniqueById(payload.vaults ?? [])
+      this.items = uniqueById(payload.items ?? [])
+      this.attachments = uniqueById(payload.attachments ?? [])
       this.loadedVaultIds = this.vaults.map((vault) => vault.id)
       this.vaultItemCounts = countItemsByVault(this.items)
       this.selectedItemId = this.items[0]?.id ?? null

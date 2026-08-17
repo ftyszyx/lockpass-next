@@ -1,14 +1,19 @@
 import type { DesktopUserProfile } from '@/services/vaultRepository'
+import {
+  serverAccountIdentityForUser,
+  serverAccountIdentityKey,
+} from './userIdentity'
 
 let serverAccountSetupQueue: Promise<void> = Promise.resolve()
 const serverAccountSetupTasks = new Map<string, Promise<unknown>>()
 
 export function withServerAccountSetupLock<T>(
+  serverUrl: string,
   accountId: string,
   operationName: 'create' | 'restore',
   task: () => Promise<T>,
 ): Promise<T> {
-  const operationKey = `${accountId}:${operationName}`
+  const operationKey = `${serverAccountIdentityKey(serverUrl, accountId)}:${operationName}`
   const existing = serverAccountSetupTasks.get(operationKey)
   if (existing) return existing as Promise<T>
 
@@ -43,11 +48,11 @@ export function deduplicateUserProfiles(users: DesktopUserProfile[]): DesktopUse
 
 export function findServerAccountUser(
   users: DesktopUserProfile[],
+  serverUrl: string,
   accountId: string,
 ): DesktopUserProfile | null {
-  return users.find(
-    (user) => user.id === accountId || user.sync?.accountId === accountId,
-  ) ?? null
+  const identity = serverAccountIdentityKey(serverUrl, accountId)
+  return users.find((user) => serverAccountIdentityForUser(user) === identity) ?? null
 }
 
 export function upsertServerAccountUser(
@@ -55,13 +60,15 @@ export function upsertServerAccountUser(
   user: DesktopUserProfile,
 ): DesktopUserProfile[] {
   const accountId = user.sync?.accountId ?? user.id
-  const existing = findServerAccountUser(users, accountId)
+  const serverUrl = user.sync?.serverUrl ?? ''
+  const identity = serverAccountIdentityForUser(user)
+  const existing = identity ? findServerAccountUser(users, serverUrl, accountId) : null
   const existingIndex = existing ? users.indexOf(existing) : -1
   const next = users.filter(
     (candidate) =>
       candidate.id !== user.id &&
       candidate.id !== existing?.id &&
-      candidate.sync?.accountId !== accountId,
+      (!identity || serverAccountIdentityForUser(candidate) !== identity),
   )
   const nextUser = existing
     ? { ...user, createdAt: existing.createdAt }

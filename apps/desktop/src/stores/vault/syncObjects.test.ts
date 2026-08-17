@@ -4,6 +4,7 @@ import {
   chunkArray,
   countItemsByVault,
   mergeById,
+  uniqueById,
 } from "./syncObjects";
 
 assert.deepEqual(chunkArray([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]]);
@@ -25,6 +26,27 @@ assert.deepEqual(
     { id: "two", value: 20 },
     { id: "three", value: 3 },
   ],
+);
+
+assert.deepEqual(
+  uniqueById([
+    { id: "duplicate", value: 1 },
+    { id: "duplicate", value: 2 },
+  ]),
+  [{ id: "duplicate", value: 2 }],
+  "the latest in-memory copy should replace duplicate object ids",
+);
+
+assert.deepEqual(
+  mergeById(
+    [
+      { id: "duplicate", value: 1 },
+      { id: "duplicate", value: 2 },
+    ],
+    [],
+  ),
+  [{ id: "duplicate", value: 2 }],
+  "merging an empty payload should still repair existing duplicates",
 );
 
 const item = (id: string, vaultId: string, deletedAt: string | null): VaultItem => ({
@@ -54,6 +76,7 @@ const item = (id: string, vaultId: string, deletedAt: string | null): VaultItem 
 
 assert.deepEqual(
   countItemsByVault([
+    item("one", "vault-one", null),
     item("one", "vault-one", null),
     item("two", "vault-one", "2026-01-02T00:00:00.000Z"),
     item("three", "vault-two", null),

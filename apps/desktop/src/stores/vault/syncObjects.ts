@@ -29,14 +29,14 @@ type VaultObject = Vault | VaultItem | VaultAttachment
 export async function buildSyncPushObjects(input: SyncBuildInput): Promise<SyncPushObject[]> {
   const objects: SyncPushObject[] = []
 
-  for (const vault of input.vaults.filter((candidate) => shouldPushSync(candidate.sync))) {
+  for (const vault of uniqueById(input.vaults).filter((candidate) => shouldPushSync(candidate.sync))) {
     const objectId = toServerUuid(vault.id)
     const revision = vault.sync.revision
     const payload = withCleanSync(vault, revision)
     objects.push(await makeSyncPushObject(input, vault.sync, 'vault_metadata', objectId, objectId, payload))
   }
 
-  for (const item of input.items.filter((candidate) => shouldPushSync(candidate.sync))) {
+  for (const item of uniqueById(input.items).filter((candidate) => shouldPushSync(candidate.sync))) {
     const objectId = toServerUuid(item.id)
     const vaultId = toServerUuid(item.vaultId)
     const revision = item.sync.revision
@@ -44,7 +44,7 @@ export async function buildSyncPushObjects(input: SyncBuildInput): Promise<SyncP
     objects.push(await makeSyncPushObject(input, item.sync, 'vault_item', objectId, vaultId, payload))
   }
 
-  for (const attachment of input.attachments.filter((candidate) => shouldPushSync(candidate.sync))) {
+  for (const attachment of uniqueById(input.attachments).filter((candidate) => shouldPushSync(candidate.sync))) {
     const objectId = toServerUuid(attachment.id)
     const vaultId = toServerUuid(attachment.vaultId)
     const revision = attachment.sync.revision
@@ -66,15 +66,15 @@ export interface LocalObjectBuildInput {
 export async function buildLocalEncryptedObjectRecords(input: LocalObjectBuildInput): Promise<EncryptedObjectRecord[]> {
   const records: EncryptedObjectRecord[] = []
 
-  for (const vault of input.vaults) {
+  for (const vault of uniqueById(input.vaults)) {
     records.push(await makeLocalEncryptedObjectRecord(input, vault.sync, 'vault_metadata', vault.id, vault.id, vault))
   }
 
-  for (const item of input.items) {
+  for (const item of uniqueById(input.items)) {
     records.push(await makeLocalEncryptedObjectRecord(input, item.sync, 'vault_item', item.id, item.vaultId, item))
   }
 
-  for (const attachment of input.attachments) {
+  for (const attachment of uniqueById(input.attachments)) {
     records.push(await makeLocalEncryptedObjectRecord(input, attachment.sync, 'vault_attachment', attachment.id, attachment.vaultId, attachment))
   }
 
@@ -418,22 +418,23 @@ function withCleanSync<T extends { sync: SyncMetadata }>(value: T, revision: num
 }
 
 function upsertById<T extends { id: string }>(items: T[], value: T): T[] {
-  return items.some((item) => item.id === value.id)
-    ? items.map((item) => (item.id === value.id ? value : item))
-    : [value, ...items]
+  return mergeById(items, [value])
 }
 
 export function mergeById<T extends { id: string }>(items: T[], values: T[]): T[] {
-  if (values.length === 0) return items
-  const next = new Map(items.map((item) => [item.id, item]))
-  for (const value of values) {
-    next.set(value.id, value)
+  return uniqueById([...items, ...values])
+}
+
+export function uniqueById<T extends { id: string }>(items: T[]): T[] {
+  const next = new Map<string, T>()
+  for (const item of items) {
+    next.set(item.id, item)
   }
   return [...next.values()]
 }
 
 export function countItemsByVault(items: VaultItem[]): Record<string, number> {
-  return items.reduce<Record<string, number>>((counts, item) => {
+  return uniqueById(items).reduce<Record<string, number>>((counts, item) => {
     if (!item.sync.deletedAt) {
       counts[item.vaultId] = (counts[item.vaultId] ?? 0) + 1
     }

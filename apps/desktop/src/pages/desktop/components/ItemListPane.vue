@@ -47,6 +47,12 @@ const sortedItems = computed(() => {
   })
 })
 
+function vaultContextLabel(item: VaultItem): string {
+  if (!vaultStore.query.trim()) return ''
+  const vault = vaultStore.visibleVaults.find((candidate) => candidate.id === item.vaultId)
+  return vault ? t('list.vaultContext', { name: vault.name }) : ''
+}
+
 function selectType(type: (typeof typeFilters)[number]): void {
   vaultStore.selectedType = type
   categoryMenuOpen.value = false
@@ -156,6 +162,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
         :item="item"
         :selected="selectedItem?.id === item.id"
         :type-label="typeLabel(t, item.type)"
+        :context-label="vaultContextLabel(item)"
         @select="emit('selectItem', $event)"
       />
     </div>

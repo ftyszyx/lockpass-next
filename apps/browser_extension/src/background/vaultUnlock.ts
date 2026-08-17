@@ -22,12 +22,13 @@ import {
   type ExtensionWrappedVaultKey
 } from '@/services/extensionSyncClient'
 import type { ExtensionPanelState } from '@/shared/models'
+import { serverAccountStorageScope } from './accountScope'
 
 const cryptoProvider = new WebVaultCryptoProvider()
 let activeVaultSession: ActiveExtensionVaultSession | null = null
 
 export interface ActiveExtensionVaultSession {
-  accountId: string
+  accountScope: string
   sessionId: string
   keyId: string
   syncSpaceId: string
@@ -41,10 +42,13 @@ export async function unlockExtensionVault(input: {
   if (!state.account) throw new Error('account-missing')
   if (!input.password) throw new Error('master-password-required')
 
-  const deviceToken = await loadEncryptedDeviceToken(state.account.id)
+  const deviceToken = await loadEncryptedDeviceToken(state.account.serverUrl, state.account.id)
   if (!deviceToken) throw new Error('device-authorization-missing')
 
-  const storedSecretKey = await loadTrustedSecretKey(state.account.id).catch(() => null)
+  const storedSecretKey = await loadTrustedSecretKey(
+    state.account.serverUrl,
+    state.account.id
+  ).catch(() => null)
   const suppliedSecretKey = input.secretKey?.trim() || ''
   const secretKey = suppliedSecretKey || storedSecretKey
   if (!secretKey) throw new Error('secret-key-required')
@@ -70,10 +74,10 @@ export async function unlockExtensionVault(input: {
     )
     const decrypted = await decryptSnapshot(snapshot.objects, session.sessionId)
     if (!storedSecretKey && suppliedSecretKey) {
-      await saveTrustedSecretKey(state.account.id, suppliedSecretKey)
+      await saveTrustedSecretKey(state.account.serverUrl, state.account.id, suppliedSecretKey)
     }
     activeVaultSession = {
-      accountId: state.account.id,
+      accountScope: serverAccountStorageScope(state.account.serverUrl, state.account.id),
       sessionId: session.sessionId,
       keyId: wrappedVaultKey.keyId,
       syncSpaceId: syncSpace.id
@@ -99,18 +103,23 @@ export async function closeExtensionVaultSession(): Promise<void> {
   activeVaultSession = null
 }
 
-export function requireActiveExtensionVaultSession(accountId: string): ActiveExtensionVaultSession {
-  if (!activeVaultSession || activeVaultSession.accountId !== accountId) {
+export function requireActiveExtensionVaultSession(
+  serverUrl: string,
+  accountId: string
+): ActiveExtensionVaultSession {
+  const accountScope = serverAccountStorageScope(serverUrl, accountId)
+  if (!activeVaultSession || activeVaultSession.accountScope !== accountScope) {
     throw new Error('vault-session-expired')
   }
   return activeVaultSession
 }
 
-export function hasActiveExtensionVaultSession(accountId: string): boolean {
-  return activeVaultSession?.accountId === accountId
+export function hasActiveExtensionVaultSession(serverUrl: string, accountId: string): boolean {
+  return activeVaultSession?.accountScope === serverAccountStorageScope(serverUrl, accountId)
 }
 
 export async function encryptExtensionVaultObject(
+  serverUrl: string,
   accountId: string,
   metadata: {
     objectType: 'vault_item' | 'vault_attachment' | 'vault_metadata'
@@ -120,7 +129,7 @@ export async function encryptExtensionVaultObject(
   },
   payload: unknown
 ): Promise<EncryptedSyncObjectPayload> {
-  const session = requireActiveExtensionVaultSession(accountId)
+  const session = requireActiveExtensionVaultSession(serverUrl, accountId)
   return cryptoProvider.encryptObject(session.sessionId, session.keyId, metadata, payload)
 }
 
@@ -157,7 +166,7 @@ async function unlockCryptoSession(
   }
   try {
     return await cryptoProvider.unlockUser({
-      userId: accountId,
+      userId: wrapped.wrappedVaultKey.aad.userId || accountId,
       password,
       secretKey,
       cryptoConfig

@@ -43,6 +43,10 @@ export interface CreateUserPayload {
   password: string
   secretKey?: string
   sync?: Pick<SyncConnectPayload, 'mode' | 'serverUrl'>
+  serverAccount?: {
+    serverUrl: string
+    accountId: string
+  }
 }
 
 export interface RestoreServerAccountPayload {

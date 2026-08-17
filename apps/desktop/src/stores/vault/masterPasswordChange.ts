@@ -10,6 +10,7 @@ import {
 import { DESKTOP_STORE_SCHEMA_VERSION, snapshotActiveUser } from './model'
 import { syncServerUrlForSettings } from './syncConnection'
 import { toServerUuid } from './syncObjects'
+import { cryptoUserIdForUser } from './userIdentity'
 
 interface ChangeMasterPasswordInput {
   activeUserId: string | null
@@ -39,7 +40,7 @@ export async function changeStoredMasterPassword(
   }
 
   const nextCrypto = await changeUserMasterPassword(
-    input.user.id,
+    cryptoUserIdForUser(input.user),
     input.sessionId,
     input.currentPassword,
     input.newPassword,

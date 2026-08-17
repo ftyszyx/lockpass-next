@@ -8,7 +8,21 @@ import {
   startDeepLinkListener,
   subscribeToDeepLinks,
 } from "@/services/deepLink";
+import {
+  cacheDesktopQuickSearchPayload,
+  clearDesktopQuickSearchPayload,
+  quickSearchItemCopyValue,
+  showDesktopQuickSearchWindow,
+  startDesktopQuickSearchCopyListener,
+  type DesktopQuickSearchCopyRequest,
+} from "@/services/desktopQuickSearch";
 import { openLogDir } from "@/services/logger";
+import {
+  hideDesktopWindow,
+  replaceDesktopGlobalShortcuts,
+  showDesktopWindow,
+  stopDesktopGlobalShortcuts,
+} from "@/services/globalShortcuts";
 import { createPerfTrace } from "@/services/perfTrace";
 import type { SyncMode } from "@/services/syncClient";
 import { shortcutMatchesEvent } from "@/services/shortcuts";
@@ -84,8 +98,10 @@ let clipboardCleanupValue = "";
 let deepLinkUnlisten: (() => void) | null = null;
 let deepLinkListenerStop: (() => void) | null = null;
 let systemSessionLockStop: (() => void) | null = null;
+let quickSearchCopyStop: (() => void) | null = null;
 let autoLockTimer: number | null = null;
 let autoSyncTimer: number | null = null;
+let globalSearchLoad: Promise<void> | null = null;
 
 const toast = reactive<ToastState>({ visible: false, message: "" });
 const operationProgress = reactive({
@@ -356,6 +372,7 @@ provide(
     confirmDeleteVault,
     confirmSwitchUser,
     copySavedBackupPath,
+    copyQuickDetailValue,
     copyValue,
     createBackup,
     createUser,
@@ -436,6 +453,11 @@ provide(
 
 onMounted(async () => {
   await initializeVaultPage();
+  await refreshDesktopQuickSearchPayload();
+  quickSearchCopyStop = await startDesktopQuickSearchCopyListener(
+    handleDesktopQuickSearchCopy,
+  );
+  await refreshGlobalShortcuts(true);
   systemSessionLockStop = await startSystemSessionLockListener(
     handleSystemSessionLock,
   );
@@ -498,6 +520,9 @@ onUnmounted(() => {
   deepLinkListenerStop = null;
   systemSessionLockStop?.();
   systemSessionLockStop = null;
+  quickSearchCopyStop?.();
+  quickSearchCopyStop = null;
+  void stopDesktopGlobalShortcuts();
 });
 
 watch(
@@ -508,6 +533,29 @@ watch(
 watch(
   () => vaultStore.settings.theme,
   (theme) => applyColorTheme(theme),
+);
+
+watch(
+  [
+    visibleItems,
+    visibleAttachments,
+    () => vaultStore.unlocked,
+    () => vaultStore.settings.locale,
+    () => vaultStore.settings.theme,
+  ] as const,
+  () => {
+    void refreshDesktopQuickSearchPayload();
+  },
+  { flush: "post" },
+);
+
+watch(
+  [() => vaultStore.query.trim(), () => vaultStore.unlocked] as const,
+  ([query, unlocked]) => {
+    if (!query || !unlocked) return;
+    void ensureGlobalSearchDataLoaded();
+  },
+  { flush: "post" },
 );
 
 watch(
@@ -522,15 +570,101 @@ watch(
   { flush: "post" },
 );
 
+function ensureGlobalSearchDataLoaded(): Promise<void> {
+  const hasMissingVaults = vaultStore.visibleVaults.some(
+    (vault) => !vaultStore.loadedVaultIds.includes(vault.id),
+  );
+  if (!hasMissingVaults) return Promise.resolve();
+  if (globalSearchLoad) return globalSearchLoad;
+
+  globalSearchLoad = vaultStore
+    .ensureAllVaultObjectsLoaded()
+    .catch(() => {
+      showToast(t("toast.searchLoadFailed"));
+    })
+    .finally(() => {
+      globalSearchLoad = null;
+    });
+  return globalSearchLoad;
+}
+
+async function refreshDesktopQuickSearchPayload(): Promise<void> {
+  try {
+    if (!vaultStore.unlocked) {
+      await clearDesktopQuickSearchPayload();
+      return;
+    }
+
+    await cacheDesktopQuickSearchPayload({
+      items: visibleItems.value,
+      attachments: visibleAttachments.value,
+      query: "",
+      locale: vaultStore.settings.locale,
+      theme: vaultStore.settings.theme,
+    });
+  } catch {
+    // The main page remains usable if the standalone window is unavailable.
+  }
+}
+
 function selectItem(item: VaultItem): void {
+  if (
+    vaultStore.query.trim() &&
+    vaultStore.selectedVaultId !== "all" &&
+    vaultStore.selectedVaultId !== item.vaultId
+  ) {
+    vaultStore.selectedVaultId = item.vaultId;
+  }
   vaultStore.selectItem(item.id);
   showSensitive.value = false;
   activeTab.value = "details";
 }
 
-function openQuickSearch(): void {
+async function openQuickSearch(): Promise<void> {
   quickQuery.value = vaultStore.query;
+  await ensureGlobalSearchDataLoaded();
+
+  try {
+    const opened = await showDesktopQuickSearchWindow({
+      items: visibleItems.value,
+      attachments: visibleAttachments.value,
+      query: quickQuery.value,
+      locale: vaultStore.settings.locale,
+      theme: vaultStore.settings.theme,
+    });
+    if (opened) {
+      activeModal.value = null;
+      return;
+    }
+  } catch {
+    await showDesktopWindow();
+  }
+
   activeModal.value = "quick";
+}
+
+async function refreshGlobalShortcuts(notifyFailure: boolean): Promise<boolean> {
+  const result = await replaceDesktopGlobalShortcuts(
+    vaultStore.settings.shortcuts.global,
+    {
+      quickSearch: handleGlobalQuickSearch,
+      lock: lockApp,
+      showMainWindow: showDesktopWindow,
+      hideMainWindow: hideDesktopWindow,
+    },
+    () => showToast(t("shortcuts.actionFailed")),
+  );
+  if (result.failedActions.length === 0) return true;
+  if (notifyFailure) showToast(t("shortcuts.registrationFailed"));
+  return false;
+}
+
+async function handleGlobalQuickSearch(): Promise<void> {
+  if (!vaultStore.hydrated || !vaultStore.unlocked) {
+    await showDesktopWindow();
+    return;
+  }
+  await openQuickSearch();
 }
 
 function resetVaultDraft(): void {
@@ -541,6 +675,7 @@ function resetVaultDraft(): void {
 }
 
 function clearSensitiveUiState(): void {
+  void clearDesktopQuickSearchPayload();
   activeDrawer.value = null;
   activeManagementPage.value = null;
   quickQuery.value = "";
@@ -774,7 +909,7 @@ async function handleDeepLink(url: string): Promise<void> {
 
     await vaultStore.completeOfficialSyncAuthorization(url);
     activeManagementPage.value = null;
-    activeDrawer.value = "sync";
+    activeDrawer.value = null;
     vaultStore.clearOfficialLoginState();
     showToast(t("sync.connectSuccess"));
     scheduleAutoSync("device-bound", 250);
@@ -1154,12 +1289,23 @@ async function changeShortcut(payload: {
   shortcut: string;
 }): Promise<void> {
   await vaultStore.setShortcut(payload.scope, payload.action, payload.shortcut);
-  showToast(t("toast.settingsSaved"));
+  const registered =
+    payload.scope !== "global" || (await refreshGlobalShortcuts(false));
+  showToast(
+    registered
+      ? t("toast.settingsSaved")
+      : t("shortcuts.registrationFailed"),
+  );
 }
 
 async function resetShortcuts(): Promise<void> {
   await vaultStore.resetShortcuts();
-  showToast(t("shortcuts.defaultsRestored"));
+  const registered = await refreshGlobalShortcuts(false);
+  showToast(
+    registered
+      ? t("shortcuts.defaultsRestored")
+      : t("shortcuts.registrationFailed"),
+  );
 }
 
 async function openDesktopLogDir(): Promise<void> {
@@ -1183,11 +1329,31 @@ async function openUserWebApp(): Promise<void> {
   }
 }
 
+async function handleDesktopQuickSearchCopy(
+  request: DesktopQuickSearchCopyRequest,
+): Promise<void> {
+  if (!vaultStore.unlocked) return;
+  const item = request.itemId
+    ? visibleItems.value.find((candidate) => candidate.id === request.itemId)
+    : null;
+  if (item) selectItem(item);
+  await copyValue(request.value, t(`toast.${request.message}`));
+}
+
+async function copyQuickDetailValue(
+  value: string,
+  item: VaultItem,
+): Promise<void> {
+  selectItem(item);
+  activeModal.value = null;
+  await copyValue(value);
+}
+
 function selectQuickResult(item: VaultItem): void {
   selectItem(item);
   activeModal.value = null;
   copyValue(
-    item.fields.find((field) => field.kind === "password")?.value ?? item.title,
+    quickSearchItemCopyValue(item),
     t("toast.copiedPassword"),
   );
 }
@@ -1198,7 +1364,7 @@ function handleInternalShortcut(event: KeyboardEvent): void {
   const shortcuts = vaultStore.settings.shortcuts.internal;
   if (shortcutMatchesEvent(shortcuts.quickSearch, event)) {
     event.preventDefault();
-    openQuickSearch();
+    void openQuickSearch();
     return;
   }
   if (shortcutMatchesEvent(shortcuts.lock, event)) {

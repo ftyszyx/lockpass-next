@@ -14,6 +14,7 @@ import {
 import { PasswordInput } from "@lockpass/ui";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { configuredOfficialApiUrl } from "@/services/appConfig";
 import type { SyncMode } from "@/services/syncClient";
 import type { UserDraft } from "../types";
 
@@ -54,6 +55,15 @@ const showSelfhostDialog = ref(false);
 const selfhostHelpOpen = ref(false);
 const selfhostUrlDraft = ref("");
 const selfhostUrlError = ref(false);
+const officialServerOptionLabel = computed(
+  () => `${t("sync.officialHosted")} · ${configuredOfficialApiUrl()}`,
+);
+const selfHostedServerOptionLabel = computed(() => {
+  const serverUrl = props.serverUrl.trim();
+  return serverUrl
+    ? `${t("sync.selfHosted")} · ${serverUrl}`
+    : t("sync.selfHosted");
+});
 const serverSetupDone = computed(
   () => !props.serverFirst || props.serverConnected,
 );
@@ -230,8 +240,8 @@ function saveSelfhostUrl(): void {
               :disabled="serverBusy"
               @change="updateServerMode"
             >
-              <option value="official">{{ t("sync.officialHosted") }}</option>
-              <option value="selfhost">{{ t("sync.selfHosted") }}</option>
+              <option value="official">{{ officialServerOptionLabel }}</option>
+              <option value="selfhost">{{ selfHostedServerOptionLabel }}</option>
             </select>
           </label>
           <div class="grid gap-2">

@@ -6,6 +6,7 @@ import {
   type VaultItemType,
 } from "@lockpass/core";
 import { reactive, ref, type Ref } from "vue";
+import { fieldsWithoutRedundantLegacyNote } from "@/services/legacyImportRepair";
 import { saveAttachmentFile } from "@/services/vaultRepository";
 import type { AttachmentDraft, SaveItemPayload } from "@/stores/vault/types";
 import {
@@ -130,7 +131,10 @@ export function useItemEditor(input: UseItemEditorInput) {
     const urlFields = item.urls.map((url) =>
       makeDraftField(input.t, "url", url, false, input.t("fields.url")),
     );
-    const draftFields = [...urlFields, ...item.fields].map((field) => ({
+    const draftFields = [
+      ...urlFields,
+      ...fieldsWithoutRedundantLegacyNote(item),
+    ].map((field) => ({
       ...field,
     }));
     const attachmentDrafts = input.selectedItemAttachments.value.map(

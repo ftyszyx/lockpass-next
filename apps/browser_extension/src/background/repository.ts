@@ -29,7 +29,7 @@ export async function loadPanelState(): Promise<ExtensionPanelState> {
     loadSessionState(),
     hasSiteAccess(),
     persistent.account
-      ? hasTrustedSecretKey(persistent.account.id).catch(() => false)
+      ? hasTrustedSecretKey(persistent.account.serverUrl, persistent.account.id).catch(() => false)
       : Promise.resolve(false)
   ])
 
@@ -95,7 +95,11 @@ export async function loadOrCreateClientDeviceId(): Promise<string> {
 
 export async function saveDeviceAuthorization(authorization: ExtensionDeviceAuthorization): Promise<void> {
   const persistent = await loadPersistentState()
-  await saveEncryptedDeviceToken(authorization.account.id, authorization.deviceToken)
+  await saveEncryptedDeviceToken(
+    authorization.serverUrl,
+    authorization.account.id,
+    authorization.deviceToken
+  )
   await chrome.storage.local.set({
     [PERSISTENT_STATE_KEY]: {
       ...persistent,

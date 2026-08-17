@@ -6,6 +6,7 @@ import { vaultItemIconText } from './vaultFormatters'
 const props = defineProps<{
   item: VaultItem
   typeLabel: string
+  contextLabel?: string
   selected?: boolean
 }>()
 
@@ -24,7 +25,9 @@ const emit = defineEmits<{
     <span class="lp-vault-item-icon">{{ vaultItemIconText(item) }}</span>
     <span class="lp-vault-item-copy">
       <strong>{{ item.title }}</strong>
-      <small>{{ item.subtitle || typeLabel }}</small>
+      <small :title="contextLabel || undefined">
+        {{ item.subtitle || typeLabel }}<template v-if="contextLabel"> · {{ contextLabel }}</template>
+      </small>
     </span>
     <span class="lp-vault-item-actions">
       <span v-if="item.attachmentIds.length" class="lp-vault-item-attachment">

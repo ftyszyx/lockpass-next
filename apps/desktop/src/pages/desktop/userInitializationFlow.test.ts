@@ -123,8 +123,13 @@ assert.match(
 );
 assert.match(
   vaultStore,
-  /withServerAccountSetupLock\(input\.exchange\.account\.id, '(?:create|restore)'/,
+  /withServerAccountSetupLock\(input\.exchange\.serverUrl, input\.exchange\.account\.id, '(?:create|restore)'/,
   "server account setup should serialize repeated callbacks",
+);
+assert.match(
+  vaultStore,
+  /serverAccountLocalUserId\([\s\S]*input\.exchange\.serverUrl,[\s\S]*input\.exchange\.account\.id/,
+  "server accounts should use a server-scoped local user id",
 );
 assert.match(
   vaultStore,

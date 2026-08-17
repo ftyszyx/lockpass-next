@@ -39,6 +39,10 @@ interface UserSessionStore {
     password: string;
     secretKey: string;
     sync: Pick<SyncConnectPayload, "mode" | "serverUrl">;
+    serverAccount?: {
+      serverUrl: string;
+      accountId: string;
+    };
   }): Promise<{
     secretKeyStorage: "saved" | "unsupported" | "failed";
   }>;
@@ -279,6 +283,12 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
           mode: setupServerMode.value,
           serverUrl: setupServerUrl.value,
         },
+        serverAccount: pendingServerExchange.value
+          ? {
+              serverUrl: pendingServerExchange.value.serverUrl,
+              accountId: pendingServerExchange.value.account.id,
+            }
+          : undefined,
       });
       if (pendingServerExchange.value) {
         await input.vaultStore.applyPendingServerAccountExchange(
