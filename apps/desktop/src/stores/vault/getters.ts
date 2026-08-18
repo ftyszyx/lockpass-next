@@ -4,6 +4,19 @@ import { vaultItemMatchesListFilters } from './searchFilters'
 import type { VaultStoreState } from './state'
 import { uniqueById } from './syncObjects'
 
+export function countVisibleVaultItems(state: Pick<VaultStoreState, 'vaults' | 'vaultItemCounts'>): number {
+  const visibleVaultIds = new Set(
+    uniqueById(state.vaults)
+      .filter((vault) => !vault.sync.deletedAt)
+      .map((vault) => vault.id),
+  )
+
+  return Object.entries(state.vaultItemCounts).reduce(
+    (total, [vaultId, count]) => total + (visibleVaultIds.has(vaultId) ? count : 0),
+    0,
+  )
+}
+
 export const vaultGetters = {
   hasUsers: (state: VaultStoreState) => state.users.length > 0,
   activeUser: (state: VaultStoreState) => {
@@ -67,7 +80,7 @@ export const vaultGetters = {
   },
   vaultCount: (state: VaultStoreState) => {
     return (vaultId: string | 'all') => {
-      if (vaultId === 'all') return Object.values(state.vaultItemCounts).reduce((total, count) => total + count, 0)
+      if (vaultId === 'all') return countVisibleVaultItems(state)
       return state.vaultItemCounts[vaultId] ?? 0
     }
   }
