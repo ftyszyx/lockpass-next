@@ -700,6 +700,7 @@ const enUS: LocaleMessages = {
     title: "Unlock vault",
     accountPickerTitle: "Choose local account",
     accountSelectLabel: "Account",
+    addAccount: "Add another account",
     backToAccounts: "Back to accounts",
     body: "Enter your master password. Trusted devices read the Secret Key from OS secure storage.",
     fastUnlockBody:

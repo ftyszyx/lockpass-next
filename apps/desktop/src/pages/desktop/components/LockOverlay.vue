@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ArrowLeft, ShieldCheck, Unlock } from "@lucide/vue";
+import { ArrowLeft, Unlock, UserPlus } from "@lucide/vue";
 import { PasswordInput } from "@lockpass/ui";
 import { nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import type { DesktopUserProfile } from "@/services/vaultRepository";
 import { useVaultStore } from "@/stores/vault";
 
 const props = defineProps<{
@@ -19,6 +20,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   unlock: [];
   unlockSelectedUser: [userId: string];
+  addAccount: [];
   useSavedSecretKey: [];
   clearAuthError: [];
   "update:password": [value: string];
@@ -105,20 +107,9 @@ function continueToUnlock(): void {
   if (selectedUserId.value) emit("unlockSelectedUser", selectedUserId.value);
 }
 
-function userLoginLabel(user: {
-  displayName: string;
-  username: string;
-  sync?: {
-    mode: string;
-    accountLabel: string | null;
-    serverUrl: string;
-  } | null;
-}): string {
+function userLoginLabel(user: DesktopUserProfile): string {
   const account = user.sync?.accountLabel || user.displayName || user.username;
-  const server =
-    user.sync?.mode === "official"
-      ? t("sync.officialHosted")
-      : user.sync?.serverUrl.replace(/^https?:\/\//i, "").replace(/\/$/, "");
+  const server = user.sync?.serverUrl || t("system.serverUrlNotConfigured");
   return server ? `${account} · ${server}` : account;
 }
 
@@ -143,8 +134,6 @@ function submitUnlock(): void {
       class="auth-panel grid w-[420px] max-w-[94vw] gap-4 rounded-lg border p-6"
       @submit.prevent="submitUnlock"
     >
-      <span class="auth-mark" aria-hidden="true"><ShieldCheck class="size-5" /></span>
-
       <div v-if="unlockStep === 'account'" class="grid gap-3">
         <div class="grid gap-1">
           <h2 class="auth-heading">
@@ -176,6 +165,15 @@ function submitUnlock(): void {
         >
           <Unlock class="size-4" />
           {{ unlocking ? t("lock.unlocking") : t("app.unlock") }}
+        </button>
+        <button
+          class="plain-button justify-center"
+          type="button"
+          :disabled="unlocking"
+          @click="emit('addAccount')"
+        >
+          <UserPlus class="size-4" />
+          {{ t("lock.addAccount") }}
         </button>
       </div>
       <div v-else-if="unlockStep === 'secretKey'" class="grid gap-3">
@@ -228,13 +226,14 @@ function submitUnlock(): void {
             >
           </div>
           <button
-            class="icon-button"
+            class="plain-button shrink-0 px-2.5"
             type="button"
             :title="t('lock.backToAccounts')"
             :aria-label="t('lock.backToAccounts')"
             @click="unlockStep = 'account'"
           >
             <ArrowLeft class="size-4" />
+            {{ t("lock.backToAccounts") }}
           </button>
         </div>
         <div class="grid gap-1">

@@ -18,16 +18,23 @@ function userDisplayName(user: { displayName: string; username: string }): strin
 
 function userAccountLabel(user: {
   username: string
-  sync?: { accountLabel: string | null; serverUrl: string } | null
+  sync?: { accountLabel: string | null } | null
 }): string {
-  const accountLabel = user.sync?.accountLabel || user.username
-  if (!user.sync?.serverUrl || !user.sync.accountLabel) return accountLabel
+  return user.sync?.accountLabel || user.username
+}
 
-  try {
-    return `${accountLabel} · ${new URL(user.sync.serverUrl).host}`
-  } catch {
-    return `${accountLabel} · ${user.sync.serverUrl}`
-  }
+function shouldShowAccountLabel(user: {
+  displayName: string
+  username: string
+  sync?: { accountLabel: string | null } | null
+}): boolean {
+  return userAccountLabel(user) !== userDisplayName(user)
+}
+
+function userServerUrl(user: {
+  sync?: { serverUrl: string } | null
+}): string {
+  return user.sync?.serverUrl.trim() || t('system.serverUrlNotConfigured')
 }
 
 function userInitial(user: { displayName: string; username: string }): string {
@@ -50,7 +57,7 @@ function userInitial(user: { displayName: string; username: string }): string {
         <button
           v-for="user in vaultStore.users"
           :key="user.id"
-          class="grid min-h-16 w-full grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-3 text-left hover:bg-teal-50"
+          class="grid min-h-[72px] w-full grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-teal-50"
           :class="{ 'bg-blue-50 hover:bg-blue-50': user.id === vaultStore.activeUserId }"
           type="button"
           @click="emit('switchUser', user.id)"
@@ -58,7 +65,13 @@ function userInitial(user: { displayName: string; username: string }): string {
           <span class="grid size-10 place-items-center rounded-lg bg-slate-900 text-sm font-black text-white">{{ userInitial(user) }}</span>
           <span class="min-w-0">
             <strong class="block truncate text-sm text-slate-950">{{ userDisplayName(user) }}</strong>
-            <small class="block truncate text-sm text-slate-500">{{ userAccountLabel(user) }}</small>
+            <small v-if="shouldShowAccountLabel(user)" class="block truncate text-sm text-slate-500">
+              {{ userAccountLabel(user) }}
+            </small>
+            <small class="flex min-w-0 items-center gap-1 text-xs text-slate-500">
+              <span class="shrink-0">{{ t('sync.serverUrl') }}:</span>
+              <span class="truncate" :title="userServerUrl(user)">{{ userServerUrl(user) }}</span>
+            </small>
           </span>
           <Check v-if="user.id === vaultStore.activeUserId" class="size-4 text-teal-700" />
           <ChevronRight v-else class="size-4 text-slate-500" />

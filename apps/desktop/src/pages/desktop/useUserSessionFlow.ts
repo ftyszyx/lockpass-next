@@ -357,6 +357,10 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
     openAddUser({ returnToUserManagement: true });
   }
 
+  function openAddUserFromLock(): void {
+    openAddUser();
+  }
+
   async function signOutCurrentUser(payload: {
     deleteLocalData: boolean;
   }): Promise<void> {
@@ -450,6 +454,7 @@ export function useUserSessionFlow(input: UseUserSessionFlowInput) {
     fullUnlockRequired,
     hasLegacyImport,
     openAddUser,
+    openAddUserFromLock,
     openAddUserFromManagement,
     openUserManagement,
     pendingServerExchange,

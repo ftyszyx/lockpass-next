@@ -4,7 +4,6 @@ import {
   LogIn,
   LogOut,
   RefreshCw,
-  ShieldCheck,
   X,
 } from "@lucide/vue";
 import { computed, ref, watch } from "vue";
@@ -227,10 +226,6 @@ function syncErrorMessageKey(error: unknown): string {
       >
         <X class="size-4" />
       </button>
-
-      <span class="auth-mark" aria-hidden="true">
-        <ShieldCheck class="size-5" />
-      </span>
 
       <h2 id="server-account-title" class="auth-heading pr-10">
         {{ t("sync.title") }}

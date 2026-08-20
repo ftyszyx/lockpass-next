@@ -332,12 +332,6 @@ select {
     box-shadow: var(--app-shadow-lg);
   }
 
-  .auth-mark {
-    @apply grid size-10 shrink-0 place-items-center rounded-md;
-    background: var(--app-primary-soft);
-    color: var(--app-primary-text);
-  }
-
   .auth-copy {
     color: var(--app-muted);
   }

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import type { VaultItemField } from "@lockpass/core";
 import {
   DEFAULT_SYNC_SETTINGS,
+  backupSyncSettings,
   buildSubtitle,
   normalizeLayout,
   normalizeLoggingSettings,
@@ -60,7 +61,7 @@ const selfhostSync = normalizeSyncSettings({
   mode: "selfhost",
   serverUrl: "http://127.0.0.1:1480",
 });
-assert.equal(selfhostSync.serverUrl, "");
+assert.equal(selfhostSync.serverUrl, "http://127.0.0.1:1480");
 
 const connectedSelfhostSync = normalizeSyncSettings({
   mode: "selfhost",
@@ -68,6 +69,27 @@ const connectedSelfhostSync = normalizeSyncSettings({
   accountId: "account-one",
 });
 assert.equal(connectedSelfhostSync.serverUrl, "http://127.0.0.1:1480");
+
+const storedOfficialSync = normalizeSyncSettings({
+  mode: "official",
+  serverUrl: "https://old-api.example.com",
+});
+assert.equal(storedOfficialSync.serverUrl, "https://old-api.example.com");
+
+const backupSync = backupSyncSettings({
+  mode: "selfhost",
+  serverUrl: "https://vault.example.com",
+  accountId: "account-one",
+  accountLabel: "person@example.com",
+  deviceId: "device-one",
+  syncSpaceId: "space-one",
+  cursor: 42,
+});
+assert.equal(backupSync.serverUrl, "https://vault.example.com");
+assert.equal(backupSync.accountId, null);
+assert.equal(backupSync.deviceId, null);
+assert.equal(backupSync.syncSpaceId, null);
+assert.equal(backupSync.cursor, 0);
 
 assert.equal(
   buildSubtitle("login", [usernameField, urlField], [], "", "en-US"),

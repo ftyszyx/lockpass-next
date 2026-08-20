@@ -20,6 +20,11 @@ assert.match(
   /@add-user="page\.openAddUserFromManagement"/,
   "DesktopVaultModalLayer should route add-account events through page context",
 );
+assert.match(
+  modalLayerSource,
+  /@add-account="page\.openAddUserFromLock"/,
+  "DesktopVaultModalLayer should route locked add-account events through page context",
+);
 
 const itemEditorBindings =
   pageSource.match(/const\s*{([\s\S]*?)}\s*=\s*useItemEditor\(/)?.[1] ?? "";
@@ -42,6 +47,11 @@ assert.match(
   providedContext,
   /\bopenAddUserFromManagement\b/,
   "DesktopVaultPage should provide openAddUserFromManagement to modal components",
+);
+assert.match(
+  providedContext,
+  /\bopenAddUserFromLock\b/,
+  "DesktopVaultPage should provide openAddUserFromLock to modal components",
 );
 
 console.log("desktopPageContext tests passed");

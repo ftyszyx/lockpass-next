@@ -28,8 +28,7 @@ const activeUser = computed(() => vaultStore.activeUser)
 const accountLabel = computed(() => activeUser.value?.sync?.accountLabel || activeUser.value?.displayName || activeUser.value?.username || '')
 const serverLabel = computed(() => {
   const sync = activeUser.value?.sync ?? vaultStore.settings.sync
-  if (sync.mode === 'official') return t('sync.officialHosted')
-  return sync.serverUrl.replace(/^https?:\/\//i, '').replace(/\/$/, '')
+  return sync.serverUrl || t('settings.accountDetailUnavailable')
 })
 const maskedSecretKey = computed(() => props.revealedSecretKey ? '••••••••••••••••' : '')
 

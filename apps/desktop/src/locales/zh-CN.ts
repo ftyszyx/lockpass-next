@@ -647,6 +647,7 @@ const zhCN = {
     title: "解锁保险库",
     accountPickerTitle: "选择本机账号",
     accountSelectLabel: "账号",
+    addAccount: "添加其他账号",
     backToAccounts: "返回账号选择",
     body: "输入主密码。受信任设备会从系统安全存储读取安全密钥。",
     fastUnlockBody: "输入主密码后，使用本机保存的安全密钥快速解锁。",

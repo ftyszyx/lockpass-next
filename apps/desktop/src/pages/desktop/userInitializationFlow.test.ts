@@ -28,20 +28,25 @@ assert.match(
   /props\.secretKeyRequired[\s\S]*unlockStep\.value = "secretKey"/,
   "manual Secret Key entry should only open after a Secret Key is required",
 );
-assert.doesNotMatch(
+assert.match(
   lockOverlay,
-  /manageUsers|manage-users|t\("user\.manageUsers"\)/,
-  "the locked account picker should only allow unlock",
+  /emit\('addAccount'\)[\s\S]*t\("lock\.addAccount"\)/,
+  "the locked account picker should provide an entry for another account",
 );
 assert.match(
   lockOverlay,
   /emit\("unlockSelectedUser", selectedUserId\.value\)/,
   "the account picker should select the account before requesting its master password",
 );
-assert.doesNotMatch(
-  lockOverlay,
-  /createNewUser|createNewAccount/,
-  "the lock screen should not bypass account management to create an account",
+assert.match(
+  modalLayer,
+  /@add-account="page\.openAddUserFromLock"/,
+  "the add-account entry should open the existing account setup flow",
+);
+assert.match(
+  modalLayer,
+  /<UserSetupModal[\s\S]*@close="page\.closeUserSetup"/,
+  "closing account setup should restore its previous screen",
 );
 
 assert.match(

@@ -43,7 +43,6 @@ export const DEFAULT_SECURITY_SETTINGS: DesktopSecuritySettings = {
   autoLockOnLimit: true,
   autoLockDelaySeconds: 300,
 };
-export const LEGACY_DEFAULT_SELF_HOST_SYNC_SERVER_URL = "http://127.0.0.1:1480";
 export const DEFAULT_SYNC_SETTINGS: DesktopSyncSettings = {
   mode: "official",
   serverUrl: "",
@@ -165,8 +164,19 @@ export function backupUserProfile(
 
   return {
     ...user,
-    sync: { ...DEFAULT_SYNC_SETTINGS },
+    sync: backupSyncSettings(user.sync),
     crypto: cryptoConfig,
+  };
+}
+
+export function backupSyncSettings(
+  sync: Partial<DesktopSyncSettings> | null | undefined,
+): DesktopSyncSettings {
+  const normalized = normalizeSyncSettings(sync);
+  return {
+    ...DEFAULT_SYNC_SETTINGS,
+    mode: normalized.mode,
+    serverUrl: normalized.serverUrl,
   };
 }
 
@@ -270,17 +280,12 @@ export function normalizeSyncSettings(
     sync?.mode === "official" || sync?.mode === "selfhost"
       ? sync.mode
       : DEFAULT_SYNC_SETTINGS.mode;
-  const normalizedSelfHostUrl = normalizeSyncServerUrl(sync?.serverUrl ?? "");
-  const selfHostServerUrl =
-    normalizedSelfHostUrl === LEGACY_DEFAULT_SELF_HOST_SYNC_SERVER_URL &&
-    !sync?.accountId &&
-    !sync?.deviceId
-      ? ""
-      : normalizedSelfHostUrl;
+  const normalizedServerUrl = normalizeSyncServerUrl(sync?.serverUrl ?? "");
   return {
     mode,
     serverUrl:
-      mode === "official" ? configuredOfficialApiUrl() : selfHostServerUrl,
+      normalizedServerUrl ||
+      (mode === "official" ? configuredOfficialApiUrl() : ""),
     syncSpaceId:
       typeof sync?.syncSpaceId === "string" && sync.syncSpaceId
         ? sync.syncSpaceId

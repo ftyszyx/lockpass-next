@@ -1,6 +1,6 @@
 [package]
 name = "lockpass-next-desktop"
-version = "0.0.111"
+version = "0.0.112"
 description = "LockPass desktop application"
 authors = ["LockPass"]
 license = ""

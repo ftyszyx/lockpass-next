@@ -3,10 +3,8 @@ import {
   ArrowLeft,
   Check,
   CircleHelp,
-  KeyRound,
   LogIn,
   Save,
-  ShieldCheck,
   Unlock,
   UserPlus,
   X,
@@ -223,8 +221,6 @@ function saveSelfhostUrl(): void {
         <X class="size-4" />
       </button>
 
-      <span class="auth-mark" aria-hidden="true"><ShieldCheck class="size-5" /></span>
-
       <div v-if="showServerStep" class="grid gap-4">
         <div class="grid gap-1">
           <h2 class="auth-heading">
@@ -405,10 +401,6 @@ function saveSelfhostUrl(): void {
           <ArrowLeft class="size-4" />
           {{ t("user.backToPrevious") }}
         </button>
-        <span
-          class="inline-flex size-10 items-center justify-center rounded-lg bg-teal-50 text-teal-800"
-          ><KeyRound class="size-5"
-        /></span>
         <div class="grid gap-1">
           <h2 class="auth-heading">
             {{ t("user.secretKeySaveTitle") }}

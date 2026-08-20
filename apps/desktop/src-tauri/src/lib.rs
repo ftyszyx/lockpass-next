@@ -1901,24 +1901,7 @@ fn save_user_sync_settings(
     sync: &serde_json::Value,
     updated_at: &str,
 ) -> Result<(), String> {
-    if sync.is_null() {
-        conn.execute("delete from sync_settings where id = 'default'", [])
-            .map_err(|error| format!("failed to clear user sync settings: {error}"))?;
-        return Ok(());
-    }
-
-    let mode = sync
-        .get("mode")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or("official");
-    if !matches!(mode, "official" | "selfhost") {
-        return Err("invalid sync settings mode".to_string());
-    }
-
-    let server_url = sync
-        .get("serverUrl")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or_default();
+    let (mode, server_url) = validate_user_sync_settings(sync)?;
     let cursor = sync
         .get("cursor")
         .and_then(serde_json::Value::as_i64)
@@ -2514,6 +2497,11 @@ fn validate_vault_store(data: &serde_json::Value) -> Result<(), String> {
             return Err("user profile must not contain plaintext vault data".to_string());
         }
 
+        let sync = user
+            .get("sync")
+            .ok_or_else(|| format!("user profile missing sync settings: {user_id}"))?;
+        validate_user_sync_settings(sync)?;
+
         let Some(crypto) = user.get("crypto") else {
             continue;
         };
@@ -2560,6 +2548,34 @@ fn validate_vault_store(data: &serde_json::Value) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+fn validate_user_sync_settings(sync: &serde_json::Value) -> Result<(&str, &str), String> {
+    if sync.is_null() {
+        return Err("user profile sync settings are required".to_string());
+    }
+
+    let mode = sync
+        .get("mode")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "user profile sync mode is required".to_string())?;
+    if !matches!(mode, "official" | "selfhost") {
+        return Err("invalid sync settings mode".to_string());
+    }
+
+    let server_url = sync
+        .get("serverUrl")
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "user profile sync serverUrl is required".to_string())?;
+    let parsed = tauri::Url::parse(server_url)
+        .map_err(|_| "user profile sync serverUrl must be a valid HTTP(S) URL".to_string())?;
+    if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
+        return Err("user profile sync serverUrl must be a valid HTTP(S) URL".to_string());
+    }
+
+    Ok((mode, server_url))
 }
 
 fn contains_forbidden_plaintext_key(value: &serde_json::Value) -> bool {
@@ -2955,6 +2971,42 @@ mod tests {
     }
 
     #[test]
+    fn vault_store_rejects_user_without_sync_settings() {
+        let mut store =
+            vault_store_with_fast_unlock(encrypted_envelope("device-wrap-vault-key-v1"));
+        store["users"][0]
+            .as_object_mut()
+            .expect("user should be an object")
+            .remove("sync");
+
+        let error =
+            validate_vault_store(&store).expect_err("a persisted user must have sync settings");
+        assert!(error.contains("missing sync settings"));
+    }
+
+    #[test]
+    fn vault_store_rejects_user_without_sync_server_url() {
+        let mut store =
+            vault_store_with_fast_unlock(encrypted_envelope("device-wrap-vault-key-v1"));
+        store["users"][0]["sync"]["serverUrl"] = json!("  ");
+
+        let error =
+            validate_vault_store(&store).expect_err("a persisted user must have a sync server URL");
+        assert!(error.contains("serverUrl is required"));
+    }
+
+    #[test]
+    fn vault_store_rejects_non_http_sync_server_url() {
+        let mut store =
+            vault_store_with_fast_unlock(encrypted_envelope("device-wrap-vault-key-v1"));
+        store["users"][0]["sync"]["serverUrl"] = json!("file:///tmp/lockpass");
+
+        let error = validate_vault_store(&store)
+            .expect_err("a persisted user must use an HTTP(S) sync server URL");
+        assert!(error.contains("valid HTTP(S) URL"));
+    }
+
+    #[test]
     fn vault_store_rejects_device_unlock_key_plaintext() {
         let mut store = vault_store_with_fast_unlock(json!({
             "version": 1,
@@ -3073,6 +3125,17 @@ mod tests {
                     "displayName": "User 1",
                     "createdAt": "2026-01-01T00:00:00.000Z",
                     "updatedAt": "2026-01-01T00:00:00.000Z",
+                    "sync": {
+                        "mode": "official",
+                        "serverUrl": "https://api.lockpass.cn",
+                        "syncSpaceId": null,
+                        "accountId": null,
+                        "accountLabel": null,
+                        "deviceId": null,
+                        "cursor": 0,
+                        "connectedAt": null,
+                        "lastSyncAt": null
+                    },
                     "crypto": {
                         "keyId": "key-1",
                         "kdfParams": {

@@ -20,6 +20,8 @@ export async function ensureSyncSpace(
 }
 
 export function syncServerUrlForSettings(sync: DesktopSyncSettings): string {
+  const storedServerUrl = normalizeSyncServerUrl(sync.serverUrl)
+  if (storedServerUrl) return storedServerUrl
   return sync.mode === 'official'
     ? configuredOfficialApiUrl()
     : requireSelfHostServerUrl(sync.serverUrl)
@@ -63,9 +65,7 @@ export function parseSyncDeviceBindCallback(value: string): SyncDeviceBindCallba
     }
     return {
       ...decoded,
-      serverUrl: decoded.mode === 'official'
-        ? configuredOfficialApiUrl()
-        : normalizeSyncServerUrl(decoded.serverUrl)
+      serverUrl: normalizeSyncServerUrl(decoded.serverUrl)
     }
   } catch (error) {
     if (error instanceof Error && error.message === 'syncOfficialCallbackMismatch') throw error
